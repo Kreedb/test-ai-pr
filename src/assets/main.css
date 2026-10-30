@@ -834,6 +834,97 @@ section[id] {
   word-break: break-all;
 }
 
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field > span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.field input[type='text'],
+.field select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--bg-soft);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.86rem;
+}
+
+.field input[type='text']:focus,
+.field select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.form-section {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.form-section h3 {
+  margin-bottom: 8px;
+}
+
+.check-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: 8px;
+}
+
+.check-grid.disabled {
+  opacity: 0.5;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.84rem;
+}
+
+.check input {
+  accent-color: var(--accent);
+}
+
+.warn-inline {
+  display: block;
+  margin-top: 4px;
+  color: var(--warn);
+}
+
+.roundtrip-ok {
+  margin: 0;
+  color: var(--ok);
+  font-weight: 600;
+}
+
+.roundtrip-diff {
+  margin: 0 0 10px;
+  color: var(--warn);
+}
+
+.xml-preview {
+  min-height: 320px;
+  white-space: pre;
+  overflow: auto;
+}
+
 @media (max-width: 640px) {
   .app-header {
     flex-wrap: wrap;

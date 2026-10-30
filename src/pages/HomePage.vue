@@ -20,11 +20,11 @@ const tools = [
   },
   {
     path: '/xml',
-    tag: 'SII → ESI XML',
-    title: 'ESI XML 生成器',
+    tag: 'SII ⇄ ESI XML',
+    title: 'ESI XML 编辑器',
     description:
-      '从 EEPROM 转储生成 EtherCATInfo XML：编辑设备身份、端口与邮箱配置，并用原始转储做逐字节回归校验。',
-    action: '打开 XML 生成器',
+      '从 EEPROM 转储或已有的 EtherCATInfo XML 出发编辑设备描述：身份、端口、邮箱、超时与 SyncManager 尺寸，并用原始转储做逐字节回归校验。',
+    action: '打开 XML 编辑器',
   },
 ]
 

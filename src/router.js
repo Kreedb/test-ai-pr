@@ -6,7 +6,7 @@ export const routes = [
   { path: '/', label: '首页' },
   { path: '/parser', label: 'EEPROM 解析器' },
   { path: '/generator', label: 'EEPROM 生成器' },
-  { path: '/xml', label: 'ESI XML 生成器' },
+  { path: '/xml', label: 'ESI XML 编辑器' },
 ]
 
 function currentPath() {

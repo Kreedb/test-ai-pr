@@ -30,13 +30,15 @@
 - 生成后展示设备信息、类别布局、提示信息，可下载 `.bin` 或复制十六进制。
 - 示例：`public/samples/limx-tron2.xml` 与 `public/samples/limx-tron2.bin` 是一对真实数据，生成的 bin 与示例逐字节一致。
 
-### ESI XML 生成器（`#/xml`）
+### ESI XML 生成器 / 编辑器（`#/xml`）
 
 - 输入 SII EEPROM 转储（`.bin`、Intel HEX 或十六进制文本），生成对应的 `EtherCATInfo` XML。
-- 可编辑厂商 ID / 名称、产品码、修订号、订货号、设备名称、组、EEPROM 大小、四个端口的 Physics、邮箱协议与 CoE 服务。
+- 也可以直接导入已有的 `EtherCATInfo` XML（拖拽、选择文件或粘贴），把整份设备描述载入编辑器后再修改；含多个 `<Device>` 的文件（例如 Beckhoff SSC 5.13 的 `esi/SlaveStackCode.xml` 带四个设备）可以在页面上切换要编辑的设备。
+- 可编辑厂商 ID / 名称、产品码、修订号、订货号、设备名称、组、EEPROM 大小、`ConfigData` / `BootStrap`、四个端口的 Physics、邮箱协议与 CoE 服务（含 `SegmentedSdo`）、`Info` 里的状态机与邮箱超时、`ProfileNo`，以及两个邮箱 SyncManager 的 `MinSize` / `MaxSize`。
 - 可选择是否输出 FMMU、SyncManager、TxPDO / RxPDO、DC 与 `IdentificationReg134`；也可以从“空白模板”开始，只生成身份信息与 Eeprom 段。
-- 每次生成后会把 XML 重新编译成 SII 镜像，并与原始转储逐字节比对；差异字节会在页面上列出（修改字段后的差异属预期）。
-- 支持复制 XML 与下载 `.xml`。
+- 每次生成后会把 XML 重新编译成 SII 镜像，并与基准逐字节比对：来源是转储时对比原始转储，来源是 ESI 时对比原 ESI 的编译结果。差异字节会在页面上列出（修改字段后的差异属预期）。
+- 支持复制 XML、下载 `.xml`，以及把当前编辑结果编译成 `.bin` 下载。
+- 导入 ESI 时会提示哪些内容无法写入 SII（对象字典、`InitCmd`、`ImageData16x14`、`Slots` / `Modules`、`Exclude`、`SegmentedSdo`）。
 
 ## 输入格式示例
 

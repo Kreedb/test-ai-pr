@@ -37,7 +37,7 @@ const MAILBOX_PROTOCOL_BITS = {
 }
 
 const PORT_TYPE_BY_PHYSICS = {
-  Y: 2, // MII / 100BASE-TX
+  Y: 1, // MII / 100BASE-TX
   E: 3, // EBUS
   K: 4, // Fast Hot Connect
 }
@@ -56,7 +56,7 @@ const FMMU_NAME_BY_USAGE = {
 }
 
 const PORT_PHYSICS_BY_TYPE = {
-  2: 'Y',
+  1: 'Y',
   3: 'E',
   4: 'K',
 }
@@ -386,7 +386,7 @@ function buildPdoCategory(elements, strings, bitSizes, warnings) {
     const smText = element.getAttribute('Sm')
     const syncManager = smText === null || smText.trim() === '' ? 0xff : parseNumber(smText) & 0xff
     const flags =
-      (element.getAttribute('Fixed') === '1' ? 0x0010 : 0x0000) |
+      (flagAttribute(element, 'Fixed') ? 0x0010 : 0x0000) |
       (flagAttribute(indexElement, 'DependOnSlot') ? 0x0200 : 0x0000)
 
     writer.u16(index)
@@ -457,7 +457,7 @@ function buildSyncManagerCategory(smElements, bitsBySm, warnings) {
       control: parseNumber(element.getAttribute('ControlByte')) & 0xff,
       status: 0,
       enable: element.hasAttribute('Enable')
-        ? parseNumber(element.getAttribute('Enable')) & 0xff
+        ? (flagAttribute(element, 'Enable') ? 0x01 : 0x00)
         : 0x01,
       type: (index + 1) & 0xff,
       name: textOf(element),
@@ -520,8 +520,8 @@ function buildGeneralCategory(fields) {
   data[10] = fields.sysmanClass & 0xff
   data[11] = fields.flags & 0xff
   writeU16(data, 12, fields.ebusCurrent)
-  writeU16(data, 14, fields.portsWord)
-  writeU16(data, 16, fields.physicalMemoryAddress)
+  writeU16(data, 14, fields.physicalMemoryAddress)
+  writeU16(data, 16, fields.portsWord)
   return data
 }
 
@@ -610,7 +610,11 @@ export function generateSiiFromEsi(xmlText) {
   }
 
   const physics = (device.getAttribute('Physics') || '').trim()
-  const portType = PORT_TYPE_BY_PHYSICS[physics.charAt(0).toUpperCase()] || 0
+  let portsWord = 0
+  for (let index = 0; index < Math.min(physics.length, 4); index++) {
+    const type = PORT_TYPE_BY_PHYSICS[physics.charAt(index).toUpperCase()] || 0
+    portsWord |= type << (index * 4)
+  }
 
   const eeprom = child(device, 'Eeprom')
   const declaredSize = parseNumber(textOf(child(eeprom, 'ByteSize')))
@@ -692,9 +696,11 @@ export function generateSiiFromEsi(xmlText) {
     sysmanClass: 0,
     flags: generalFlags,
     ebusCurrent: parseNumber(textOf(child(device, 'EbusCurrent'))) & 0xffff,
-    portsWord: portType & 0x0f,
-    // No ESI field maps to this; TwinCAT writes 0x0011 in the reference image.
-    physicalMemoryAddress: 0x0011,
+    portsWord,
+    // The physical-memory-address word is not derived from the ESI. TwinCAT
+    // writes 0x0002 in the reference image; the field is unused unless the
+    // "identification via physical memory" flag is set.
+    physicalMemoryAddress: 0x0002,
   })
 
   const categories = []
@@ -780,6 +786,9 @@ export function generateSiiFromEsi(xmlText) {
 
 function escapeXml(value) {
   return String(value ?? '')
+    // XML 1.0 forbids most C0 control characters; SII strings can carry them
+    // after Latin-1 decoding (for example NUL padding).
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -966,10 +975,20 @@ export function exportEsiXml(result) {
       message: `DS402 通道数 ${general.ds402Channels} 无法在 ESI 中表达，重新生成时为 0。`,
     })
   }
-  if ((general?.ports || []).slice(1).some((type) => type)) {
+  const portTypes = general?.ports || []
+  const firstUnusedPort = portTypes.findIndex((type) => !type)
+  if (firstUnusedPort !== -1 && portTypes.slice(firstUnusedPort).some((type) => type)) {
     warnings.push({
       level: 'info',
-      message: 'SII 端口 1-3 的类型无法写入 ESI 的 Physics 属性，重新生成时只保留端口 0。',
+      message: 'SII 端口类型在未使用端口之后仍有定义，ESI 的 Physics 属性无法表达这种间隔。',
+    })
+  }
+  if (general && general.physicalMemoryAddress !== null && general.physicalMemoryAddress !== 0x0002) {
+    warnings.push({
+      level: 'info',
+      message: `General 类别的物理内存地址 0x${Number(general.physicalMemoryAddress ?? 0)
+        .toString(16)
+        .toUpperCase()} 无法写入 ESI，重新生成时为 0x0002。`,
     })
   }
   if ((general?.flags ?? 0) & 0x01) {

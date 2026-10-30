@@ -430,7 +430,7 @@ function parseGeneral(data, warnings) {
   const u16 = (index) => (index + 1 < data.length ? readU16(data, index) : null)
   const i16 = (index) => (index + 1 < data.length ? readI16(data, index) : null)
 
-  const portsWord = u16(14)
+  const portsWord = u16(16)
   return {
     groupStringIndex: at(0),
     imageStringIndex: at(1),
@@ -447,7 +447,7 @@ function parseGeneral(data, warnings) {
     ebusCurrent: i16(12),
     portsWord,
     ports: portsWord === null ? null : decodePorts(portsWord),
-    physicalMemoryAddress: u16(16),
+    physicalMemoryAddress: u16(14),
     raw: Array.from(data),
   }
 }

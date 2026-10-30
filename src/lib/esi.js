@@ -386,9 +386,8 @@ function deriveBootStrap(syncManagers) {
   return out
 }
 
-// ESI PDO attributes map onto the SII PDO flag word (ETG.1000.6 Table 21,
-// the bits listed in PDO_FLAG_BITS): 0x0001 Mandatory, 0x0010 Fixed content,
-// 0x0200 Depend on slot.
+// ESI PDO attributes map onto the SII PDO flag word, using the bits named in
+// PDO_FLAG_BITS: 0x0001 Mandatory, 0x0010 Fixed content, 0x0200 Depend on slot.
 function pdoFlags(pdoElement, indexElement) {
   return (
     (flagAttribute(pdoElement, 'Mandatory') ? 0x0001 : 0x0000) |
@@ -754,16 +753,29 @@ export function parseEsiXml(xmlText, options = {}) {
     : ''
 
   const bitSizes = collectBitSizes(device)
+  const txPdos = children(device, 'TxPdo').map((element) => readEsiPdo(element, bitSizes, warnings))
+  const rxPdos = children(device, 'RxPdo').map((element) => readEsiPdo(element, bitSizes, warnings))
+
+  // Mirror the compiler's fallback chain for the SyncManager length:
+  // DefaultSize, then the bits of the PDOs mapped onto it, then MinSize.
+  const bitsBySm = new Map()
+  for (const pdo of [...txPdos, ...rxPdos]) {
+    if (pdo.syncManager === 0xff) continue
+    bitsBySm.set(pdo.syncManager, (bitsBySm.get(pdo.syncManager) || 0) + pdo.totalBits)
+  }
+
   const syncManagers = children(device, 'Sm').map((element, index) => {
     const minSize = element.hasAttribute('MinSize') ? parseNumber(element.getAttribute('MinSize')) : null
     const maxSize = element.hasAttribute('MaxSize') ? parseNumber(element.getAttribute('MaxSize')) : null
     const defaultSize = element.hasAttribute('DefaultSize')
       ? parseNumber(element.getAttribute('DefaultSize'))
       : null
+    const mappedBits = bitsBySm.get(index)
+    const derivedSize = mappedBits === undefined ? null : Math.ceil(mappedBits / 8)
     return {
       index,
       startAddress: parseNumber(element.getAttribute('StartAddress')) & 0xffff,
-      length: (defaultSize ?? minSize ?? 0) & 0xffff,
+      length: (defaultSize ?? derivedSize ?? minSize ?? 0) & 0xffff,
       control: parseNumber(element.getAttribute('ControlByte')) & 0xff,
       enable: element.hasAttribute('Enable') ? (flagAttribute(element, 'Enable') ? 0x01 : 0x00) : 0x01,
       minSize,
@@ -791,43 +803,48 @@ export function parseEsiXml(xmlText, options = {}) {
 
   const profileNo = parseNumber(textOf(child(child(device, 'Profile'), 'ProfileNo'))) || null
 
+  // Count only what this device description loses, not the whole file: a
+  // multi-device ESI would otherwise report the other devices' content too.
   const dropped = {
-    objects: countElements(root, 'Object'),
-    initCommands: countElements(root, 'InitCmd'),
-    images: countElements(root, 'ImageData16x14'),
-    slots: countElements(root, 'Slot'),
-    modules: countElements(root, 'Module'),
-    excludes: countElements(root, 'Exclude'),
+    objects: countElements(device, 'Object'),
+    initCommands: countElements(device, 'InitCmd'),
+    images: countElements(device, 'ImageData16x14'),
+    slots: countElements(device, 'Slot'),
+    modules: children(child(descriptions, 'Modules'), 'Module').length,
+    excludes: countElements(device, 'Exclude'),
   }
 
   if (dropped.objects) {
     warnings.push({
       level: 'info',
-      message: `ESI 中的 ${dropped.objects} 个对象字典条目（Profile/Dictionary）无法写入 SII，重新生成时会被丢弃。`,
+      message: `该设备描述中的 ${dropped.objects} 个对象字典条目（Profile/Dictionary）无法写入 SII，重新生成时会被丢弃。`,
     })
   }
   if (dropped.initCommands) {
     warnings.push({
       level: 'info',
-      message: `ESI 中的 ${dropped.initCommands} 条 InitCmd（启动命令）无法写入 SII，重新生成时会被丢弃。`,
+      message: `该设备描述中的 ${dropped.initCommands} 条 InitCmd（启动命令）无法写入 SII，重新生成时会被丢弃。`,
     })
   }
   if (dropped.images) {
     warnings.push({
       level: 'info',
-      message: `ESI 中的 ${dropped.images} 张 ImageData16x14 图像无法写入 SII，重新生成时会被丢弃。`,
+      message: `该设备描述中的 ${dropped.images} 张 ImageData16x14 图像无法写入 SII，重新生成时会被丢弃。`,
     })
   }
   if (dropped.slots || dropped.modules) {
+    const parts = []
+    if (dropped.slots) parts.push(`${dropped.slots} 个 Slot`)
+    if (dropped.modules) parts.push(`${dropped.modules} 个 Module`)
     warnings.push({
       level: 'info',
-      message: `ESI 中的槽位定义（${dropped.slots} 个 Slot / ${dropped.modules} 个 Module）无法写入 SII，重新生成时会被丢弃。`,
+      message: `该设备描述中的槽位定义（${parts.join(' / ')}）无法写入 SII，重新生成时会被丢弃。`,
     })
   }
   if (dropped.excludes) {
     warnings.push({
       level: 'info',
-      message: `ESI 中的 ${dropped.excludes} 条 PDO Exclude（互斥分配）无法写入 SII，重新生成时会被丢弃。`,
+      message: `该设备描述中的 ${dropped.excludes} 条 PDO Exclude（互斥分配）无法写入 SII，重新生成时会被丢弃。`,
     })
   }
 
@@ -865,8 +882,8 @@ export function parseEsiXml(xmlText, options = {}) {
     strings: [],
     fmmus,
     syncManagers,
-    txPdos: children(device, 'TxPdo').map((element) => readEsiPdo(element, bitSizes, warnings)),
-    rxPdos: children(device, 'RxPdo').map((element) => readEsiPdo(element, bitSizes, warnings)),
+    txPdos,
+    rxPdos,
     dc: readEsiDc(device),
     categories: [],
     esi: {
@@ -1175,6 +1192,13 @@ function optionValue(options, key, fallback) {
   return value === undefined || value === null ? fallback : value
 }
 
+// Like `optionValue`, but an explicit `null` means "leave this out" rather than
+// "keep the source value": the editor page sends null when a field is cleared.
+function nullableOption(options, key, fallback) {
+  const value = options[key]
+  return value === undefined ? fallback : value
+}
+
 function boolOption(options, key, fallback) {
   const value = options[key]
   return value === undefined || value === null ? fallback : Boolean(value)
@@ -1211,16 +1235,23 @@ export function generateEsiXml(result, options = {}) {
     Boolean(general?.flags & 0x08),
   )
   const physics = optionValue(options, 'physics', physicsForPorts(general?.ports))
-  const includeMailbox = boolOption(options, 'includeMailbox', true)
+  // A device with neither mailbox protocols nor the Mailbox-DLL flag has no
+  // <Mailbox> element, and emitting an empty one would flip General bit 0x04.
+  const sourceHasMailbox = mailboxProtocols !== 0 || Boolean(general?.flags & 0x04)
+  const includeMailbox = boolOption(options, 'includeMailbox', sourceHasMailbox)
   const includeFmmu = boolOption(options, 'includeFmmu', true)
   const includeSyncManagers = boolOption(options, 'includeSyncManagers', true)
   const includePdos = boolOption(options, 'includePdos', true)
   const includeDc = boolOption(options, 'includeDc', true)
-  const stateMachineTimeouts = optionValue(options, 'stateMachineTimeouts', esi.stateMachineTimeouts || null)
-  const mailboxTimeouts = optionValue(options, 'mailboxTimeouts', esi.mailboxTimeouts || null)
-  const profileNo = optionValue(options, 'profileNo', esi.profileNo ?? null)
+  const stateMachineTimeouts = nullableOption(
+    options,
+    'stateMachineTimeouts',
+    esi.stateMachineTimeouts || null,
+  )
+  const mailboxTimeouts = nullableOption(options, 'mailboxTimeouts', esi.mailboxTimeouts || null)
+  const profileNo = nullableOption(options, 'profileNo', esi.profileNo ?? null)
   const coeSegmentedSdo = boolOption(options, 'coeSegmentedSdo', Boolean(esi.coeSegmentedSdo))
-  const syncManagerSizes = optionValue(options, 'syncManagerSizes', esi.syncManagerSizes || null)
+  const syncManagerSizes = nullableOption(options, 'syncManagerSizes', esi.syncManagerSizes || null)
   const configData = optionValue(options, 'configData', esi.configData || hexRange(result.bytes, 0, 10))
   const bootStrap = optionValue(options, 'bootStrap', esi.bootStrap || hexRange(result.bytes, 0x28, 8))
 
@@ -1380,7 +1411,6 @@ export function generateEsiXml(result, options = {}) {
     })
   }
 
-  const sourceHasMailbox = mailboxProtocols !== 0 || Boolean(general?.flags & 0x04)
   if (includeMailbox) {
     push(4, '<Mailbox DataLinkLayer="true">')
     // Mailbox protocol elements follow the ETG.2000 sequence.
@@ -1464,6 +1494,12 @@ export function generateEsiXml(result, options = {}) {
     warnings.push({
       level: 'info',
       message: 'SII 端口类型在未使用端口之后仍有定义，ESI 的 Physics 属性无法表达这种间隔。',
+    })
+  }
+  if (general?.ebusCurrent) {
+    warnings.push({
+      level: 'info',
+      message: `General 类别的 Ebus 电流 ${general.ebusCurrent} mA 未写入 ESI，重新生成时为 0。`,
     })
   }
   if (general && general.physicalMemoryAddress !== null && general.physicalMemoryAddress !== 0x0002) {

@@ -244,7 +244,8 @@ function timeoutGroup(values, fields) {
 }
 
 function smSizeOptions() {
-  const sizes = {}
+  // Keep the sizes of SyncManagers the form does not model (SM2 and up).
+  const sizes = { ...(source.value?.result?.esi?.syncManagerSizes || {}) }
   form.smSizes.forEach((entry, index) => {
     const minSize = numericField(entry.minSize, null)
     const maxSize = numericField(entry.maxSize, null)
@@ -451,6 +452,9 @@ function loadFromText() {
   error.value = ''
   try {
     if (text.startsWith('<') || /<EtherCATInfo[\s>]/.test(text.slice(0, 2048))) {
+      if (text.length > MAX_XML_BYTES) {
+        throw new Error(`XML 内容超过 ${formatBytes(MAX_XML_BYTES)} 限制`)
+      }
       fileName.value = ''
       sampleName.value = ''
       applyEsi(text, '', '')
@@ -494,6 +498,10 @@ async function handleFile(file) {
   try {
     if (file.size > MAX_XML_BYTES) {
       throw new Error(`文件超过 ${formatBytes(MAX_XML_BYTES)} 限制`)
+    }
+    // Only XML may be this large; reject an oversized dump before reading it.
+    if (file.size > MAX_INPUT_BYTES && !/\.xml$|\.esi$/i.test(file.name)) {
+      throw new Error(`文件超过 ${formatBytes(MAX_INPUT_BYTES)} 限制`)
     }
     const bytes = new Uint8Array(await file.arrayBuffer())
     if (looksLikeEsiXml(bytes)) {
@@ -943,7 +951,7 @@ function downloadBin() {
             </div>
           </template>
           <p v-else class="muted small">
-            已从生成的 XML 重新编译出 {{ formatBytes(check.actualLength) }} 的镜像；空白模板没有可对比的基准。
+            已从生成的 XML 重新编译出 {{ formatBytes(check.actualLength) }} 的镜像；没有可对比的基准。
           </p>
         </template>
       </section>

@@ -886,7 +886,7 @@ export function generateEsiXml(result, options = {}) {
   push(2, '</Groups>')
   push(2, '<Devices>')
 
-  push(3, physics ? `<Device Physics="${escapeXml(physics)}">` : '<Device>')
+  push(3, `<Device Physics="${escapeXml(physics)}">`)
   push(
     4,
     `<Type ProductCode="${productCode}" RevisionNo="${revisionNumber}">${escapeXml(orderName)}</Type>`,
@@ -953,7 +953,16 @@ export function generateEsiXml(result, options = {}) {
       5,
       `<Index${pdo.flags & 0x0200 ? ' DependOnSlot="true"' : ''}>${hexValue(pdo.index)}</Index>`,
     )
-    if (pdo.name) push(5, `<Name>${escapeXml(pdo.name)}</Name>`)
+    const pdoName = pdo.name || `PDO 0x${pdo.index.toString(16).toUpperCase()}`
+    if (!pdo.name) {
+      warnings.push({
+        level: 'warn',
+        message: `PDO 0x${pdo.index
+          .toString(16)
+          .toUpperCase()} 没有名称，ESI 要求 <Name>，已写入占位名称 ${pdoName}。`,
+      })
+    }
+    push(5, `<Name>${escapeXml(pdoName)}</Name>`)
     for (const entry of pdo.entries) {
       const typeName = DATA_TYPE_NAMES[entry.dataType]
       if (!typeName) {
@@ -987,17 +996,11 @@ export function generateEsiXml(result, options = {}) {
     })
   }
 
-  const hasMailbox = mailboxProtocols !== 0 || Boolean(general?.flags & 0x04)
-  if (includeMailbox && mailboxProtocols & 0x21) {
-    warnings.push({
-      level: 'warn',
-      message: '当前导出器不写入 AoE / VoE 邮箱协议元素，重新生成时对应的协议位会丢失。',
-    })
-  }
-  if (includeMailbox && hasMailbox) {
+  const sourceHasMailbox = mailboxProtocols !== 0 || Boolean(general?.flags & 0x04)
+  if (includeMailbox) {
     push(4, '<Mailbox DataLinkLayer="true">')
-    // Mailbox protocol elements follow the ETG.2000 sequence. AoE and VoE are
-    // SII-only bits that this exporter does not emit.
+    // Mailbox protocol elements follow the ETG.2000 sequence.
+    if (mailboxProtocols & 0x01) push(5, '<AoE />')
     if (mailboxProtocols & 0x02) push(5, '<EoE />')
     if (mailboxProtocols & 0x04) {
       const attributes = [
@@ -1011,8 +1014,9 @@ export function generateEsiXml(result, options = {}) {
     }
     if (mailboxProtocols & 0x08) push(5, '<FoE />')
     if (mailboxProtocols & 0x10) push(5, '<SoE />')
+    if (mailboxProtocols & 0x20) push(5, '<VoE />')
     push(4, '</Mailbox>')
-  } else if (!includeMailbox && hasMailbox) {
+  } else if (sourceHasMailbox) {
     warnings.push({ level: 'info', message: '已按设置省略 Mailbox 元素。' })
   }
 

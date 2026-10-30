@@ -21,15 +21,11 @@ const PORT_LETTERS = { 1: 'Y', 3: 'E', 4: 'K' }
 const PORT_CHOICES = [
   { value: 0, label: '未使用' },
   { value: 1, label: 'MII / 100BASE-TX' },
+  { value: 2, label: 'Reserved' },
   { value: 3, label: 'EBUS' },
   { value: 4, label: 'Fast Hot Connect' },
 ]
 const COE_SERVICES = COE_DETAIL_BITS.filter((service) => service.bit !== 0x01)
-// AoE (0x01) and VoE (0x20) are SII-only bits; the exporter does not emit
-// elements for them, so they are not offered as toggles.
-const MAILBOX_CHOICES = MAILBOX_PROTOCOLS.filter((protocol) =>
-  [0x02, 0x04, 0x08, 0x10].includes(protocol.bit),
-)
 
 // A device description with no SII image behind it. The builder fills in the
 // identity fields from the form and omits every optional category.
@@ -92,20 +88,22 @@ const parsed = computed(() => source.value?.result || null)
 const warnings = computed(() => [
   ...(parsed.value?.warnings || []),
   ...(output.value?.warnings || []),
+  ...(check.value?.warnings || []),
 ])
 
 const physics = computed(() => {
   const letters = []
   for (const value of form.ports) {
-    if (!value) break
-    letters.push(PORT_LETTERS[value] || '')
+    const letter = PORT_LETTERS[value]
+    if (!letter) break
+    letters.push(letter)
   }
   return letters.join('')
 })
 
 const physicsGap = computed(() => {
-  const firstUnused = form.ports.indexOf(0)
-  return firstUnused !== -1 && form.ports.slice(firstUnused).some((value) => value !== 0)
+  const firstBlocked = form.ports.findIndex((value) => !PORT_LETTERS[value])
+  return firstBlocked !== -1 && form.ports.slice(firstBlocked).some((value) => PORT_LETTERS[value])
 })
 
 const coeLabels = computed(() => {
@@ -545,7 +543,7 @@ function downloadXml() {
           <p class="muted small">
             Physics 属性：<span class="mono">{{ physics || '（无）' }}</span>
             <span v-if="physicsGap" class="warn-inline">
-              未使用的端口之后仍有端口定义，ESI 无法表达这种间隔，后续端口会被忽略。
+              未使用或保留端口之后仍有端口定义，ESI 无法表达这种间隔，后续端口会被忽略。
             </span>
           </p>
         </div>
@@ -557,7 +555,7 @@ function downloadXml() {
             写入 Mailbox 元素
           </label>
           <div class="check-grid" :class="{ disabled: !form.includeMailbox }">
-            <label v-for="protocol in MAILBOX_CHOICES" :key="protocol.bit" class="check">
+            <label v-for="protocol in MAILBOX_PROTOCOLS" :key="protocol.bit" class="check">
               <input
                 type="checkbox"
                 :checked="hasProtocol(protocol.bit)"

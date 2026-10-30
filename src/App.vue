@@ -4,12 +4,14 @@ import { computed } from 'vue'
 import GeneratorPage from '@/pages/GeneratorPage.vue'
 import HomePage from '@/pages/HomePage.vue'
 import ParserPage from '@/pages/ParserPage.vue'
+import XmlGeneratorPage from '@/pages/XmlGeneratorPage.vue'
 import { routes, useRoute } from '@/router'
 
 const pages = {
   '/': HomePage,
   '/parser': ParserPage,
   '/generator': GeneratorPage,
+  '/xml': XmlGeneratorPage,
 }
 
 const path = useRoute()

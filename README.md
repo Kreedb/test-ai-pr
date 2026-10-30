@@ -30,6 +30,14 @@
 - 生成后展示设备信息、类别布局、提示信息，可下载 `.bin` 或复制十六进制。
 - 示例：`public/samples/limx-tron2.xml` 与 `public/samples/limx-tron2.bin` 是一对真实数据，生成的 bin 与示例逐字节一致。
 
+### ESI XML 生成器（`#/xml`）
+
+- 输入 SII EEPROM 转储（`.bin`、Intel HEX 或十六进制文本），生成对应的 `EtherCATInfo` XML。
+- 可编辑厂商 ID / 名称、产品码、修订号、订货号、设备名称、组、EEPROM 大小、四个端口的 Physics、邮箱协议与 CoE 服务。
+- 可选择是否输出 FMMU、SyncManager、TxPDO / RxPDO、DC 与 `IdentificationReg134`；也可以从“空白模板”开始，只生成身份信息与 Eeprom 段。
+- 每次生成后会把 XML 重新编译成 SII 镜像，并与原始转储逐字节比对；差异字节会在页面上列出（修改字段后的差异属预期）。
+- 支持复制 XML 与下载 `.xml`。
+
 ## 输入格式示例
 
 纯十六进制：
@@ -60,7 +68,7 @@ Intel HEX：
 
 ```
 src/lib/sii.js          # 纯 JS SII 解析器（无 Vue 依赖）：输入解码、CRC、固定头、类别、PDO、DC
-src/lib/esi.js          # ESI XML -> SII 生成器，以及 SII -> ESI XML 导出
+src/lib/esi.js          # ESI XML -> SII 生成器，以及 SII -> ESI XML 导出与回归校验
 src/lib/format.js       # 显示格式化辅助函数
 src/lib/download.js     # 浏览器下载辅助函数
 src/router.js           # 极简 hash 路由（GitHub Pages 子路径下无需重写规则）
@@ -102,7 +110,7 @@ Deployment is handled by `.github/workflows/deploy.yml`, which runs on every pus
 
 Because this is a project site served from a subpath, `vite.config.js` sets `base: '/test-ai-pr/'` so that built asset URLs resolve under `https://kreedb.github.io/test-ai-pr/`. If the site ever moves to a custom domain or a user page repository, change `base` back to `/`.
 
-Navigation uses hash routes (`#/parser`, `#/generator`), so no server-side rewrite rules are needed. To preview the production build locally, run `npm run build` followed by `npm run preview` and open http://localhost:4173/test-ai-pr/.
+Navigation uses hash routes (`#/parser`, `#/generator`, `#/xml`), so no server-side rewrite rules are needed. To preview the production build locally, run `npm run build` followed by `npm run preview` and open http://localhost:4173/test-ai-pr/.
 
 ## Path alias
 

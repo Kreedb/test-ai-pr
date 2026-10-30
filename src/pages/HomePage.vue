@@ -18,6 +18,14 @@ const tools = [
       '从 TwinCAT 导出的 EtherCATInfo XML 构建 SII 二进制镜像，可直接下载烧录或与厂商转储逐字节比对。',
     action: '打开生成器',
   },
+  {
+    path: '/xml',
+    tag: 'SII → ESI XML',
+    title: 'ESI XML 生成器',
+    description:
+      '从 EEPROM 转储生成 EtherCATInfo XML：编辑设备身份、端口与邮箱配置，并用原始转储做逐字节回归校验。',
+    action: '打开 XML 生成器',
+  },
 ]
 
 const navRoutes = routes.filter((route) => route.path !== '/')

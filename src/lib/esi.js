@@ -814,15 +814,59 @@ function physicsForPorts(ports) {
   return letters.join('')
 }
 
-export function exportEsiXml(result) {
+function hexRange(bytes, start, length) {
+  const out = new Uint8Array(length)
+  if (bytes && bytes.length) {
+    out.set(bytes.subarray(start, Math.min(start + length, bytes.length)))
+  }
+  return toHexString(out)
+}
+
+function optionValue(options, key, fallback) {
+  const value = options[key]
+  return value === undefined || value === null ? fallback : value
+}
+
+function boolOption(options, key, fallback) {
+  const value = options[key]
+  return value === undefined || value === null ? fallback : Boolean(value)
+}
+
+// Builds an EtherCATInfo document from a parsed SII image. Every field can be
+// overridden through `options`, which is what the ESI XML generator page uses
+// to edit a device before exporting it.
+export function generateEsiXml(result, options = {}) {
   if (!result || !result.info) throw new Error('没有可导出的解析结果')
 
   const warnings = []
-  const { info, general, strings, fmmus, syncManagers, txPdos, rxPdos, dc } = result
-  const deviceName = general?.deviceName || ''
-  const orderName = general?.orderName || deviceName || 'Device'
-  const groupName = general?.groupName || 'Group'
-  const byteSize = info.eepromSizeBytes || result.byteLength
+  const { info, general, fmmus, syncManagers, txPdos, rxPdos, dc } = result
+  const deviceName = optionValue(options, 'deviceName', general?.deviceName || '')
+  const orderName = optionValue(options, 'orderName', general?.orderName || deviceName || 'Device')
+  const groupName = optionValue(options, 'groupName', general?.groupName || 'Group')
+  const vendorName = optionValue(options, 'vendorName', 'Vendor (SII image)')
+  const vendorId = optionValue(options, 'vendorId', info.vendorId ?? 0)
+  const productCode = optionValue(options, 'productCode', info.productCode ?? 0)
+  const revisionNumber = optionValue(options, 'revisionNumber', info.revisionNumber ?? 0)
+  const byteSize = optionValue(
+    options,
+    'byteSize',
+    info.eepromSizeBytes || result.byteLength || 2048,
+  )
+  const mailboxProtocols = optionValue(options, 'mailboxProtocols', info.mailboxProtocols ?? 0)
+  const coeDetails = optionValue(options, 'coeDetails', general?.coeDetails ?? 0)
+  const identificationReg134 = boolOption(
+    options,
+    'identificationReg134',
+    Boolean(general?.flags & 0x08),
+  )
+  const physics = optionValue(options, 'physics', physicsForPorts(general?.ports))
+  const includeMailbox = boolOption(options, 'includeMailbox', true)
+  const includeFmmu = boolOption(options, 'includeFmmu', true)
+  const includeSyncManagers = boolOption(options, 'includeSyncManagers', true)
+  const includePdos = boolOption(options, 'includePdos', true)
+  const includeDc = boolOption(options, 'includeDc', true)
+  const configData = optionValue(options, 'configData', hexRange(result.bytes, 0, 10))
+  const bootStrap = optionValue(options, 'bootStrap', hexRange(result.bytes, 0x28, 8))
 
   const lines = []
   const push = (depth, text) => lines.push(`${'\t'.repeat(depth)}${text}`)
@@ -830,8 +874,8 @@ export function exportEsiXml(result) {
   push(0, '<?xml version="1.0" encoding="utf-8"?>')
   push(0, '<EtherCATInfo Version="1.6">')
   push(1, '<Vendor>')
-  push(2, `<Id>${hexId(info.vendorId)}</Id>`)
-  push(2, '<Name>Vendor (SII image)</Name>')
+  push(2, `<Id>${hexId(vendorId)}</Id>`)
+  push(2, `<Name>${escapeXml(vendorName)}</Name>`)
   push(1, '</Vendor>')
   push(1, '<Descriptions>')
   push(2, '<Groups>')
@@ -842,14 +886,13 @@ export function exportEsiXml(result) {
   push(2, '</Groups>')
   push(2, '<Devices>')
 
-  const physics = physicsForPorts(general?.ports)
-  push(3, physics ? `<Device Physics="${physics}">` : '<Device>')
+  push(3, physics ? `<Device Physics="${escapeXml(physics)}">` : '<Device>')
   push(
     4,
-    `<Type ProductCode="${info.productCode}" RevisionNo="${info.revisionNumber}">${escapeXml(orderName)}</Type>`,
+    `<Type ProductCode="${productCode}" RevisionNo="${revisionNumber}">${escapeXml(orderName)}</Type>`,
   )
   push(4, `<Name LcId="1033">${escapeXml(deviceName || orderName)}</Name>`)
-  if (general?.flags & 0x08) {
+  if (identificationReg134) {
     push(4, '<Info>')
     push(5, '<IdentificationReg134>true</IdentificationReg134>')
     push(4, '</Info>')
@@ -858,23 +901,48 @@ export function exportEsiXml(result) {
 
   const fmmuUsages = (fmmus || []).map((entry) => entry.usage)
   while (fmmuUsages.length && fmmuUsages[fmmuUsages.length - 1] === 0xff) fmmuUsages.pop()
-  for (const usage of fmmuUsages) {
-    push(4, `<Fmmu>${escapeXml(FMMU_NAME_BY_USAGE[usage] ?? 'Out')}</Fmmu>`)
+  if (includeFmmu) {
+    for (const usage of fmmuUsages) {
+      if (FMMU_NAME_BY_USAGE[usage] === undefined) {
+        warnings.push({
+          level: 'warn',
+          message: `FMMU 用途 0x${usage.toString(16).toUpperCase()} 不是标准值，导出为 Out。`,
+        })
+      }
+      push(4, `<Fmmu>${escapeXml(FMMU_NAME_BY_USAGE[usage] ?? 'Out')}</Fmmu>`)
+    }
+  } else if (fmmuUsages.length) {
+    warnings.push({ level: 'info', message: `已按设置省略 ${fmmuUsages.length} 个 FMMU 条目。` })
   }
 
   const smNames = ['MBoxOut', 'MBoxIn', 'Outputs', 'Inputs']
-  for (const manager of syncManagers || []) {
-    const name = smNames[manager.index] || `SM${manager.index}`
-    const attributes = [`DefaultSize="${manager.length}"`]
-    if (manager.index < 2) {
-      attributes.unshift('MaxSize="256"', 'MinSize="34"')
+  if (includeSyncManagers) {
+    for (const manager of syncManagers || []) {
+      const name = smNames[manager.index] || `SM${manager.index}`
+      const attributes = [`DefaultSize="${manager.length}"`]
+      if (manager.index < 2) {
+        attributes.unshift('MaxSize="256"', 'MinSize="34"')
+      }
+      if (manager.enable > 1) {
+        warnings.push({
+          level: 'warn',
+          message: `SyncManager ${manager.index} 的 Enable 字节为 0x${manager.enable
+            .toString(16)
+            .toUpperCase()}，ESI 只能表达启用/禁用，导出为启用。`,
+        })
+      }
+      attributes.push(
+        `StartAddress="${hexValue(manager.startAddress)}"`,
+        `ControlByte="${hexValue(manager.control)}"`,
+        `Enable="${manager.enable ? '1' : '0'}"`,
+      )
+      push(4, `<Sm ${attributes.join(' ')}>${name}</Sm>`)
     }
-    attributes.push(
-      `StartAddress="${hexValue(manager.startAddress)}"`,
-      `ControlByte="${hexValue(manager.control)}"`,
-      `Enable="${manager.enable}"`,
-    )
-    push(4, `<Sm ${attributes.join(' ')}>${name}</Sm>`)
+  } else if ((syncManagers || []).length) {
+    warnings.push({
+      level: 'info',
+      message: `已按设置省略 ${syncManagers.length} 个 SyncManager 条目。`,
+    })
   }
 
   const writePdo = (tag, pdo) => {
@@ -909,29 +977,46 @@ export function exportEsiXml(result) {
     push(4, `</${tag}>`)
   }
 
-  for (const pdo of rxPdos || []) writePdo('RxPdo', pdo)
-  for (const pdo of txPdos || []) writePdo('TxPdo', pdo)
+  if (includePdos) {
+    for (const pdo of rxPdos || []) writePdo('RxPdo', pdo)
+    for (const pdo of txPdos || []) writePdo('TxPdo', pdo)
+  } else if ((rxPdos || []).length + (txPdos || []).length) {
+    warnings.push({
+      level: 'info',
+      message: `已按设置省略 ${(rxPdos || []).length + (txPdos || []).length} 个 PDO。`,
+    })
+  }
 
-  const protocols = info.mailboxProtocols || 0
-  if (protocols || general?.flags & 0x04) {
+  const hasMailbox = mailboxProtocols !== 0 || Boolean(general?.flags & 0x04)
+  if (includeMailbox && mailboxProtocols & 0x21) {
+    warnings.push({
+      level: 'warn',
+      message: '当前导出器不写入 AoE / VoE 邮箱协议元素，重新生成时对应的协议位会丢失。',
+    })
+  }
+  if (includeMailbox && hasMailbox) {
     push(4, '<Mailbox DataLinkLayer="true">')
-    if (protocols & 0x04) {
+    // Mailbox protocol elements follow the ETG.2000 sequence. AoE and VoE are
+    // SII-only bits that this exporter does not emit.
+    if (mailboxProtocols & 0x02) push(5, '<EoE />')
+    if (mailboxProtocols & 0x04) {
       const attributes = [
-        `SdoInfo="${general?.coeDetails & 0x02 ? 'true' : 'false'}"`,
-        `PdoAssign="${general?.coeDetails & 0x04 ? 'true' : 'false'}"`,
-        `PdoConfig="${general?.coeDetails & 0x08 ? 'true' : 'false'}"`,
-        `PdoUpload="${general?.coeDetails & 0x10 ? 'true' : 'false'}"`,
-        `CompleteAccess="${general?.coeDetails & 0x20 ? 'true' : 'false'}"`,
+        `SdoInfo="${coeDetails & 0x02 ? 'true' : 'false'}"`,
+        `PdoAssign="${coeDetails & 0x04 ? 'true' : 'false'}"`,
+        `PdoConfig="${coeDetails & 0x08 ? 'true' : 'false'}"`,
+        `PdoUpload="${coeDetails & 0x10 ? 'true' : 'false'}"`,
+        `CompleteAccess="${coeDetails & 0x20 ? 'true' : 'false'}"`,
       ]
       push(5, `<CoE ${attributes.join(' ')} />`)
     }
-    if (protocols & 0x08) push(5, '<FoE />')
-    if (protocols & 0x02) push(5, '<EoE />')
-    if (protocols & 0x10) push(5, '<SoE />')
+    if (mailboxProtocols & 0x08) push(5, '<FoE />')
+    if (mailboxProtocols & 0x10) push(5, '<SoE />')
     push(4, '</Mailbox>')
+  } else if (!includeMailbox && hasMailbox) {
+    warnings.push({ level: 'info', message: '已按设置省略 Mailbox 元素。' })
   }
 
-  if (dc?.elements?.length) {
+  if (includeDc && dc?.elements?.length) {
     push(4, '<Dc>')
     for (const element of dc.elements) {
       push(5, '<OpMode>')
@@ -943,17 +1028,22 @@ export function exportEsiXml(result) {
         `<CycleTimeSync0 Factor="${element.sync0CycleFactor ?? 1}">${element.sync0CycleTime ?? 0}</CycleTimeSync0>`,
       )
       push(6, `<ShiftTimeSync0>${element.sync0ShiftTime ?? 0}</ShiftTimeSync0>`)
-      push(6, `<ShiftTimeSync1>${element.sync1ShiftTime ?? 0}</ShiftTimeSync1>`)
       push(6, `<CycleTimeSync1 Factor="1">${element.sync1CycleFactor ?? 0}</CycleTimeSync1>`)
+      push(6, `<ShiftTimeSync1>${element.sync1ShiftTime ?? 0}</ShiftTimeSync1>`)
       push(5, '</OpMode>')
     }
     push(4, '</Dc>')
+  } else if (!includeDc && dc?.elements?.length) {
+    warnings.push({
+      level: 'info',
+      message: `已按设置省略 ${dc.elements.length} 个 DC 操作模式。`,
+    })
   }
 
   push(4, '<Eeprom>')
   push(5, `<ByteSize>${byteSize}</ByteSize>`)
-  push(5, `<ConfigData>${toHexString(result.bytes.subarray(0, 10))}</ConfigData>`)
-  push(5, `<BootStrap>${toHexString(result.bytes.subarray(0x28, 0x30))}</BootStrap>`)
+  push(5, `<ConfigData>${configData}</ConfigData>`)
+  push(5, `<BootStrap>${bootStrap}</BootStrap>`)
   push(4, '</Eeprom>')
   push(3, '</Device>')
   push(2, '</Devices>')
@@ -977,7 +1067,11 @@ export function exportEsiXml(result) {
   }
   const portTypes = general?.ports || []
   const firstUnusedPort = portTypes.findIndex((type) => !type)
-  if (firstUnusedPort !== -1 && portTypes.slice(firstUnusedPort).some((type) => type)) {
+  if (
+    options.physics === undefined &&
+    firstUnusedPort !== -1 &&
+    portTypes.slice(firstUnusedPort).some((type) => type)
+  ) {
     warnings.push({
       level: 'info',
       message: 'SII 端口类型在未使用端口之后仍有定义，ESI 的 Physics 属性无法表达这种间隔。',
@@ -997,9 +1091,57 @@ export function exportEsiXml(result) {
   if ((general?.flags ?? 0) & 0x10) {
     warnings.push({ level: 'info', message: 'General 标志位“Physical Memory 识别”无法在 ESI 中表达。' })
   }
-  if ((info.eepromSizeRaw ?? 0) !== Math.floor(byteSize / 128) - 1) {
+  if (
+    options.byteSize === undefined &&
+    (info.eepromSizeRaw ?? 0) !== Math.floor(byteSize / 128) - 1
+  ) {
     warnings.push({ level: 'warn', message: 'EEPROM 大小字段与输入长度不一致，导出值按输入长度计算。' })
   }
 
   return { xml: `${lines.join('\n')}\n`, warnings }
+}
+
+// Backwards-compatible wrapper used by the parser page's "导出 XML" action.
+export function exportEsiXml(result) {
+  return generateEsiXml(result)
+}
+
+// Rebuilds an SII image from generated ESI XML and compares it with the dump
+// the XML was derived from. Pass null when there is no source dump.
+export function verifyEsiXml(xmlText, expectedBytes = null) {
+  const generated = generateSiiFromEsi(xmlText)
+  if (!expectedBytes) {
+    return {
+      ...generated,
+      expectedLength: null,
+      actualLength: generated.bytes.length,
+      identical: null,
+      diffCount: 0,
+      firstDiffs: [],
+    }
+  }
+
+  const expected = expectedBytes
+  const length = Math.max(expected.length, generated.bytes.length)
+  let diffCount = 0
+  const firstDiffs = []
+  for (let offset = 0; offset < length; offset++) {
+    const expectedByte = offset < expected.length ? expected[offset] : null
+    const actualByte = offset < generated.bytes.length ? generated.bytes[offset] : null
+    if (expectedByte !== actualByte) {
+      diffCount += 1
+      if (firstDiffs.length < 8) {
+        firstDiffs.push({ offset, expected: expectedByte, actual: actualByte })
+      }
+    }
+  }
+
+  return {
+    ...generated,
+    expectedLength: expected.length,
+    actualLength: generated.bytes.length,
+    identical: diffCount === 0,
+    diffCount,
+    firstDiffs,
+  }
 }

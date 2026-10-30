@@ -1,7 +1,7 @@
 // EtherCAT ESI (EtherCATInfo XML) to SII EEPROM image generator, plus the
 // reverse export used by the parser to turn a parsed image back into ESI XML.
 // `parseEsiXml` reads a device description into the same model the parser
-// produces, so the XML editor page can start from either source.
+// produces, so callers can round-trip ESI XML without the UI.
 //
 // The generated layout follows what TwinCAT's EEPROM export produces for the
 // reference pair `Box 1 (Limx EtherCAT).bin` / `Limx Tron2 Driver_new.xml`:
@@ -1524,11 +1524,6 @@ export function generateEsiXml(result, options = {}) {
   }
 
   return { xml: `${lines.join('\n')}\n`, warnings }
-}
-
-// Backwards-compatible wrapper used by the parser page's "导出 XML" action.
-export function exportEsiXml(result) {
-  return generateEsiXml(result)
 }
 
 // Rebuilds an SII image from generated ESI XML and compares it with the dump

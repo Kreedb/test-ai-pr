@@ -1,17 +1,13 @@
 <script setup>
 import { computed } from 'vue'
 
-import GeneratorPage from '@/pages/GeneratorPage.vue'
 import HomePage from '@/pages/HomePage.vue'
 import ParserPage from '@/pages/ParserPage.vue'
-import XmlGeneratorPage from '@/pages/XmlGeneratorPage.vue'
 import { routes, useRoute } from '@/router'
 
 const pages = {
   '/': HomePage,
   '/parser': ParserPage,
-  '/generator': GeneratorPage,
-  '/xml': XmlGeneratorPage,
 }
 
 const path = useRoute()
@@ -26,7 +22,7 @@ const active = computed(() => routes.find((route) => route.path === path.value))
         <div class="brand-mark" aria-hidden="true">EC</div>
         <div>
           <h1>EtherCAT 工具箱</h1>
-          <p>SII EEPROM 解析与生成 · 数据仅在浏览器本地处理</p>
+          <p>SII EEPROM 解析、编辑与 ESI XML 导出 · 数据仅在浏览器本地处理</p>
         </div>
       </a>
 

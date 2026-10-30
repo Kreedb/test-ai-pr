@@ -1,49 +1,27 @@
 <script setup>
-import { routes } from '@/router'
-
 const tools = [
   {
     path: '/parser',
-    tag: 'SII → 结构',
+    tag: 'SII → 编辑 → ESI XML',
     title: 'EEPROM 解析器',
     description:
-      '上传 SII EEPROM 转储，查看固定头、字符串、SyncManager、PDO 与 DC，并导出 JSON、原始 bin 或 ESI XML。',
+      '上传 .bin 格式的 SII EEPROM 转储，解析并可编辑固定头、General、字符串、FMMU、SyncManager、PDO 与 DC，导出 ESI XML，并用内置生成器重新编译校验。',
     action: '打开解析器',
   },
-  {
-    path: '/generator',
-    tag: 'ESI XML → bin',
-    title: 'EEPROM 生成器',
-    description:
-      '从 TwinCAT 导出的 EtherCATInfo XML 构建 SII 二进制镜像，可直接下载烧录或与厂商转储逐字节比对。',
-    action: '打开生成器',
-  },
-  {
-    path: '/xml',
-    tag: 'SII ⇄ ESI XML',
-    title: 'ESI XML 编辑器',
-    description:
-      '从 EEPROM 转储或已有的 EtherCATInfo XML 出发编辑设备描述：身份、端口、邮箱、超时与 SyncManager 尺寸，并用原始转储做逐字节回归校验。',
-    action: '打开 XML 编辑器',
-  },
 ]
-
-const navRoutes = routes.filter((route) => route.path !== '/')
 </script>
 
 <template>
   <main class="app-main">
     <section class="card hero">
       <span class="hero-tag">EtherCAT 工具箱</span>
-      <h2>从 ESI 描述文件到 SII EEPROM 镜像</h2>
+      <h2>SII EEPROM 解析、编辑与 ESI XML 导出</h2>
       <p>
-        一组在浏览器本地运行的 EtherCAT 工具：解析从站 EEPROM 转储、生成可烧录的 SII 镜像，并在两种格式之间往返转换。
+        上传 .bin 转储即可查看并编辑全部 SII 字段，导出 EtherCATInfo XML，并用内置的 EEPROM 生成器重新编译校验。
         所有数据只在本机处理，不会上传。
       </p>
       <div class="hero-actions">
-        <a v-for="route in navRoutes" :key="route.path" class="btn" :href="`#${route.path}`">
-          {{ route.label }}
-        </a>
+        <a class="btn primary" href="#/parser">打开解析器</a>
       </div>
     </section>
 

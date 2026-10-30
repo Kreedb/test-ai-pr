@@ -24,14 +24,15 @@ export function formatBytes(count) {
   return `${(count / 1024 / 1024).toFixed(1)} MiB`
 }
 
-// EtherCAT strings are byte strings (usually ASCII, sometimes ISO-8859-1).
-// Render control characters and NUL padding visibly instead of dropping them.
-export function printable(text) {
-  if (!text) return ''
-  let out = ''
-  for (const char of text) {
-    const code = char.codePointAt(0)
-    out += code < 0x20 || code === 0x7f ? '·' : char
-  }
-  return out
+export function parseHexValue(text) {
+  const cleaned = String(text ?? '')
+    .trim()
+    .replace(/^(?:#x|0x)/i, '')
+    .replace(/[^0-9a-f]/gi, '')
+  return cleaned ? parseInt(cleaned, 16) : 0
+}
+
+export function parseDecValue(text, fallback = 0) {
+  const value = Number.parseInt(String(text ?? '').trim(), 10)
+  return Number.isFinite(value) ? value : fallback
 }

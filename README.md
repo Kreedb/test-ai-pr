@@ -14,7 +14,7 @@ npm install
 npm run dev
 ```
 
-The dev server starts on http://localhost:5173 with hot module replacement enabled.
+The dev server starts on http://localhost:5173/test-ai-pr/ with hot module replacement enabled. The `/test-ai-pr/` prefix comes from the `base` setting described in [Deployment](#deployment).
 
 ## Scripts
 
@@ -23,6 +23,16 @@ The dev server starts on http://localhost:5173 with hot module replacement enabl
 | `npm run dev`     | Start the dev server with HMR               |
 | `npm run build`   | Build for production into `dist/`           |
 | `npm run preview` | Serve the production build locally          |
+
+## Deployment
+
+The site is published to GitHub Pages at https://kreedb.github.io/test-ai-pr/.
+
+Deployment is handled by `.github/workflows/deploy.yml`, which runs on every push to `main` and can also be triggered manually from the Actions tab (`workflow_dispatch`). It installs dependencies with `npm ci`, runs `npm run build`, and publishes `dist/` via the GitHub Pages actions.
+
+Because this is a project site served from a subpath, `vite.config.js` sets `base: '/test-ai-pr/'` so that built asset URLs resolve under `https://kreedb.github.io/test-ai-pr/`. If the site ever moves to a custom domain or a user page repository, change `base` back to `/`.
+
+To preview the production build locally, run `npm run build` followed by `npm run preview` and open http://localhost:4173/test-ai-pr/.
 
 ## Structure
 

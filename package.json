@@ -10,7 +10,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test"
   },
   "dependencies": {
     "@flatten-js/core": "^1.6.15",
@@ -23,6 +24,7 @@
     "dsn-to-circuit-json": "0.0.8",
     "dsnts": "^0.1.12",
     "earcut": "^3.2.4",
+    "fast-xml-parser": "^5.11.2",
     "fflate": "^0.8.2",
     "graphics-debug": "^0.0.101",
     "kicadts": "0.0.63",

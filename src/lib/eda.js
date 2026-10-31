@@ -6,7 +6,8 @@
 //
 // Pipeline: source document -> Circuit JSON -> KiCad S-expression.
 // `altium-to-circuit-json` reads Altium PcbDoc/SchDoc, `dsn-to-circuit-json`
-// reads Specctra DSN (placement/netlist) and SES (routed board).
+// reads Specctra DSN (placement/netlist) and SES (routed board), and
+// `./eagle.js` reads EAGLE XML boards and schematics.
 
 const MB = 1024 * 1024
 
@@ -35,6 +36,14 @@ export const SOURCE_FORMATS = [
     status: 'supported',
     converts: 'PCB',
     note: 'Allegro、OrCAD PCB Designer、PADS Layout、Xpedition 都能导出 DSN；.ses 是自动布线结果，需与同工程的 .dsn 一起上传。',
+  },
+  {
+    id: 'eagle',
+    label: 'EAGLE XML',
+    extensions: ['.brd', '.sch'],
+    status: 'supported',
+    converts: 'PCB + 原理图',
+    note: 'EAGLE 6 及以后版本的 XML 文件；.brd 会按内容区分 EAGLE XML 与 Allegro 二进制。板图和原理图可一起上传，元件按位号对齐。',
   },
   {
     id: 'pads',
@@ -88,6 +97,21 @@ export const LOSS_NOTES = {
     '没有丝印、阻焊/助焊层图形和铜皮。',
     '焊盘只按 DSN 中声明的形状与尺寸重建，焊盘叠层和自定义焊盘会简化。',
   ],
+  eaglePcb: [
+    '只导出 Dimension 层的主板框，其余闭合轮廓按板内开槽处理；弧形板框会退化成折线。',
+    '设计规则、网络类、层叠材料和盲埋孔定义不导出；过孔只按 extent 还原起始/结束层。',
+    '铜皮（多边形覆铜）以 KiCad zone 输出，但隔离带和灌注参数会重算，需要在 KiCad 里重新灌注。',
+    '焊盘叠层的热焊盘/反焊盘、自定义焊盘（只支持方、圆、椭圆）会简化；八角焊盘按方焊盘输出。',
+    '元件属性（manufacturer、MPN、自定义属性）和 3D 封装数据不导出。',
+    '丝印按线条和文字重建，EAGLE 矢量字体会被 KiCad 字体替换，弧形导线按直线近似。',
+  ],
+  eagleSch: [
+    '元件符号按 EAGLE 库里的线条、圆和多边形重建；引脚名称/编号默认隐藏，符号样式会与原图有差异。',
+    '多张图纸会输出为独立子图，同名网络按全局标签合并；EAGLE 的模块（module）和总线不导出。',
+    '网络标签只来自 EAGLE 的 label，自动显示的 N$ 网络名不会额外生成标签。',
+    '图纸边框、标题栏和 EAGLE 的 plain 图形不导出。',
+    '元件属性、designator 显示样式和 EAGLE 矢量文字字体不保留。',
+  ],
 }
 
 export class EdaConversionError extends Error {
@@ -109,9 +133,15 @@ function leadingText(bytes) {
   return new TextDecoder('utf-8', { fatal: false }).decode(sample).replace(/^﻿/, '')
 }
 
+function isEagleXmlText(text) {
+  const trimmed = String(text || '').replace(/^﻿/, '').trimStart()
+  return trimmed.startsWith('<') && /<eagle[\s>]/.test(trimmed)
+}
+
 /**
  * Identify a source document from its file name and first bytes. Extension
- * alone is not enough: OrCAD Capture and Specctra both use `.dsn`.
+ * alone is not enough: OrCAD Capture and Specctra both use `.dsn`, and `.brd`
+ * is EAGLE XML in some tools and a Cadence Allegro binary in others.
  */
 export function detectSource(name, bytes) {
   const lower = String(name || '').toLowerCase()
@@ -128,7 +158,14 @@ export function detectSource(name, bytes) {
 
   if (lower.endsWith('.ses')) return { id: 'specctra', kind: 'ses' }
   if (lower.endsWith('.asc')) return { id: 'pads', kind: 'pcb' }
-  if (lower.endsWith('.brd')) return { id: 'allegro', kind: 'pcb' }
+  if (lower.endsWith('.brd')) {
+    return isEagleXmlText(leadingText(bytes))
+      ? { id: 'eagle', kind: 'pcb' }
+      : { id: 'allegro', kind: 'pcb' }
+  }
+  if (lower.endsWith('.sch')) {
+    return isEagleXmlText(leadingText(bytes)) ? { id: 'eagle', kind: 'schematic' } : { id: 'unknown', kind: 'unknown' }
+  }
   if (lower.endsWith('.edif')) return { id: 'orcad', kind: 'schematic' }
 
   return { id: 'unknown', kind: 'unknown' }
@@ -147,7 +184,7 @@ function unsupportedMessage(source, format) {
     )
   }
   return new EdaConversionError(
-    `无法识别 ${source.name}。支持 Altium .PcbDoc/.SchDoc 与 Specctra .dsn/.ses。`,
+    `无法识别 ${source.name}。支持 Altium .PcbDoc/.SchDoc、Specctra .dsn/.ses 与 EAGLE XML .brd/.sch。`,
   )
 }
 
@@ -340,6 +377,69 @@ async function convertSpecctra(sources, warnings) {
   return { circuitJson, summary: summarize(circuitJson) }
 }
 
+async function convertEagle(sources, warnings) {
+  const { looksLikeEagleXml, parseEagleXml, eagleToCircuitJson } = await import('./eagle.js')
+  const decoder = new TextDecoder('utf-8', { fatal: false })
+  let board = null
+  let schematic = null
+
+  for (const source of sources) {
+    if (source.format.kind !== 'pcb' && source.format.kind !== 'schematic') {
+      throw new EdaConversionError(`${source.name} 不是 EAGLE 的板图或原理图，请只选择 .brd / .sch。`)
+    }
+    const text = decoder.decode(source.bytes)
+    if (!looksLikeEagleXml(text)) {
+      throw new EdaConversionError(`${source.name} 看起来不是 EAGLE XML，无法解析。`)
+    }
+    const parsed = parseEagleXml(text)
+    if (parsed.version && Number(parsed.version.split('.')[0]) < 6) {
+      warnings.push({
+        level: 'warn',
+        message: `${source.name} 的 EAGLE 版本是 ${parsed.version}，只保证 EAGLE 6 及以后 XML 的解析结果。`,
+      })
+    }
+    if (source.format.kind === 'pcb') {
+      if (board) throw new EdaConversionError('一次只能转换一块板：检测到多个 EAGLE .brd，请分批转换。')
+      if (!parsed.board) throw new EdaConversionError(`${source.name} 里没有 <board> 节点。`)
+      board = parsed.board
+    } else {
+      if (schematic) {
+        throw new EdaConversionError('一次只能转换一张 EAGLE 原理图工程：检测到多个 .sch，请分批转换。')
+      }
+      if (!parsed.schematic) throw new EdaConversionError(`${source.name} 里没有 <schematic> 节点。`)
+      schematic = parsed.schematic
+    }
+  }
+
+  const circuitJson = eagleToCircuitJson({ board, schematic }, warnings)
+  const summary = summarize(circuitJson)
+  if (board && schematic) {
+    const elementNames = new Set(
+      (board.elements?.element ? [board.elements.element].flat() : []).map((element) => element.name),
+    )
+    const partNames = (schematic.parts?.part ? [schematic.parts.part].flat() : []).map((part) => part.name)
+    if (elementNames.size && partNames.length && !partNames.some((name) => elementNames.has(name))) {
+      warnings.push({
+        level: 'warn',
+        message: '板图与原理图的位号没有交集，可能不是同一个工程；封装和符号仍会分别输出，但不会互相关联。',
+      })
+    }
+  }
+  if (!summary.hasBoard) {
+    warnings.push({
+      level: 'info',
+      message: '本次只转换了 EAGLE 原理图，没有板级数据，因此不生成 .kicad_pcb。',
+    })
+  }
+  if (summary.hasSchematic && !summary.hasBoard) {
+    warnings.push({
+      level: 'info',
+      message: '没有上传同工程的 .brd，原理图里的封装只保留名称，需要的话请把 .brd 一起上传。',
+    })
+  }
+  return { circuitJson, summary }
+}
+
 /**
  * Convert the uploaded documents. `sources` is `[{ name, bytes }]` where
  * `bytes` is a Uint8Array. Resolves to `{ files, summary, warnings, elapsedMs }`.
@@ -372,11 +472,11 @@ export async function convertEda(sources) {
   }
   if (formats.size > 1) {
     throw new EdaConversionError(
-      '一次只能转换同一类来源的文件，请把 Altium 与 Specctra 文件分开上传。',
+      '一次只能转换同一类来源的文件，请把 Altium、Specctra 与 EAGLE 文件分开上传。',
     )
   }
   const [formatId] = formats
-  if (!['altium', 'specctra'].includes(formatId)) {
+  if (!['altium', 'specctra', 'eagle'].includes(formatId)) {
     throw unsupportedMessage(prepared[0], prepared[0].format)
   }
 
@@ -385,7 +485,9 @@ export async function convertEda(sources) {
   const { circuitJson, summary } =
     formatId === 'altium'
       ? await convertAltium(prepared, warnings)
-      : await convertSpecctra(prepared, warnings)
+      : formatId === 'eagle'
+        ? await convertEagle(prepared, warnings)
+        : await convertSpecctra(prepared, warnings)
 
   const files = await toKicadFiles(circuitJson, summary, baseNameOf(prepared))
 

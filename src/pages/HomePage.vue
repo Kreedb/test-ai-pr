@@ -10,10 +10,10 @@ const tools = [
   },
   {
     path: '/convert',
-    tag: 'Altium / Specctra → KiCad',
+    tag: 'Altium / Specctra / EAGLE → KiCad',
     title: 'EDA 转 KiCad',
     description:
-      '把 Altium .PcbDoc/.SchDoc 或 Specctra .dsn/.ses 转成 .kicad_pcb、.kicad_sch 与 .kicad_pro，页面会逐项说明哪些信息可能无法无损转换。',
+      '把 Altium .PcbDoc/.SchDoc、Specctra .dsn/.ses 或 EAGLE XML .brd/.sch 转成 .kicad_pcb、.kicad_sch 与 .kicad_pro，页面会逐项说明哪些信息可能无法无损转换。',
     action: '打开转换器',
   },
 ]
@@ -26,7 +26,7 @@ const tools = [
       <h2>SII EEPROM 解析与 EDA 格式转换</h2>
       <p>
         上传 .bin 转储即可查看并编辑全部 SII 字段，导出 EtherCATInfo XML，并用内置的 EEPROM 生成器重新编译校验；
-        也可以把 Altium 或 Specctra 工程转换成 KiCad 文件。所有数据只在本机处理，不会上传。
+        也可以把 Altium、Specctra 或 EAGLE 工程转换成 KiCad 文件。所有数据只在本机处理，不会上传。
       </p>
       <div class="hero-actions">
         <a class="btn primary" href="#/parser">打开解析器</a>

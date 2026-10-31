@@ -1,7 +1,8 @@
 # 第三方组件与数据说明
 
-本仓库以 GPL-3.0 发布（见 `LICENSE`）。`#/convert`（EDA 转 KiCad）页面不自带转换算法，而是集成下列开源项目，
+本仓库以 GPL-3.0 发布（见 `LICENSE`）。`#/convert`（EDA 转 KiCad）页面集成了下列开源项目，
 它们全部是 GPL-3.0 兼容的宽松许可（MIT / ISC / Apache-2.0 / BSD / Unlicense）。
+EAGLE XML 的字段映射是本仓库自己的代码（`src/lib/eagle.js`），只依赖 `fast-xml-parser` 做 XML 解析。
 
 ## 运行时依赖
 
@@ -19,6 +20,7 @@
 | `@flatten-js/core` | 1.6.15 | MIT | 平面几何运算 |
 | `circuit-json-to-connectivity-map` | 0.0.36 | MIT | 网络连通性 |
 | `earcut` | 3.2.4 | ISC | 多边形三角化 |
+| `fast-xml-parser` | 5.11.x | MIT | EAGLE XML 解析 |
 | `fflate` | 0.8.3 | MIT | 多文件打包下载 |
 | `graphics-debug` | 0.0.101 | MIT | DSN 转换器的调试图形 |
 | `zod` | 3.25.76 | MIT | Circuit JSON 校验 |
@@ -37,6 +39,7 @@
 | --- | --- | --- |
 | `public/samples/altium/PA6940.PcbDoc`、`M8_Y-adapter.SchDoc`、`Project_Information.SchDoc` | [luxonis/oak-hardware](https://github.com/luxonis/oak-hardware) 的 PA6940 YM8-Adapter 工程 | MIT，Copyright (c) 2020 luxonis |
 | `public/samples/specctra/motor-driver.dsn` | [tscircuit/dsn-to-circuit-json](https://github.com/tscircuit/dsn-to-circuit-json) 的测试资产 | MIT，Copyright (c) 2025 tscircuit Inc. |
+| `public/samples/eagle/SOT23-3.brd`、`SOT23-3.sch` | [tedyapo/ugly-smd-adapters](https://github.com/tedyapo/ugly-smd-adapters) 的 SOT23-3 转接板 | MIT，Copyright (c) 2016 Theodore C. Yapo |
 | `public/samples/akd-eeprom.bin` | [ethercrab-rs/ethercrab](https://github.com/ethercrab-rs/ethercrab) 测试数据 | 见上游仓库 |
 | `public/samples/limx-tron2.bin`、`limx-tron2.xml` | Limx Dynamics Tron2 EEPROM 转储与 TwinCAT ESI | 见上游 |
 

@@ -6,8 +6,8 @@
 //
 // Pipeline: source document -> Circuit JSON -> KiCad S-expression.
 // `altium-to-circuit-json` reads Altium PcbDoc/SchDoc, `dsn-to-circuit-json`
-// reads Specctra DSN (placement/netlist) and SES (routed board), and
-// `./eagle.js` reads EAGLE XML boards and schematics.
+// reads Specctra DSN (placement/netlist) and SES (routed board), `./eagle.js`
+// reads EAGLE XML boards and schematics, and `./pads.js` reads PADS Layout ASCII.
 
 const MB = 1024 * 1024
 
@@ -27,7 +27,7 @@ export const SOURCE_FORMATS = [
     extensions: ['.PcbDoc', '.SchDoc'],
     status: 'supported',
     converts: 'PCB + 原理图',
-    note: 'PCB 与原理图都支持，可一次选中同一工程的 .PcbDoc 和多张 .SchDoc 一起转换，网表会在两者之间对齐。',
+    note: 'PCB 与原理图都支持,可一次选中同一工程的 .PcbDoc 和多张 .SchDoc 一起转换,网表会在两者之间对齐。',
   },
   {
     id: 'specctra',
@@ -35,7 +35,7 @@ export const SOURCE_FORMATS = [
     extensions: ['.dsn', '.ses'],
     status: 'supported',
     converts: 'PCB',
-    note: 'Allegro、OrCAD PCB Designer、PADS Layout、Xpedition 都能导出 DSN；.ses 是自动布线结果，需与同工程的 .dsn 一起上传。',
+    note: 'Allegro、OrCAD PCB Designer、PADS Layout、Xpedition 都能导出 DSN;.ses 是自动布线结果,需与同工程的 .dsn 一起上传。',
   },
   {
     id: 'eagle',
@@ -43,15 +43,15 @@ export const SOURCE_FORMATS = [
     extensions: ['.brd', '.sch'],
     status: 'supported',
     converts: 'PCB + 原理图',
-    note: 'EAGLE 6 及以后版本的 XML 文件；.brd 会按内容区分 EAGLE XML 与 Allegro 二进制。板图和原理图可一起上传，元件按位号对齐。',
+    note: 'EAGLE 6 及以后版本的 XML 文件;.brd 会按内容区分 EAGLE XML 与 Allegro 二进制。板图和原理图可一起上传,元件按位号对齐。',
   },
   {
     id: 'pads',
     label: 'PADS Layout ASCII',
     extensions: ['.asc'],
-    status: 'planned',
+    status: 'supported',
     converts: 'PCB',
-    note: '暂未支持。PADS Layout 里用 File → Export → DSN 导出 Specctra 文件即可走现有的 DSN 通道。',
+    note: 'PADS Layout 的 File → Export → ASCII 导出文件;二进制 .pcb 与 PADS Logic 原理图不支持。元件、焊盘、走线、过孔、敷铜和丝印会按下面列出的有损项转换。',
   },
   {
     id: 'allegro',
@@ -59,7 +59,7 @@ export const SOURCE_FORMATS = [
     extensions: ['.brd'],
     status: 'planned',
     converts: 'PCB',
-    note: '二进制格式随版本变化且未公开，暂未支持；EAGLE 5 及更早的二进制 .brd 也不支持。Allegro 用 File → Export → Specctra 导出 DSN，或提供 Gerber 再转换。',
+    note: '二进制格式随版本变化且未公开,暂未支持;EAGLE 5 及更早的二进制 .brd 也不支持。Allegro 用 File → Export → Specctra 导出 DSN,或提供 Gerber 再转换。',
   },
   {
     id: 'orcad',
@@ -67,7 +67,7 @@ export const SOURCE_FORMATS = [
     extensions: ['.dsn', '.edif'],
     status: 'planned',
     converts: '原理图',
-    note: 'Capture 的二进制 .dsn 与 Specctra 的文本 .dsn 同名，页面会按内容区分。暂未支持原理图导入，可在 Capture 里导出 EDIF/网表。',
+    note: 'Capture 的二进制 .dsn 与 Specctra 的文本 .dsn 同名,页面会按内容区分。暂未支持原理图导入,可在 Capture 里导出 EDIF/网表。',
   },
 ]
 
@@ -75,43 +75,53 @@ export const SOURCE_FORMATS = [
 // the page; keep them in sync with the converters' documented coverage.
 export const LOSS_NOTES = {
   altiumPcb: [
-    '只支持最多 10 层铜层（顶层、8 层内层、底层）；层数更多的板会直接转换失败。',
-    '3D 模型（STEP/嵌入式模型）不会写入 .kicad_pcb，KiCad 里需要手动重新指定。',
-    '设计规则（线宽、间距、差分对、规则优先级）、网络类、Room、层叠材料的设置不导出。',
-    '敷铜以 KiCad zone 输出，但填充算法和优先级会重新计算，需要在 KiCad 里重新灌注。',
-    '封装按焊盘几何重建，不引用任何 KiCad 封装库；元件库名、封装名、BOM 字段会丢。',
-    '丝印/装配层的文字会换成 KiCad 字体，字号、对齐和旋转可能有细微偏差。',
-    '尺寸标注、钻孔表、Gerber/装配输出设置、板级变体（variant）配置不导出。',
+    '只支持最多 10 层铜层(顶层、8 层内层、底层);层数更多的板会直接转换失败。',
+    '3D 模型(STEP/嵌入式模型)不会写入 .kicad_pcb,KiCad 里需要手动重新指定。',
+    '设计规则(线宽、间距、差分对、规则优先级)、网络类、Room、层叠材料的设置不导出。',
+    '敷铜以 KiCad zone 输出,但填充算法和优先级会重新计算,需要在 KiCad 里重新灌注。',
+    '封装按焊盘几何重建,不引用任何 KiCad 封装库;元件库名、封装名、BOM 字段会丢。',
+    '丝印/装配层的文字会换成 KiCad 字体,字号、对齐和旋转可能有细微偏差。',
+    '尺寸标注、钻孔表、Gerber/装配输出设置、板级变体(variant)配置不导出。',
   ],
   altiumSch: [
-    '元件符号重建为通用符号（电阻、电容、二极管等）或“方框 + 引脚”形式，厂商符号的图形、引脚长度和样式会简化。',
-    '多张原理图会输出为根图 + 每张子图的层次结构，KiCad 里按同名网络标签保持跨图连接。',
-    '总线、总线入口、图纸符号（sheet symbol）与端口会扁平化或转为普通标签。',
-    'ERC 标记、掩膜（blanket）、参数集、设计变体、PCB 注释不导出。',
-    '文字字体、字号、颜色、线宽按近似值输出，注释框和图片可能丢失。',
-    '封装映射只保留名称，符号与封装的绑定需要在 KiCad 里重新确认。',
+    '元件符号重建为通用符号(电阻、电容、二极管等)或“方框 + 引脚”形式,厂商符号的图形、引脚长度和样式会简化。',
+    '多张原理图会输出为根图 + 每张子图的层次结构,KiCad 里按同名网络标签保持跨图连接。',
+    '总线、总线入口、图纸符号(sheet symbol)与端口会扁平化或转为普通标签。',
+    'ERC 标记、掩膜(blanket)、参数集、设计变体、PCB 注释不导出。',
+    '文字字体、字号、颜色、线宽按近似值输出,注释框和图片可能丢失。',
+    '封装映射只保留名称,符号与封装的绑定需要在 KiCad 里重新确认。',
   ],
   dsn: [
-    'DSN 只包含布局（元件位置、焊盘、板框）和网表；走线要另外上传同一工程自动布线后的 .ses。',
-    'DSN 里的 rule / clearance 段（默认线宽、间距）不会被导出，需要在 KiCad 里重新设置设计规则。',
+    'DSN 只包含布局(元件位置、焊盘、板框)和网表;走线要另外上传同一工程自动布线后的 .ses。',
+    'DSN 里的 rule / clearance 段(默认线宽、间距)不会被导出,需要在 KiCad 里重新设置设计规则。',
     '没有丝印、阻焊/助焊层图形和铜皮。',
-    '焊盘只按 DSN 中声明的形状与尺寸重建，焊盘叠层和自定义焊盘会简化。',
+    '焊盘只按 DSN 中声明的形状与尺寸重建,焊盘叠层和自定义焊盘会简化。',
   ],
   eaglePcb: [
-    '只导出 Dimension 层的主板框，其余闭合轮廓按板内开槽处理；弧形板框会退化成折线。',
-    '设计规则、网络类、层叠材料和盲埋孔定义不导出；过孔只按 extent 还原起始/结束层。',
-    '铜皮（多边形覆铜）以 KiCad zone 输出，但隔离带和灌注参数会重算，需要在 KiCad 里重新灌注。',
-    '焊盘叠层的热焊盘/反焊盘、自定义焊盘（只支持方、圆、椭圆）会简化；八角焊盘按方焊盘输出。',
-    '元件属性（manufacturer、MPN、自定义属性）和 3D 封装数据不导出；KiCad 封装的 Value 字段为空，原理图里的符号值仍会保留。',
-    'Document（48）等非丝印层的说明文字不导出，避免把工艺备注印到板子上。',
-    '丝印按线条和文字重建，EAGLE 矢量字体会被 KiCad 字体替换，弧形导线按直线近似。',
+    '只导出 Dimension 层的主板框,其余闭合轮廓按板内开槽处理;弧形板框会退化成折线。',
+    '设计规则、网络类、层叠材料和盲埋孔定义不导出;过孔只按 extent 还原起始/结束层。',
+    '铜皮(多边形覆铜)以 KiCad zone 输出,但隔离带和灌注参数会重算,需要在 KiCad 里重新灌注。',
+    '焊盘叠层的热焊盘/反焊盘、自定义焊盘(只支持方、圆、椭圆)会简化;八角焊盘按方焊盘输出。',
+    '元件属性(manufacturer、MPN、自定义属性)和 3D 封装数据不导出;KiCad 封装的 Value 字段为空,原理图里的符号值仍会保留。',
+    'Document(48)等非丝印层的说明文字不导出,避免把工艺备注印到板子上。',
+    '丝印按线条和文字重建,EAGLE 矢量字体会被 KiCad 字体替换,弧形导线按直线近似。',
   ],
   eagleSch: [
-    '元件符号按 EAGLE 库里的线条、圆和多边形重建；引脚名称/编号默认隐藏，符号样式会与原图有差异。',
-    '多张图纸会输出为独立子图，同名网络按全局标签合并；EAGLE 的模块（module）和总线不导出。',
-    '网络标签只来自 EAGLE 的 label，自动显示的 N$ 网络名不会额外生成标签。',
+    '元件符号按 EAGLE 库里的线条、圆和多边形重建;引脚名称/编号默认隐藏,符号样式会与原图有差异。',
+    '多张图纸会输出为独立子图,同名网络按全局标签合并;EAGLE 的模块(module)和总线不导出。',
+    '网络标签只来自 EAGLE 的 label,自动显示的 N$ 网络名不会额外生成标签。',
     '图纸边框、标题栏和 EAGLE 的 plain 图形不导出。',
     '元件属性、designator 显示样式和 EAGLE 矢量文字字体不保留。',
+  ],
+  pads: [
+    '只读 ASCII 导出文件(.asc),二进制 .pcb 数据库与 PADS Logic 原理图不支持;导出时请勾选 Parts、Nets、Decals、Copper 等全部内容。',
+    '内层铜箔按 net/面积输出为 KiCad zone,但隔离带、热焊盘参数和灌注结果会重算,需要在 KiCad 里重新灌注。',
+    '热焊盘(RT/ST)、反焊盘(RA/SA)和环形焊盘(A)不输出;焊盘叠层只取元件面那一层。',
+    '内层(-1)焊盘与内层走线没有对应的单层信息,会落到最近的铜层或跳过。',
+    '设计规则、网络类、层叠材料、盲埋孔定义、装配/阻焊/助焊层图形和文本不导出。',
+    '走线只在同层、相邻的连续线段之间成对连线;弧线走线会断成折线,圆弧板框同样按折线输出。',
+    '元件属性(制造商、MPN)、3D 模型和封装库名不导出,KiCad 里需要重新关联。',
+    '丝印文字用 KiCad 字体重排,PADS 的矢量字体、字宽比例和对齐方式会有偏差。',
   ],
 }
 
@@ -139,10 +149,15 @@ function isEagleXmlText(text) {
   return trimmed.startsWith('<') && /<eagle[\s>]/.test(trimmed)
 }
 
+function isPadsAsciiText(text) {
+  return /^[!*]PADS-POWERPCB-/i.test(String(text || '').replace(/^﻿/, '').trimStart().slice(0, 512))
+}
+
 /**
  * Identify a source document from its file name and first bytes. Extension
- * alone is not enough: OrCAD Capture and Specctra both use `.dsn`, and `.brd`
- * is EAGLE XML in some tools and a Cadence Allegro binary in others.
+ * alone is not enough: OrCAD Capture and Specctra both use `.dsn`, `.brd` is
+ * EAGLE XML in some tools and a Cadence Allegro binary in others, and `.asc` is
+ * used by unrelated netlist formats.
  */
 export function detectSource(name, bytes) {
   const lower = String(name || '').toLowerCase()
@@ -158,7 +173,13 @@ export function detectSource(name, bytes) {
   }
 
   if (lower.endsWith('.ses')) return { id: 'specctra', kind: 'ses' }
-  if (lower.endsWith('.asc')) return { id: 'pads', kind: 'pcb' }
+  if (lower.endsWith('.asc')) {
+    // Any ASCII text is a plausible `.asc`, so only accept the ones that carry
+    // the PADS-POWERPCB banner as a PADS board.
+    return isPadsAsciiText(leadingText(bytes))
+      ? { id: 'pads', kind: 'pcb' }
+      : { id: 'unknown', kind: 'unknown' }
+  }
   if (lower.endsWith('.brd')) {
     return isEagleXmlText(leadingText(bytes))
       ? { id: 'eagle', kind: 'pcb' }
@@ -180,12 +201,12 @@ function unsupportedMessage(source, format) {
   const entry = SOURCE_FORMATS.find((item) => item.id === format.id)
   if (entry?.status === 'planned') {
     return new EdaConversionError(
-      `暂不支持 ${source.name}：${formatLabel(format.id)} 尚未接入，本期先集成已有的开源转换器。`,
+      `暂不支持 ${source.name}:${formatLabel(format.id)} 尚未接入,本期先集成已有的开源转换器。`,
       entry.note,
     )
   }
   return new EdaConversionError(
-    `无法识别 ${source.name}。支持 Altium .PcbDoc/.SchDoc、Specctra .dsn/.ses 与 EAGLE XML .brd/.sch。`,
+    `无法识别 ${source.name}。支持 Altium .PcbDoc/.SchDoc、Specctra .dsn/.ses、EAGLE XML .brd/.sch 与 PADS ASCII .asc。`,
   )
 }
 
@@ -296,7 +317,7 @@ async function convertAltium(sources, warnings) {
     const parsed = parseAltiumFile(source.bytes)
     if (source.format.kind === 'pcb') {
       if (documents.pcb) {
-        throw new EdaConversionError('一次只能转换一块板：检测到多个 .PcbDoc，请分批转换。')
+        throw new EdaConversionError('一次只能转换一块板:检测到多个 .PcbDoc,请分批转换。')
       }
       documents.pcb = parsed.document
     } else {
@@ -320,19 +341,19 @@ async function convertAltium(sources, warnings) {
   if (documents.schematics.length > 1) {
     warnings.push({
       level: 'info',
-      message: `检测到 ${documents.schematics.length} 张原理图，将输出层次化工程（根图 + 每张子图各一个 .kicad_sch）。`,
+      message: `检测到 ${documents.schematics.length} 张原理图,将输出层次化工程(根图 + 每张子图各一个 .kicad_sch)。`,
     })
   }
   if (summary.models > 0) {
     warnings.push({
       level: 'info',
-      message: `原始设计含 ${summary.models} 个 3D 模型，.kicad_pcb 不携带模型数据，需要在 KiCad 里重新关联。`,
+      message: `原始设计含 ${summary.models} 个 3D 模型,.kicad_pcb 不携带模型数据,需要在 KiCad 里重新关联。`,
     })
   }
   if (!summary.hasBoard) {
     warnings.push({
       level: 'info',
-      message: '本次只转换了原理图，没有板级数据，因此不生成 .kicad_pcb。',
+      message: '本次只转换了原理图,没有板级数据,因此不生成 .kicad_pcb。',
     })
   }
 
@@ -348,12 +369,12 @@ async function convertSpecctra(sources, warnings) {
   const dsn = dsnSources[0]
   const ses = sources.find((source) => source.format.kind === 'ses')
   if (!dsn) {
-    throw new EdaConversionError('SES 只是自动布线结果，必须同时上传同一工程的 .dsn 才能转换。')
+    throw new EdaConversionError('SES 只是自动布线结果,必须同时上传同一工程的 .dsn 才能转换。')
   }
   if (dsnSources.length > 1) {
     warnings.push({
       level: 'warn',
-      message: `上传了 ${dsnSources.length} 个 .dsn，只使用了 ${dsn.name}。每块板请单独转换。`,
+      message: `上传了 ${dsnSources.length} 个 .dsn,只使用了 ${dsn.name}。每块板请单独转换。`,
     })
   }
 
@@ -371,7 +392,7 @@ async function convertSpecctra(sources, warnings) {
     warnings.push({
       level: 'warn',
       code: 'no-routing',
-      message: '只提供了 DSN：只有元件位置、焊盘与网表，走线为空。补上同工程的 .ses 可一并转换布线。',
+      message: '只提供了 DSN:只有元件位置、焊盘与网表,走线为空。补上同工程的 .ses 可一并转换布线。',
     })
   }
 
@@ -386,26 +407,26 @@ async function convertEagle(sources, warnings) {
 
   for (const source of sources) {
     if (source.format.kind !== 'pcb' && source.format.kind !== 'schematic') {
-      throw new EdaConversionError(`${source.name} 不是 EAGLE 的板图或原理图，请只选择 .brd / .sch。`)
+      throw new EdaConversionError(`${source.name} 不是 EAGLE 的板图或原理图,请只选择 .brd / .sch。`)
     }
     const text = decoder.decode(source.bytes)
     if (!looksLikeEagleXml(text)) {
-      throw new EdaConversionError(`${source.name} 看起来不是 EAGLE XML，无法解析。`)
+      throw new EdaConversionError(`${source.name} 看起来不是 EAGLE XML,无法解析。`)
     }
     const parsed = parseEagleXml(text)
     if (parsed.version && Number(parsed.version.split('.')[0]) < 6) {
       warnings.push({
         level: 'warn',
-        message: `${source.name} 的 EAGLE 版本是 ${parsed.version}，只保证 EAGLE 6 及以后 XML 的解析结果。`,
+        message: `${source.name} 的 EAGLE 版本是 ${parsed.version},只保证 EAGLE 6 及以后 XML 的解析结果。`,
       })
     }
     if (source.format.kind === 'pcb') {
-      if (board) throw new EdaConversionError('一次只能转换一块板：检测到多个 EAGLE .brd，请分批转换。')
+      if (board) throw new EdaConversionError('一次只能转换一块板:检测到多个 EAGLE .brd,请分批转换。')
       if (!parsed.board) throw new EdaConversionError(`${source.name} 里没有 <board> 节点。`)
       board = parsed.board
     } else {
       if (schematic) {
-        throw new EdaConversionError('一次只能转换一张 EAGLE 原理图工程：检测到多个 .sch，请分批转换。')
+        throw new EdaConversionError('一次只能转换一张 EAGLE 原理图工程:检测到多个 .sch,请分批转换。')
       }
       if (!parsed.schematic) throw new EdaConversionError(`${source.name} 里没有 <schematic> 节点。`)
       schematic = parsed.schematic
@@ -422,7 +443,7 @@ async function convertEagle(sources, warnings) {
     if (elementNames.size && partNames.length && !partNames.some((name) => elementNames.has(name))) {
       warnings.push({
         level: 'warn',
-        message: '板图与原理图的位号没有交集，可能不是同一个工程；封装和符号仍会分别输出，但不会互相关联。',
+        message: '板图与原理图的位号没有交集,可能不是同一个工程;封装和符号仍会分别输出,但不会互相关联。',
       })
     }
   }
@@ -430,7 +451,53 @@ async function convertEagle(sources, warnings) {
     warnings.push({
       level: 'info',
       message:
-        '本次只转换了 EAGLE 原理图，没有板级数据，因此不生成 .kicad_pcb；封装只保留名称，需要 PCB 时请把同工程的 .brd 一起上传。',
+        '本次只转换了 EAGLE 原理图,没有板级数据,因此不生成 .kicad_pcb;封装只保留名称,需要 PCB 时请把同工程的 .brd 一起上传。',
+    })
+  }
+  return { circuitJson, summary }
+}
+
+async function convertPads(sources, warnings) {
+  const { looksLikePadsAscii, parsePadsAscii, padsToCircuitJson } = await import('./pads.js')
+  const decoder = new TextDecoder('utf-8', { fatal: false })
+  let parsed = null
+
+  for (const source of sources) {
+    if (source.format.kind !== 'pcb') {
+      throw new EdaConversionError(`${source.name} 不是 PADS 板级导出文件,请只选择 .asc。`)
+    }
+    const text = decoder.decode(source.bytes)
+    if (!looksLikePadsAscii(text)) {
+      throw new EdaConversionError(
+        `${source.name} 没有 PADS-POWERPCB 版本头。请用 PADS Layout 的 File → Export → ASCII 重新导出,并确认导出时勾选了所有需要的段落。`,
+      )
+    }
+    if (parsed) {
+      throw new EdaConversionError('一次只能转换一块板:检测到多个 PADS .asc,请分批转换。')
+    }
+    parsed = parsePadsAscii(text)
+  }
+
+  const majorVersion = Number(/^V?(\d+)/.exec(parsed.version || '')?.[1])
+  if (Number.isFinite(majorVersion) && majorVersion < 9) {
+    warnings.push({
+      level: 'warn',
+      message: `PADS 版本是 ${parsed.version},字段顺序按 V9 及以后校验,请对照板图后再使用。`,
+    })
+  }
+  if (parsed.units === 'BASIC') {
+    warnings.push({
+      level: 'info',
+      message: '文件使用 PADS 内部单位(BASIC),已按 1/38100 mil 换算成毫米。',
+    })
+  }
+
+  const circuitJson = padsToCircuitJson(parsed, warnings)
+  const summary = summarize(circuitJson)
+  if (summary.hasBoard && summary.board.tracks === 0) {
+    warnings.push({
+      level: 'info',
+      message: '文件里没有 *ROUTE* 走线段,输出只有元件、焊盘和板框;请在 PADS 里确认已布线并勾选 Routing。',
     })
   }
   return { circuitJson, summary }
@@ -448,7 +515,7 @@ export async function convertEda(sources) {
   const prepared = sources.map((source) => {
     if (source.bytes.byteLength > MAX_INPUT_BYTES) {
       throw new EdaConversionError(
-        `${source.name} 超过 ${MAX_INPUT_BYTES / MB} MiB，浏览器内转换会卡死，请先删掉不需要的图层或拆分工程。`,
+        `${source.name} 超过 ${MAX_INPUT_BYTES / MB} MiB,浏览器内转换会卡死,请先删掉不需要的图层或拆分工程。`,
       )
     }
     return { ...source, format: detectSource(source.name, source.bytes) }
@@ -457,7 +524,7 @@ export async function convertEda(sources) {
   const totalBytes = prepared.reduce((sum, source) => sum + source.bytes.byteLength, 0)
   if (totalBytes > MAX_TOTAL_BYTES) {
     throw new EdaConversionError(
-      `本次上传合计 ${Math.round(totalBytes / MB)} MiB，超过 ${MAX_TOTAL_BYTES / MB} MiB 上限，请分批转换。`,
+      `本次上传合计 ${Math.round(totalBytes / MB)} MiB,超过 ${MAX_TOTAL_BYTES / MB} MiB 上限,请分批转换。`,
     )
   }
 
@@ -468,11 +535,11 @@ export async function convertEda(sources) {
   }
   if (formats.size > 1) {
     throw new EdaConversionError(
-      '一次只能转换同一类来源的文件，请把 Altium、Specctra 与 EAGLE 文件分开上传。',
+      '一次只能转换同一类来源的文件,请把 Altium、Specctra、EAGLE 与 PADS 文件分开上传。',
     )
   }
   const [formatId] = formats
-  if (!['altium', 'specctra', 'eagle'].includes(formatId)) {
+  if (!['altium', 'specctra', 'eagle', 'pads'].includes(formatId)) {
     throw unsupportedMessage(prepared[0], prepared[0].format)
   }
 
@@ -483,22 +550,31 @@ export async function convertEda(sources) {
       ? await convertAltium(prepared, warnings)
       : formatId === 'eagle'
         ? await convertEagle(prepared, warnings)
-        : await convertSpecctra(prepared, warnings)
+        : formatId === 'pads'
+          ? await convertPads(prepared, warnings)
+          : await convertSpecctra(prepared, warnings)
 
   const files = await toKicadFiles(circuitJson, summary, baseNameOf(prepared))
+  return finish(files, formatId, summary, warnings, started, prepared)
+}
 
+function finish(files, source, summary, warnings, started, prepared) {
   if (!files.length) {
-    throw new EdaConversionError('转换器没有产生任何 KiCad 文件，原始文档可能不包含设计内容。')
+    throw new EdaConversionError('转换器没有产生任何 KiCad 文件,原始文档可能不包含设计内容。')
   }
-  if (summary.board && summary.board.tracks === 0 && !warnings.some((warning) => warning.code === 'no-routing')) {
+  if (
+    summary.board &&
+    summary.board.tracks === 0 &&
+    !warnings.some((warning) => warning.code === 'no-routing' || warning.level === 'info')
+  ) {
     warnings.push({
       level: 'warn',
-      message: '输出里没有走线，只有焊盘和放置信息；如果原设计有布线，请检查来源是否完整。',
+      message: '输出里没有走线,只有焊盘和放置信息;如果原设计有布线,请检查来源是否完整。',
     })
   }
 
   return {
-    source: formatId,
+    source,
     files,
     summary,
     warnings,

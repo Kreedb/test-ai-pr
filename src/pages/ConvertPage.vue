@@ -29,6 +29,10 @@ const SAMPLES = [
     label: 'EAGLE SOT23-3（PCB + 原理图）',
     files: ['samples/eagle/SOT23-3.brd', 'samples/eagle/SOT23-3.sch'],
   },
+  {
+    label: 'PADS ASCII（0805 + 排针）',
+    files: ['samples/pads/res0805.asc'],
+  },
 ]
 
 const LOSS_GROUPS = [
@@ -57,6 +61,11 @@ const LOSS_GROUPS = [
     title: 'EAGLE 原理图（.sch）→ .kicad_sch',
     items: LOSS_NOTES.eagleSch,
   },
+  {
+    id: 'pads',
+    title: 'PADS Layout ASCII（.asc）→ .kicad_pcb',
+    items: LOSS_NOTES.pads,
+  },
 ]
 
 const entries = ref([])
@@ -69,7 +78,7 @@ const result = shallowRef(null)
 
 // Formats that actually produce output. Everything else is either a project
 // side file the converters cannot read, or listed as not yet supported.
-const CONVERTIBLE_FORMATS = ['altium', 'specctra', 'eagle']
+const CONVERTIBLE_FORMATS = ['altium', 'specctra', 'eagle', 'pads']
 
 const formatOf = (source) => detectSource(source.name, source.bytes)
 const formatLabel = (id) => SOURCE_FORMATS.find((format) => format.id === id)?.label || '未知格式'
@@ -279,10 +288,10 @@ function clearAll() {
           accept=".PcbDoc,.SchDoc,.pcbdoc,.schdoc,.PrjPcb,.prjpcb,.dsn,.ses,.asc,.brd,.sch,.edif"
           @change="onFileChange"
         />
-        <span class="drop-title">拖拽 Altium / Specctra / EAGLE 文件到这里，或点击选择文件</span>
+        <span class="drop-title">拖拽 Altium / Specctra / EAGLE / PADS 文件到这里,或点击选择文件</span>
         <span class="drop-hint">
-          支持 .PcbDoc、.SchDoc、.dsn、.ses、.brd、.sch，可一次选择整个工程 · 单个文件最大
-          {{ formatBytes(MAX_INPUT_BYTES) }}，合计最大 {{ formatBytes(MAX_TOTAL_BYTES) }}
+          支持 .PcbDoc、.SchDoc、.dsn、.ses、.brd、.sch、.asc,可一次选择整个工程 · 单个文件最大
+          {{ formatBytes(MAX_INPUT_BYTES) }},合计最大 {{ formatBytes(MAX_TOTAL_BYTES) }}
         </span>
       </label>
 
@@ -296,13 +305,13 @@ function clearAll() {
       </ul>
 
       <p v-if="mixedFormats" class="warn-inline">
-        当前混选了不同来源的文件，请只保留同一类（Altium、Specctra 或 EAGLE）。
+        当前混选了不同来源的文件，请只保留同一类（Altium、Specctra、EAGLE 或 PADS）。
       </p>
       <p v-else-if="unsupportedEntries.length" class="warn-inline">
         {{ entryNames(unsupportedEntries) }} 的格式尚未接入，见下方支持列表。
       </p>
       <p v-else-if="ignoredEntries.length" class="muted small">
-        {{ entryNames(ignoredEntries) }} 不是转换输入（如 .PrjPcb 工程文件），已忽略。
+        {{ entryNames(ignoredEntries) }} 不是可转换的输入（工程侧文件如 .PrjPcb，或缺少 PADS-POWERPCB 版本头的 .asc），已忽略。
       </p>
 
       <div class="actions">
@@ -423,7 +432,8 @@ function clearAll() {
       </div>
       <p class="export-note">
         转换器来自 tscircuit 的开源项目：altium-to-circuit-json、dsn-to-circuit-json、circuit-json-to-kicad（均为 MIT）。
-        EAGLE XML 由本仓库的 src/lib/eagle.js 解析（fast-xml-parser，MIT）。文件不会上传到任何服务器。
+        EAGLE XML 与 PADS Layout ASCII 由本仓库的 src/lib/eagle.js、src/lib/pads.js 解析（fast-xml-parser，MIT）。
+        文件不会上传到任何服务器。
       </p>
     </section>
   </main>

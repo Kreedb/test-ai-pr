@@ -1,8 +1,9 @@
 {
-  "name": "vite-vue3-starter",
+  "name": "ethercat-toolbox",
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "license": "GPL-3.0-only",
   "engines": {
     "node": "^20.19.0 || >=22.12.0"
   },
@@ -12,10 +13,27 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "vue": "^3.5.44"
+    "@flatten-js/core": "^1.6.15",
+    "@tscircuit/circuit-json-util": "^0.0.129",
+    "@tscircuit/solver-utils": "^0.0.25",
+    "altium-to-circuit-json": "0.0.109",
+    "altiumts": "0.0.94",
+    "circuit-json-to-connectivity-map": "^0.0.36",
+    "circuit-json-to-kicad": "0.0.262",
+    "dsn-to-circuit-json": "0.0.8",
+    "dsnts": "^0.1.12",
+    "earcut": "^3.2.4",
+    "fflate": "^0.8.2",
+    "graphics-debug": "^0.0.101",
+    "kicadts": "0.0.63",
+    "vue": "^3.5.44",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.10",
     "vite": "^8.3.5"
+  },
+  "overrides": {
+    "altiumts": "0.0.94"
   }
 }

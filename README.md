@@ -21,10 +21,24 @@
 - 只存在于 SII 镜像、无法写入 ESI 的字段以 `*` 标注，并在提示中说明。
 - 原始十六进制视图与原始 `.bin` 下载。
 
+### EDA 转 KiCad（`#/convert`）
+
+- 输入 Altium `.PcbDoc` / `.SchDoc`，或 Specctra `.dsn` / `.ses`（Allegro、OrCAD PCB Designer、PADS Layout、Xpedition 都能导出），可一次选中整个工程。
+- 输出 `.kicad_pcb`、`.kicad_sch`（层次化工程会输出根图 + 每张子图）与 `.kicad_pro`，多文件时可打包成 zip 下载。
+- PCB 与原理图同时上传时按同一工程对齐元件与网络。
+- 页面固定列出每个来源可能无法无损转换的内容（层数上限、3D 模型、设计规则、敷铜、符号图形、走线需 SES 等）。
+- 转换在浏览器本地完成，不会上传任何设计文件。
+- 尚未接入 PADS ASCII `.asc`、Allegro/OrCAD 二进制 `.brd`；页面会提示改用 Specctra DSN 导出。
+
+转换器来自 tscircuit 的开源项目（`altium-to-circuit-json`、`dsn-to-circuit-json`、`circuit-json-to-kicad`），
+许可与示例数据来源见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
+
 ## 示例数据
 
 - `public/samples/akd-eeprom.bin`：Kollmorgen AKD 驱动的 EEPROM 转储（来自 [ethercrab](https://github.com/ethercrab-rs/ethercrab) 的测试数据）。
 - `public/samples/limx-tron2.bin` / `public/samples/limx-tron2.xml`：Limx Tron2 的 EEPROM 转储与对应的 TwinCAT ESI 描述文件。解析再导出后重新编译，结果与 `.bin` 逐字节一致。
+- `public/samples/altium/`：来自 [luxonis/oak-hardware](https://github.com/luxonis/oak-hardware)（MIT）的 PA6940 工程，含一块 PCB 与两张原理图，用于演示工程级转换。
+- `public/samples/specctra/motor-driver.dsn`：Specctra DSN 样例，用于演示只有布局与网表、没有走线的转换结果。
 
 ## 代码结构
 
@@ -34,11 +48,12 @@ src/lib/esi.js          # ESI XML -> SII 生成器，以及 SII -> ESI XML 导�
 src/lib/editor.js       # 解析结果的可编辑模型：字符串/名称同步、列表增删、导出参数
 src/lib/format.js       # 显示格式化与字段解析辅助函数
 src/lib/download.js     # 浏览器下载辅助函数
+src/lib/eda.js          # EDA -> KiCad 转换引擎：格式识别、按需加载转换器、结果汇总
 src/router.js           # 极简 hash 路由（GitHub Pages 子路径下无需重写规则）
-src/pages/              # 导航页、解析器页
+src/pages/              # 导航页、解析器页、EDA 转换页
 src/components/         # 可编辑表格、PDO、DC、十六进制视图
 src/App.vue             # 页面外壳：品牌、导航、路由出口、页脚
-public/samples/         # 示例 EEPROM 转储与 ESI XML
+public/samples/         # 示例 EEPROM 转储、ESI XML、Altium 与 Specctra 工程文件
 ```
 
 解析规则参考 ETG.1000.6（固定头、类别、General、FMMU）、ETG.2010（Strings、DC、PDO）与 ETG.2000（EtherCATInfo XML）。所有多字节字段按小端处理。
@@ -82,3 +97,11 @@ Navigation uses hash routes (`#/parser`), so no server-side rewrite rules are ne
 ```js
 import { parseSii } from '@/lib/sii'
 ```
+
+## License
+
+本项目以 [GNU General Public License v3.0](LICENSE) 发布。集成的第三方转换库与示例数据的许可见
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
+
+`package.json` 里的 `overrides` 把 `altiumts` 固定到 npm registry 版本，`.npmrc` 打开 `legacy-peer-deps`，
+两者都是为了让 tscircuit 这些依赖未声明完整的包能直接 `npm ci` 安装。

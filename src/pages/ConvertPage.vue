@@ -5,6 +5,7 @@ import { downloadBlob, fileBaseName } from '@/lib/download'
 import {
   LOSS_NOTES,
   MAX_INPUT_BYTES,
+  MAX_TOTAL_BYTES,
   SOURCE_FORMATS,
   convertEda,
   detectSource,
@@ -52,20 +53,40 @@ const errorDetail = ref('')
 const sampleLabel = ref('')
 const result = shallowRef(null)
 
+// Formats that actually produce output. Everything else is either a project
+// side file the converters cannot read, or listed as not yet supported.
+const CONVERTIBLE_FORMATS = ['altium', 'specctra']
+
 const formatOf = (source) => detectSource(source.name, source.bytes)
-const formatLabel = (id) => SOURCE_FORMATS.find((format) => format.id === id)?.label || id
+const formatLabel = (id) => SOURCE_FORMATS.find((format) => format.id === id)?.label || '未知格式'
+const entryNames = (list) => list.map((entry) => entry.name).join('、')
 
-const mixedFormats = computed(() => {
-  const ids = new Set(entries.value.map((entry) => formatOf(entry).id))
-  return ids.size > 1
-})
-
-const unsupportedEntries = computed(() =>
-  entries.value.filter((entry) => !['altium', 'specctra'].includes(formatOf(entry).id)),
+// Project side files (`.PrjPcb`, `.PcbLib`, `.OutJob`) carry nothing the
+// converters can read. Keep them visible but never count them as a source.
+const ignoredEntries = computed(() =>
+  entries.value.filter((entry) => formatOf(entry).id === 'unknown'),
 )
 
+const unsupportedEntries = computed(() =>
+  entries.value.filter((entry) => {
+    const { id } = formatOf(entry)
+    return id !== 'unknown' && !CONVERTIBLE_FORMATS.includes(id)
+  }),
+)
+
+const sourceFormats = computed(
+  () =>
+    new Set(
+      entries.value
+        .map((entry) => formatOf(entry).id)
+        .filter((id) => CONVERTIBLE_FORMATS.includes(id)),
+    ),
+)
+
+const mixedFormats = computed(() => sourceFormats.value.size > 1)
+
 const canConvert = computed(
-  () => entries.value.length > 0 && !mixedFormats.value && !unsupportedEntries.value.length,
+  () => sourceFormats.value.size > 0 && !mixedFormats.value && !unsupportedEntries.value.length,
 )
 
 const stats = computed(() => {
@@ -112,12 +133,30 @@ async function addFiles(fileList) {
   error.value = ''
   errorDetail.value = ''
   try {
+    // Check the declared sizes before reading anything: a 200 MB PcbDoc must
+    // be refused without being buffered first.
+    const pending = []
+    let total = entries.value.reduce((sum, entry) => sum + entry.bytes.length, 0)
     for (const file of files) {
       if (!file.size) throw new Error(`${file.name} 是空文件`)
-      const bytes = new Uint8Array(await file.arrayBuffer())
+      if (file.size > MAX_INPUT_BYTES) {
+        throw new Error(`${file.name} 超过 ${formatBytes(MAX_INPUT_BYTES)} 上限，请先拆分工程。`)
+      }
       if (entries.value.some((entry) => entry.name === file.name)) continue
-      entries.value.push({ name: file.name, bytes })
+      if (pending.some((item) => item.name === file.name)) continue
+      total += file.size
+      if (total > MAX_TOTAL_BYTES) {
+        throw new Error(`本次上传合计超过 ${formatBytes(MAX_TOTAL_BYTES)} 上限，请分批转换。`)
+      }
+      pending.push(file)
     }
+    const added = await Promise.all(
+      pending.map(async (file) => ({
+        name: file.name,
+        bytes: new Uint8Array(await file.arrayBuffer()),
+      })),
+    )
+    entries.value.push(...added)
     sampleLabel.value = ''
     result.value = null
   } catch (cause) {
@@ -171,7 +210,10 @@ async function runConversion() {
   errorDetail.value = ''
   result.value = null
   try {
-    result.value = await convertEda(entries.value.map(({ name, bytes }) => ({ name, bytes })))
+    const inputs = entries.value
+      .filter((entry) => CONVERTIBLE_FORMATS.includes(formatOf(entry).id))
+      .map(({ name, bytes }) => ({ name, bytes }))
+    result.value = await convertEda(inputs)
   } catch (cause) {
     error.value = cause.message || '转换失败'
     errorDetail.value = cause.detail || ''
@@ -220,13 +262,13 @@ function clearAll() {
         <input
           type="file"
           multiple
-          accept=".PcbDoc,.SchDoc,.pcbdoc,.schdoc,.dsn,.ses,.asc,.brd,.edif"
+          accept=".PcbDoc,.SchDoc,.pcbdoc,.schdoc,.PrjPcb,.prjpcb,.dsn,.ses,.asc,.brd,.edif"
           @change="onFileChange"
         />
         <span class="drop-title">拖拽 Altium / Specctra 文件到这里，或点击选择文件</span>
         <span class="drop-hint">
           支持 .PcbDoc、.SchDoc、.dsn、.ses，可一次选择整个工程 · 单个文件最大
-          {{ formatBytes(MAX_INPUT_BYTES) }}
+          {{ formatBytes(MAX_INPUT_BYTES) }}，合计最大 {{ formatBytes(MAX_TOTAL_BYTES) }}
         </span>
       </label>
 
@@ -243,7 +285,10 @@ function clearAll() {
         当前混选了不同来源的文件，请只保留同一类（Altium 或 Specctra）。
       </p>
       <p v-else-if="unsupportedEntries.length" class="warn-inline">
-        {{ unsupportedEntries[0].name }} 的格式尚未接入，见下方支持列表。
+        {{ entryNames(unsupportedEntries) }} 的格式尚未接入，见下方支持列表。
+      </p>
+      <p v-else-if="ignoredEntries.length" class="muted small">
+        {{ entryNames(ignoredEntries) }} 不是转换输入（如 .PrjPcb 工程文件），已忽略。
       </p>
 
       <div class="actions">

@@ -93,22 +93,35 @@ test('converts an EAGLE project into a KiCad project', async () => {
   }
 })
 
-test('keeps schematic wires attached to symbol pins', () => {
+test('schematic pin positions match the EAGLE wire endpoints', () => {
   const { schematic } = parseEagleXml(new TextDecoder().decode(sample('SOT23-3.sch')))
   const circuitJson = eagleToCircuitJson({ schematic })
   const ports = circuitJson.filter((element) => element.type === 'schematic_port')
-  const edges = circuitJson
-    .filter((element) => element.type === 'schematic_trace')
-    .flatMap((trace) => trace.edges || [])
+
+  const toArray = (value) => (value === undefined ? [] : Array.isArray(value) ? value : [value])
+  const wireEnds = []
+  for (const sheet of toArray(schematic.sheets?.sheet)) {
+    for (const net of toArray(sheet.nets?.net)) {
+      for (const segment of toArray(net.segment)) {
+        for (const wire of toArray(segment.wire)) {
+          // Schematic Circuit JSON is in 1/15 mm, EAGLE writes millimetres.
+          wireEnds.push(
+            { x: Number(wire.x1) / 15, y: Number(wire.y1) / 15 },
+            { x: Number(wire.x2) / 15, y: Number(wire.y2) / 15 },
+          )
+        }
+      }
+    }
+  }
 
   assert.equal(ports.length, 6)
   for (const port of ports) {
-    const attached = edges.some(
-      (edge) =>
-        Math.hypot(edge.from.x - port.center.x, edge.from.y - port.center.y) < 0.02 ||
-        Math.hypot(edge.to.x - port.center.x, edge.to.y - port.center.y) < 0.02,
+    // Compare against the raw source coordinates rather than the snapped trace
+    // edges, so a wrong pin transform cannot hide behind snapToPort().
+    const attached = wireEnds.some(
+      (point) => Math.hypot(point.x - port.center.x, point.y - port.center.y) < 0.02,
     )
-    assert.ok(attached, `pin ${port.pin_number} is not attached to a wire`)
+    assert.ok(attached, `pin ${port.pin_number} does not line up with an EAGLE wire endpoint`)
   }
 })
 
@@ -122,9 +135,10 @@ test('mirrored elements keep their layer, pad positions and nets', async () => {
 <wire x1="20" y1="0" x2="20" y2="20" width="0" layer="20"/>
 <wire x1="20" y1="20" x2="0" y2="20" width="0" layer="20"/>
 <wire x1="0" y1="20" x2="0" y2="0" width="0" layer="20"/>
+<text x="1" y="1" size="1" layer="48">doc note</text>
 </plain>
 <libraries><library name="lib"><packages><package name="PKG">
-<smd name="1" x="0" y="0" dx="1" dy="0.5" layer="1"/>
+<smd name="1" x="0" y="0" dx="1" dy="0.5" layer="1" roundness="50"/>
 <pad name="2" x="2" y="0" drill="0.8" diameter="1.6" shape="square"/>
 <wire x1="-1" y1="-1" x2="1" y2="-1" width="0.15" layer="21"/>
 </package></packages></library></libraries>
@@ -148,12 +162,19 @@ test('mirrored elements keep their layer, pad positions and nets', async () => {
 
   const pcb = result.files[0].content
   assert.doesNotThrow(() => kicad.parseKicadPcb(pcb))
+  assert.ok(!pcb.includes('doc note'), 'Document-layer notes must not become silkscreen text')
 
   const mirrored = footprintFor(pcb, 'U2')
   assert.ok(mirrored?.includes('(layer B.Cu)'), 'mirrored part should land on the bottom layer')
 
-  // EAGLE rotates counter-clockwise: U2 at (15, 10) is mirrored then rotated
-  // 90 degrees, so its through-hole pad (local 2,0) ends up 2 mm below the part.
+  // EAGLE roundness is a fraction of half the short side: 50% on a 1 x 0.5 mm
+  // pad is a 0.125 mm corner radius, i.e. a 0.25 roundrect ratio.
+  const top = footprintFor(pcb, 'U1')
+  const smd = findBlock(top, top.indexOf('(pad "1"'), '(pad "1"')
+  assert.ok(smd?.includes('roundrect_rratio 0.25'), `unexpected roundness: ${smd}`)
+
+  // EAGLE rotates counter-clockwise and then mirrors, so U2 at (15, 10) with
+  // rot="MR90" puts its through-hole pad (local 2,0) 2 mm above the part.
   // Rebuild the absolute offset the way KiCad renders footprint-local pads.
   const tht = findBlock(mirrored, mirrored.indexOf('(pad "2"'), '(pad "2"')
   assert.ok(tht?.includes('"GND"'), 'through-hole pad should keep the GND net')
@@ -166,5 +187,12 @@ test('mirrored elements keep their layer, pad positions and nets', async () => {
   const offsetX = localX * Math.cos(angle) + localY * Math.sin(angle)
   const offsetY = -(-localX * Math.sin(angle) + localY * Math.cos(angle))
   assert.ok(Math.abs(offsetX) < 0.01, 'pad 2 x offset should be 0')
-  assert.ok(Math.abs(offsetY + 2) < 0.01, 'pad 2 should sit 2 mm below the mirrored part')
+  assert.ok(Math.abs(offsetY - 2) < 0.01, 'pad 2 should sit 2 mm above the mirrored part')
+  // KiCad stores pad angles as absolute board angles, so the mirrored part's
+  // footprint rotation is part of the pad angle.
+  assert.equal(
+    ((Number(padAt[3]) % 360) + 360) % 360,
+    90,
+    'pad angle should include the component rotation',
+  )
 })

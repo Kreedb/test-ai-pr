@@ -125,11 +125,16 @@ function createPlacement(node) {
     ...rotation,
     origin,
     place(point) {
-      const placed = rotate(mirrorPoint(point, rotation.mirror), rotation.angle)
+      // EAGLE applies the rotation first and mirrors afterwards (KiCad's own
+      // importer sets `angle + 180` then flips the footprint, which is
+      // equivalent to rotate-then-mirror). For 0/180 the order makes no
+      // difference, but a mirrored part rotated 90/270 would be wrong the
+      // other way round.
+      const placed = mirrorPoint(rotate(point, rotation.angle), rotation.mirror)
       return { x: origin.x + placed.x, y: origin.y + placed.y }
     },
     vector(direction) {
-      return rotate(mirrorPoint(direction, rotation.mirror), rotation.angle)
+      return mirrorPoint(rotate(direction, rotation.angle), rotation.mirror)
     },
   }
 }
@@ -331,10 +336,14 @@ function packageGeometry(pkg, element, ctx) {
     const roundness = Math.min(Math.max(num(smd.roundness), 0), 100)
     const layer = copperLayer(flipLayer(num(smd.layer, 1), mirrored)) || 'top'
     const port = ensurePort(ctx, element.name, smd.name, padIndex)
-    // Circuit JSON pad positions and angles are absolute board values; the
-    // KiCad writer converts them back to footprint-local coordinates.
+    // KiCad stores a pad's angle as an absolute board angle (a footprint
+    // rotated 90 degrees has pads at 90, not 0), so the component rotation is
+    // part of `ccw_rotation`. Positions go through the same absolute
+    // placement; circuit-json-to-kicad converts them back to footprint-local.
     const angle = placement.angle + (mirrored ? -padRot.angle : padRot.angle)
-    const cornerRadius = roundness > 0 ? (Math.min(width, height) * roundness) / 100 : undefined
+    // EAGLE's roundness is a percentage of the corner radius relative to half
+    // the short side, i.e. the KiCad roundrect ratio is roundness / 200.
+    const cornerRadius = roundness > 0 ? (Math.min(width, height) * roundness) / 200 : undefined
     const pad =
       width === height && roundness >= 100
         ? { shape: 'circle', radius: width / 2 }
@@ -600,6 +609,7 @@ function addBoardOutline(board, ctx, warnings) {
       pcb_cutout_id: ctx.id('pcb_cutout', `cutout_${ctx.elements.length}`),
       shape: 'path',
       route: [...ring, ring[0]],
+      slot_width: 0,
     })
   }
   return outline
@@ -718,6 +728,8 @@ function convertBoard(board, ctx, warnings) {
     })
   }
   for (const text of list(board?.plain?.text)) {
+    const layer = num(text.layer)
+    if (![21, 22, 25, 26, 27, 28].includes(layer)) continue
     const value = String(text['#text'] ?? '').trim()
     if (!value) continue
     const rotation = parseRotation(text.rot)
@@ -730,7 +742,7 @@ function convertBoard(board, ctx, warnings) {
       anchor_position: { x: num(text.x), y: num(text.y) },
       anchor_alignment: 'bottom_left',
       ccw_rotation: rotation.mirror ? -rotation.angle : rotation.angle,
-      layer: [22, 26, 28].includes(num(text.layer)) ? 'bottom' : 'top',
+      layer: [22, 26, 28].includes(layer) ? 'bottom' : 'top',
       is_mirrored: rotation.mirror,
     })
   }

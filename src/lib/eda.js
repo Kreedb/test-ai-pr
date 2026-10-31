@@ -59,7 +59,7 @@ export const SOURCE_FORMATS = [
     extensions: ['.brd'],
     status: 'planned',
     converts: 'PCB',
-    note: '二进制格式随版本变化且未公开，暂未支持。Allegro 用 File → Export → Specctra 导出 DSN，或提供 Gerber 再转换。',
+    note: '二进制格式随版本变化且未公开，暂未支持；EAGLE 5 及更早的二进制 .brd 也不支持。Allegro 用 File → Export → Specctra 导出 DSN，或提供 Gerber 再转换。',
   },
   {
     id: 'orcad',
@@ -102,7 +102,8 @@ export const LOSS_NOTES = {
     '设计规则、网络类、层叠材料和盲埋孔定义不导出；过孔只按 extent 还原起始/结束层。',
     '铜皮（多边形覆铜）以 KiCad zone 输出，但隔离带和灌注参数会重算，需要在 KiCad 里重新灌注。',
     '焊盘叠层的热焊盘/反焊盘、自定义焊盘（只支持方、圆、椭圆）会简化；八角焊盘按方焊盘输出。',
-    '元件属性（manufacturer、MPN、自定义属性）和 3D 封装数据不导出。',
+    '元件属性（manufacturer、MPN、自定义属性）和 3D 封装数据不导出；KiCad 封装的 Value 字段为空，原理图里的符号值仍会保留。',
+    'Document（48）等非丝印层的说明文字不导出，避免把工艺备注印到板子上。',
     '丝印按线条和文字重建，EAGLE 矢量字体会被 KiCad 字体替换，弧形导线按直线近似。',
   ],
   eagleSch: [
@@ -129,7 +130,7 @@ function isCompoundFile(bytes) {
 }
 
 function leadingText(bytes) {
-  const sample = bytes.subarray(0, 512)
+  const sample = bytes.subarray(0, 4096)
   return new TextDecoder('utf-8', { fatal: false }).decode(sample).replace(/^﻿/, '')
 }
 
@@ -425,16 +426,11 @@ async function convertEagle(sources, warnings) {
       })
     }
   }
-  if (!summary.hasBoard) {
-    warnings.push({
-      level: 'info',
-      message: '本次只转换了 EAGLE 原理图，没有板级数据，因此不生成 .kicad_pcb。',
-    })
-  }
   if (summary.hasSchematic && !summary.hasBoard) {
     warnings.push({
       level: 'info',
-      message: '没有上传同工程的 .brd，原理图里的封装只保留名称，需要的话请把 .brd 一起上传。',
+      message:
+        '本次只转换了 EAGLE 原理图，没有板级数据，因此不生成 .kicad_pcb；封装只保留名称，需要 PCB 时请把同工程的 .brd 一起上传。',
     })
   }
   return { circuitJson, summary }

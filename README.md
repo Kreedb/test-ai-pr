@@ -23,12 +23,12 @@
 
 ### EDA 转 KiCad（`#/convert`）
 
-- 输入 Altium `.PcbDoc` / `.SchDoc`、Specctra `.dsn` / `.ses`（Allegro、OrCAD PCB Designer、PADS Layout、Xpedition 都能导出），或 EAGLE XML `.brd` / `.sch`，可一次选中整个工程。
+- 输入 Altium `.PcbDoc` / `.SchDoc`、Specctra `.dsn` / `.ses`（Allegro、OrCAD PCB Designer、PADS Layout、Xpedition 都能导出）、EAGLE XML `.brd` / `.sch`，或 PADS Layout ASCII `.asc`，可一次选中整个工程。
 - 输出 `.kicad_pcb`、`.kicad_sch`（层次化工程会输出根图 + 每张子图）与 `.kicad_pro`，多文件时可打包成 zip 下载。
 - PCB 与原理图同时上传时按同一工程对齐元件与网络。
 - 页面固定列出每个来源可能无法无损转换的内容（层数上限、3D 模型、设计规则、敷铜、符号图形、走线需 SES 等）。
 - 转换在浏览器本地完成，不会上传任何设计文件。
-- 尚未接入 PADS ASCII `.asc`、Allegro/OrCAD 二进制 `.brd`；页面会提示改用 Specctra DSN 导出。
+- 尚未接入 Allegro/OrCAD 二进制 `.brd`、PADS 二进制 `.pcb`、OrCAD Capture `.dsn` 与 PADS Logic 原理图：这些格式的记录布局未公开，需要逆向客户端二进制；页面会提示改用 Specctra DSN、IPC-2581 或 Gerber 导出。
 
 #### 中间格式的选择
 
@@ -43,7 +43,8 @@
 - 如果以后需要更多输出（Gerber、BOM、坐标文件），只需再接一个 Circuit JSON 写出器，现有输入解析器不用改。
 
 转换器来自 tscircuit 的开源项目（`altium-to-circuit-json`、`dsn-to-circuit-json`、`circuit-json-to-kicad`），
-EAGLE XML 由仓库内的 `src/lib/eagle.js` 解析；许可与示例数据来源见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
+EAGLE XML 与 PADS ASCII 分别由仓库内的 `src/lib/eagle.js`、`src/lib/pads.js` 解析；
+许可与示例数据来源见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
 
 ## 示例数据
 
@@ -52,6 +53,7 @@ EAGLE XML 由仓库内的 `src/lib/eagle.js` 解析；许可与示例数据来�
 - `public/samples/altium/`：来自 [luxonis/oak-hardware](https://github.com/luxonis/oak-hardware)（MIT）的 PA6940 工程，含一块 PCB 与两张原理图，用于演示工程级转换。
 - `public/samples/specctra/motor-driver.dsn`：Specctra DSN 样例，用于演示只有布局与网表、没有走线的转换结果。
 - `public/samples/eagle/SOT23-3.brd` / `SOT23-3.sch`：来自 [tedyapo/ugly-smd-adapters](https://github.com/tedyapo/ugly-smd-adapters)（MIT）的 EAGLE 7.3 转接板，用于演示 EAGLE 板图与原理图一起转换。
+- `public/samples/pads/res0805.asc`：按 [tscircuit/padsts](https://github.com/tscircuit/padsts)（MIT）测试资产的格式改写的 PADS Layout ASCII 样例，含 SMD、通孔、走线、过孔、敷铜与丝印，用于演示 PADS 转换。
 
 ## 代码结构
 
@@ -63,11 +65,12 @@ src/lib/format.js       # 显示格式化与字段解析辅助函数
 src/lib/download.js     # 浏览器下载辅助函数
 src/lib/eda.js          # EDA -> KiCad 转换引擎：格式识别、按需加载转换器、结果汇总
 src/lib/eagle.js        # EAGLE XML 板图/原理图 -> Circuit JSON 的映射
+src/lib/pads.js         # PADS Layout ASCII -> Circuit JSON 的映射
 src/router.js           # 极简 hash 路由（GitHub Pages 子路径下无需重写规则）
 src/pages/              # 导航页、解析器页、EDA 转换页
 src/components/         # 可编辑表格、PDO、DC、十六进制视图
 src/App.vue             # 页面外壳：品牌、导航、路由出口、页脚
-public/samples/         # 示例 EEPROM 转储、ESI XML、Altium / Specctra / EAGLE 工程文件
+public/samples/         # 示例 EEPROM 转储、ESI XML、Altium / Specctra / EAGLE / PADS 工程文件
 ```
 
 解析规则参考 ETG.1000.6（固定头、类别、General、FMMU）、ETG.2010（Strings、DC、PDO）与 ETG.2000（EtherCATInfo XML）。所有多字节字段按小端处理。

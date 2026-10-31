@@ -2,7 +2,9 @@
 
 本仓库以 GPL-3.0 发布（见 `LICENSE`）。`#/convert`（EDA 转 KiCad）页面集成了下列开源项目，
 它们全部是 GPL-3.0 兼容的宽松许可（MIT / ISC / Apache-2.0 / BSD / Unlicense）。
-EAGLE XML 的字段映射是本仓库自己的代码（`src/lib/eagle.js`），只依赖 `fast-xml-parser` 做 XML 解析。
+EAGLE XML 与 PADS Layout ASCII 的字段映射是本仓库自己的代码（`src/lib/eagle.js`、`src/lib/pads.js`），
+只依赖 `fast-xml-parser` 做 XML 解析。PADS ASCII 的字段顺序除对照 tscircuit 的 `padsts` 之外，
+还与 KiCad（GPL-3.0-or-later，与本仓库许可相同）的 `pcbnew/pcb_io/pads` 导入器交叉核对，未复制其代码。
 
 ## 运行时依赖
 
@@ -40,10 +42,13 @@ EAGLE XML 的字段映射是本仓库自己的代码（`src/lib/eagle.js`），�
 | `public/samples/altium/PA6940.PcbDoc`、`M8_Y-adapter.SchDoc`、`Project_Information.SchDoc` | [luxonis/oak-hardware](https://github.com/luxonis/oak-hardware) 的 PA6940 YM8-Adapter 工程 | MIT，Copyright (c) 2020 luxonis |
 | `public/samples/specctra/motor-driver.dsn` | [tscircuit/dsn-to-circuit-json](https://github.com/tscircuit/dsn-to-circuit-json) 的测试资产 | MIT，Copyright (c) 2025 tscircuit Inc. |
 | `public/samples/eagle/SOT23-3.brd`、`SOT23-3.sch` | [tedyapo/ugly-smd-adapters](https://github.com/tedyapo/ugly-smd-adapters) 的 SOT23-3 转接板 | MIT，Copyright (c) 2016 Theodore C. Yapo |
+| `public/samples/pads/res0805.asc` | 按 [tscircuit/padsts](https://github.com/tscircuit/padsts) 测试资产的格式改写的 PADS Layout ASCII 样例 | MIT，Copyright (c) 2025 tscircuit Inc. |
+| `test/fixtures/pads/*.asc` | [tscircuit/padsts](https://github.com/tscircuit/padsts) 的 `tests/fixtures` PADS ASCII 回归资产 | MIT，Copyright (c) 2025 tscircuit Inc. |
 | `public/samples/akd-eeprom.bin` | [ethercrab-rs/ethercrab](https://github.com/ethercrab-rs/ethercrab) 测试数据 | 见上游仓库 |
 | `public/samples/limx-tron2.bin`、`limx-tron2.xml` | Limx Dynamics Tron2 EEPROM 转储与 TwinCAT ESI | 见上游 |
 
 ## 商标
 
 Altium Designer、Cadence Allegro、OrCAD、PADS、KiCad 等名称归各自所有者所有，本项目与这些厂商无隶属关系。
-转换器按社区逆向整理的公开文档实现，不包含厂商代码。
+转换器按社区逆向整理的公开文档实现，不包含厂商代码；PADS ASCII 是 PADS Layout 官方提供的导出格式，
+解析的是导出文件而不是 PADS 的二进制数据库。

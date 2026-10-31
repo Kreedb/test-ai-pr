@@ -25,6 +25,10 @@ const SAMPLES = [
     label: 'Specctra DSN',
     files: ['samples/specctra/motor-driver.dsn'],
   },
+  {
+    label: 'EAGLE SOT23-3（PCB + 原理图）',
+    files: ['samples/eagle/SOT23-3.brd', 'samples/eagle/SOT23-3.sch'],
+  },
 ]
 
 const LOSS_GROUPS = [
@@ -43,6 +47,16 @@ const LOSS_GROUPS = [
     title: 'Specctra DSN / SES → .kicad_pcb',
     items: LOSS_NOTES.dsn,
   },
+  {
+    id: 'eaglePcb',
+    title: 'EAGLE 板图（.brd）→ .kicad_pcb',
+    items: LOSS_NOTES.eaglePcb,
+  },
+  {
+    id: 'eagleSch',
+    title: 'EAGLE 原理图（.sch）→ .kicad_sch',
+    items: LOSS_NOTES.eagleSch,
+  },
 ]
 
 const entries = ref([])
@@ -55,7 +69,7 @@ const result = shallowRef(null)
 
 // Formats that actually produce output. Everything else is either a project
 // side file the converters cannot read, or listed as not yet supported.
-const CONVERTIBLE_FORMATS = ['altium', 'specctra']
+const CONVERTIBLE_FORMATS = ['altium', 'specctra', 'eagle']
 
 const formatOf = (source) => detectSource(source.name, source.bytes)
 const formatLabel = (id) => SOURCE_FORMATS.find((format) => format.id === id)?.label || '未知格式'
@@ -262,12 +276,12 @@ function clearAll() {
         <input
           type="file"
           multiple
-          accept=".PcbDoc,.SchDoc,.pcbdoc,.schdoc,.PrjPcb,.prjpcb,.dsn,.ses,.asc,.brd,.edif"
+          accept=".PcbDoc,.SchDoc,.pcbdoc,.schdoc,.PrjPcb,.prjpcb,.dsn,.ses,.asc,.brd,.sch,.edif"
           @change="onFileChange"
         />
-        <span class="drop-title">拖拽 Altium / Specctra 文件到这里，或点击选择文件</span>
+        <span class="drop-title">拖拽 Altium / Specctra / EAGLE 文件到这里，或点击选择文件</span>
         <span class="drop-hint">
-          支持 .PcbDoc、.SchDoc、.dsn、.ses，可一次选择整个工程 · 单个文件最大
+          支持 .PcbDoc、.SchDoc、.dsn、.ses、.brd、.sch，可一次选择整个工程 · 单个文件最大
           {{ formatBytes(MAX_INPUT_BYTES) }}，合计最大 {{ formatBytes(MAX_TOTAL_BYTES) }}
         </span>
       </label>
@@ -282,7 +296,7 @@ function clearAll() {
       </ul>
 
       <p v-if="mixedFormats" class="warn-inline">
-        当前混选了不同来源的文件，请只保留同一类（Altium 或 Specctra）。
+        当前混选了不同来源的文件，请只保留同一类（Altium、Specctra 或 EAGLE）。
       </p>
       <p v-else-if="unsupportedEntries.length" class="warn-inline">
         {{ entryNames(unsupportedEntries) }} 的格式尚未接入，见下方支持列表。
@@ -365,7 +379,8 @@ function clearAll() {
         <span class="badge">有损转换</span>
       </div>
       <p class="muted small">
-        转换在浏览器里完成，中间模型是 Circuit JSON。下列内容在导出的 KiCad 文件里会被简化或丢失，
+        所有来源先解析成统一的中间模型 Circuit JSON，再统一写出 KiCad（.kicad_pcb / .kicad_sch / .kicad_pro），
+        因此新增一种来源只需要补一个解析器。下列内容在导出的 KiCad 文件里会被简化或丢失，
         请在 KiCad 打开后逐项核对，再重新灌注敷铜、补 3D 模型和设计规则。
       </p>
       <div class="loss-grid">
@@ -408,7 +423,7 @@ function clearAll() {
       </div>
       <p class="export-note">
         转换器来自 tscircuit 的开源项目：altium-to-circuit-json、dsn-to-circuit-json、circuit-json-to-kicad（均为 MIT）。
-        文件不会上传到任何服务器。
+        EAGLE XML 由本仓库的 src/lib/eagle.js 解析（fast-xml-parser，MIT）。文件不会上传到任何服务器。
       </p>
     </section>
   </main>

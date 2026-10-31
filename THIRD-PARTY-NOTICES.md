@@ -2,8 +2,8 @@
 
 本仓库以 GPL-3.0 发布（见 `LICENSE`）。`#/convert`（EDA 转 KiCad）页面集成了下列开源项目，
 它们全部是 GPL-3.0 兼容的宽松许可（MIT / ISC / Apache-2.0 / BSD / Unlicense）。
-EAGLE XML 与 PADS Layout ASCII 的字段映射是本仓库自己的代码（`src/lib/eagle.js`、`src/lib/pads.js`），
-只依赖 `fast-xml-parser` 做 XML 解析。PADS ASCII 的字段顺序除对照 tscircuit 的 `padsts` 之外，
+EAGLE XML 与 PADS Layout ASCII 的字段映射是本仓库自己的代码（`src/lib/eagle.js`、`src/lib/pads.js`）：
+前者只用 `fast-xml-parser` 做 XML 解析，后者是纯文本解析、没有额外依赖。PADS ASCII 的字段顺序除对照 tscircuit 的 `padsts` 之外，
 还与 KiCad（GPL-3.0-or-later，与本仓库许可相同）的 `pcbnew/pcb_io/pads` 导入器交叉核对，未复制其代码。
 
 ## 运行时依赖

@@ -5,6 +5,7 @@ import { onUnmounted, ref } from 'vue'
 export const routes = [
   { path: '/', label: '首页' },
   { path: '/parser', label: 'EEPROM 解析器' },
+  { path: '/convert', label: 'EDA 转 KiCad' },
 ]
 
 function currentPath() {

@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 
+import ConvertPage from '@/pages/ConvertPage.vue'
 import HomePage from '@/pages/HomePage.vue'
 import ParserPage from '@/pages/ParserPage.vue'
 import { routes, useRoute } from '@/router'
@@ -8,6 +9,7 @@ import { routes, useRoute } from '@/router'
 const pages = {
   '/': HomePage,
   '/parser': ParserPage,
+  '/convert': ConvertPage,
 }
 
 const path = useRoute()
@@ -22,7 +24,7 @@ const active = computed(() => routes.find((route) => route.path === path.value))
         <div class="brand-mark" aria-hidden="true">EC</div>
         <div>
           <h1>EtherCAT 工具箱</h1>
-          <p>SII EEPROM 解析、编辑与 ESI XML 导出 · 数据仅在浏览器本地处理</p>
+          <p>SII EEPROM 解析、ESI XML 导出与 EDA 格式转换 · 数据仅在浏览器本地处理</p>
         </div>
       </a>
 

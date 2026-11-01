@@ -555,10 +555,10 @@ export async function convertEda(sources) {
           : await convertSpecctra(prepared, warnings)
 
   const files = await toKicadFiles(circuitJson, summary, baseNameOf(prepared))
-  return finish(files, formatId, summary, warnings, started, prepared)
+  return finish(files, circuitJson, formatId, summary, warnings, started, prepared)
 }
 
-function finish(files, source, summary, warnings, started, prepared) {
+function finish(files, circuitJson, source, summary, warnings, started, prepared) {
   if (!files.length) {
     throw new EdaConversionError('转换器没有产生任何 KiCad 文件,原始文档可能不包含设计内容。')
   }
@@ -576,6 +576,7 @@ function finish(files, source, summary, warnings, started, prepared) {
   return {
     source,
     files,
+    circuitJson,
     summary,
     warnings,
     elapsedMs: Math.round(performance.now() - started),

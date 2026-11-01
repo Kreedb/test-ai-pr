@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, shallowRef } from 'vue'
 
+import EdaPreview from '@/components/EdaPreview.vue'
 import { downloadBlob, fileBaseName } from '@/lib/download'
 import {
   LOSS_NOTES,
@@ -358,6 +359,8 @@ function clearAll() {
           </li>
         </ul>
       </section>
+
+      <EdaPreview v-if="result.circuitJson?.length" :circuit-json="result.circuitJson" />
 
       <section class="card">
         <div class="card-head">

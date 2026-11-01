@@ -1,0 +1,267 @@
+<script setup>
+import { computed } from 'vue'
+
+// Read-only schematic canvas. Coordinates are Circuit JSON schematic units
+// with Y up; PreviewViewport flips the world group for the DOM.
+const props = defineProps({
+  sheet: { type: Object, required: true },
+  activeNet: { type: String, default: '' },
+  selectedComponentId: { type: String, default: '' },
+})
+
+const emit = defineEmits(['select'])
+
+const WIRE_COLOR = '#4ade80'
+const SYMBOL_COLOR = '#cbd5e1'
+const PIN_COLOR = '#93c5fd'
+const ACTIVE_COLOR = '#ffb340'
+
+const items = computed(() => props.sheet.items)
+
+function classesOf(item) {
+  const net = item.net || ''
+  return {
+    'preview-dim': Boolean(props.activeNet) && net !== props.activeNet,
+    'preview-hit': Boolean(props.activeNet) && net === props.activeNet,
+    'preview-selected':
+      Boolean(props.selectedComponentId) && item.componentId === props.selectedComponentId,
+  }
+}
+
+const components = computed(() => items.value.filter((item) => item.kind === 'component'))
+const graphics = computed(() => items.value.filter((item) => item.kind === 'graphic'))
+const wires = computed(() => items.value.filter((item) => item.kind === 'wire'))
+const pins = computed(() => items.value.filter((item) => item.kind === 'pin'))
+const labels = computed(() => items.value.filter((item) => item.kind === 'label'))
+const texts = computed(() => items.value.filter((item) => item.kind === 'text'))
+
+const componentById = computed(() => {
+  const map = new Map()
+  for (const component of components.value) map.set(component.id, component)
+  return map
+})
+
+function componentRect(component) {
+  const { center, size } = component.element
+  const width = Math.max(size?.width || 0.4, 0.2)
+  const height = Math.max(size?.height || 0.4, 0.2)
+  return {
+    x: (center?.x || 0) - width / 2,
+    y: (center?.y || 0) - height / 2,
+    width,
+    height,
+    isBox: component.element.is_box_with_pins !== false,
+  }
+}
+
+const FACING = {
+  right: { x: 1, y: 0 },
+  left: { x: -1, y: 0 },
+  up: { x: 0, y: 1 },
+  down: { x: 0, y: -1 },
+}
+
+// The port centre is the connection point; the pin line runs back toward the
+// symbol body, which is what KiCad draws.
+function pinStub(pin) {
+  const component = componentById.value.get(pin.componentId)
+  const center = pin.element.center || { x: 0, y: 0 }
+  const facing = FACING[pin.element.facing_direction] || FACING.right
+  const size = component?.element.size || { width: 1, height: 1 }
+  const length =
+    pin.element.distance_from_component_edge ||
+    Math.min(Math.max(size.width || 1, size.height || 1) * 0.3, 0.8)
+  return {
+    x1: center.x,
+    y1: center.y,
+    x2: center.x - facing.x * length,
+    y2: center.y - facing.y * length,
+    size,
+  }
+}
+
+const labelText = (item) => {
+  const element = item.element
+  return {
+    x: element.anchor_position?.x ?? element.center?.x ?? 0,
+    y: element.anchor_position?.y ?? element.center?.y ?? 0,
+    text: item.text,
+    anchor: element.anchor_side === 'right' ? 'end' : 'start',
+  }
+}
+
+const textOf = (item) => {
+  const element = item.element
+  const position = element.position || element.center || { x: 0, y: 0 }
+  return {
+    x: position.x,
+    y: position.y,
+    text: element.text,
+    size: Math.max(element.font_size || 0.5, 0.25),
+    color: element.color || '#94a3b8',
+    rotation: element.rotation || 0,
+    anchor:
+      element.anchor === 'bottom_left'
+        ? 'start'
+        : element.anchor === 'bottom_right'
+          ? 'end'
+          : 'middle',
+  }
+}
+</script>
+
+<template>
+  <g class="schematic">
+    <g
+      v-for="item in graphics"
+      :key="item.id"
+      :class="classesOf(item)"
+      @click.stop="emit('select', item)"
+    >
+      <line
+        v-if="item.element.x1 !== undefined"
+        :x1="item.element.x1"
+        :y1="item.element.y1"
+        :x2="item.element.x2"
+        :y2="item.element.y2"
+        :stroke="SYMBOL_COLOR"
+        :stroke-width="Math.max(item.element.stroke_width || 0.05, 0.02)"
+        stroke-linecap="round"
+      />
+      <polyline
+        v-else-if="item.element.points"
+        :points="item.element.points.map((point) => `${point.x},${point.y}`).join(' ')"
+        fill="none"
+        :stroke="SYMBOL_COLOR"
+        :stroke-width="Math.max(item.element.stroke_width || 0.05, 0.02)"
+        stroke-linecap="round"
+      />
+      <circle
+        v-else-if="item.element.radius"
+        :cx="item.element.center.x"
+        :cy="item.element.center.y"
+        :r="item.element.radius"
+        fill="none"
+        :stroke="SYMBOL_COLOR"
+        :stroke-width="Math.max(item.element.stroke_width || 0.05, 0.02)"
+      />
+    </g>
+
+    <g
+      v-for="item in wires"
+      :key="item.id"
+      :class="classesOf(item)"
+      @click.stop="emit('select', item)"
+    >
+      <title>{{ item.net ? `网络 ${item.net}` : '导线' }}</title>
+      <line
+        v-for="(edge, index) in item.element.edges || []"
+        :key="index"
+        :x1="edge.from.x"
+        :y1="edge.from.y"
+        :x2="edge.to.x"
+        :y2="edge.to.y"
+        :stroke="item.net && item.net === activeNet ? ACTIVE_COLOR : WIRE_COLOR"
+        stroke-width="0.14"
+        stroke-linecap="round"
+      />
+      <circle
+        v-for="(junction, index) in item.junctions"
+        :key="`j-${index}`"
+        :cx="junction.x"
+        :cy="junction.y"
+        :r="0.15"
+        :fill="item.net && item.net === activeNet ? ACTIVE_COLOR : WIRE_COLOR"
+      />
+    </g>
+
+    <g
+      v-for="item in components"
+      :key="item.id"
+      :class="classesOf(item)"
+      @click.stop="emit('select', item)"
+    >
+      <title>{{ [item.refdes, item.value].filter(Boolean).join(' · ') }}</title>
+      <rect
+        v-if="componentRect(item).isBox"
+        :x="componentRect(item).x"
+        :y="componentRect(item).y"
+        :width="componentRect(item).width"
+        :height="componentRect(item).height"
+        fill="rgba(91, 140, 255, 0.06)"
+        :stroke="SYMBOL_COLOR"
+        stroke-width="0.08"
+        vector-effect="non-scaling-stroke"
+      />
+    </g>
+
+    <g
+      v-for="item in pins"
+      :key="item.id"
+      :class="classesOf(item)"
+      @click.stop="emit('select', item)"
+    >
+      <title>{{ [item.refdes, item.pin, item.net].filter(Boolean).join(' · ') }}</title>
+      <line
+        :x1="pinStub(item).x1"
+        :y1="pinStub(item).y1"
+        :x2="pinStub(item).x2"
+        :y2="pinStub(item).y2"
+        :stroke="PIN_COLOR"
+        stroke-width="0.09"
+        vector-effect="non-scaling-stroke"
+      />
+      <circle
+        :cx="pinStub(item).x1"
+        :cy="pinStub(item).y1"
+        :r="0.09"
+        :fill="item.net && item.net === activeNet ? ACTIVE_COLOR : PIN_COLOR"
+      />
+      <g :transform="`translate(${pinStub(item).x1} ${pinStub(item).y1}) scale(1 -1)`">
+        <text
+          x="0"
+          y="-0.12"
+          :font-size="Math.max(Math.min(pinStub(item).size.width || 1, pinStub(item).size.height || 1) * 0.3, 0.18)"
+          fill="#cbd5e1"
+          text-anchor="middle"
+        >
+          {{ item.pin }}
+        </text>
+      </g>
+    </g>
+
+    <g v-for="item in texts" :key="item.id" :class="classesOf(item)">
+      <g :transform="`translate(${textOf(item).x} ${textOf(item).y}) scale(1 -1) rotate(${-textOf(item).rotation})`">
+        <text
+          x="0"
+          y="0"
+          :font-size="textOf(item).size"
+          :fill="textOf(item).color"
+          :text-anchor="textOf(item).anchor"
+        >
+          {{ textOf(item).text }}
+        </text>
+      </g>
+    </g>
+
+    <g
+      v-for="item in labels"
+      :key="item.id"
+      :class="classesOf(item)"
+      @click.stop="emit('select', item)"
+    >
+      <title>{{ item.text }}</title>
+      <g :transform="`translate(${labelText(item).x} ${labelText(item).y}) scale(1 -1)`">
+        <text
+          x="0"
+          y="0"
+          :font-size="Math.max((item.element.font_size || 1) * 0.9, 0.4)"
+          :fill="item.net && item.net === activeNet ? ACTIVE_COLOR : WIRE_COLOR"
+          :text-anchor="labelText(item).anchor"
+        >
+          {{ labelText(item).text }}
+        </text>
+      </g>
+    </g>
+  </g>
+</template>

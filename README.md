@@ -26,6 +26,8 @@
 - 输入 Altium `.PcbDoc` / `.SchDoc`、Specctra `.dsn` / `.ses`（Allegro、OrCAD PCB Designer、PADS Layout、Xpedition 都能导出）、EAGLE XML `.brd` / `.sch`，或 PADS Layout ASCII `.asc`，可一次选中整个工程。
 - 输出 `.kicad_pcb`、`.kicad_sch`（层次化工程会输出根图 + 每张子图）与 `.kicad_pro`，多文件时可打包成 zip 下载。
 - PCB 与原理图同时上传时按同一工程对齐元件与网络。
+- 转换结果自带只读预览：直接渲染中间模型里的 PCB 与原理图几何，滚轮缩放、拖拽平移，点击焊盘/符号/引脚即可定位。
+- 预览支持搜索网络名、位号和 `REF.PIN`；PCB 图层可逐个开关或只显示一层；选中网络后在 PCB 与原理图之间互相跳转，两侧同时高亮。预览不回写任何数据。
 - 页面固定列出每个来源可能无法无损转换的内容（层数上限、3D 模型、设计规则、敷铜、符号图形、走线需 SES 等）。
 - 转换在浏览器本地完成，不会上传任何设计文件。
 - 尚未接入 Allegro/OrCAD 二进制 `.brd`、PADS 二进制 `.pcb`、OrCAD Capture `.dsn` 与 PADS Logic 原理图：这些格式的记录布局未公开，需要逆向客户端二进制；页面会提示改用 Specctra DSN、IPC-2581 或 Gerber 导出。
@@ -66,9 +68,10 @@ src/lib/download.js     # 浏览器下载辅助函数
 src/lib/eda.js          # EDA -> KiCad 转换引擎：格式识别、按需加载转换器、结果汇总
 src/lib/eagle.js        # EAGLE XML 板图/原理图 -> Circuit JSON 的映射
 src/lib/pads.js         # PADS Layout ASCII -> Circuit JSON 的映射
+src/lib/preview.js      # 只读预览模型：PCB/原理图几何、图层、网络索引与搜索（无 Vue 依赖）
 src/router.js           # 极简 hash 路由（GitHub Pages 子路径下无需重写规则）
 src/pages/              # 导航页、解析器页、EDA 转换页
-src/components/         # 可编辑表格、PDO、DC、十六进制视图
+src/components/         # 可编辑表格、PDO、DC、十六进制视图、设计预览（视图、画布、图层）
 src/App.vue             # 页面外壳：品牌、导航、路由出口、页脚
 public/samples/         # 示例 EEPROM 转储、ESI XML、Altium / Specctra / EAGLE / PADS 工程文件
 ```

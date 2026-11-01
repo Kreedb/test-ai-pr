@@ -24,6 +24,7 @@
 ### EDA 转 KiCad（`#/convert`）
 
 - 输入 Altium `.PcbDoc` / `.SchDoc`、Specctra `.dsn` / `.ses`（Allegro、OrCAD PCB Designer、PADS Layout、Xpedition 都能导出）、EAGLE XML `.brd` / `.sch`，或 PADS Layout ASCII `.asc`，可一次选中整个工程。
+- 也可以直接上传 `.zip`：压缩包在浏览器里解开，按扩展名与内容识别其中的工程文件，工程侧文件（`.PrjPcb`、`.PcbLib`、说明文档等）与 `__MACOSX` 之类的系统文件会被忽略；成员文件仍然受单文件与合计大小上限约束，超出上限或嵌套的压缩包会逐个列出并跳过。
 - 输出 `.kicad_pcb`、`.kicad_sch`（层次化工程会输出根图 + 每张子图）与 `.kicad_pro`，多文件时可打包成 zip 下载。
 - PCB 与原理图同时上传时按同一工程对齐元件与网络。
 - 转换结果自带只读预览：直接渲染中间模型里的 PCB 与原理图几何，滚轮缩放、拖拽平移，点击焊盘/符号/引脚即可定位。
@@ -56,6 +57,7 @@ EAGLE XML 与 PADS ASCII 分别由仓库内的 `src/lib/eagle.js`、`src/lib/pad
 - `public/samples/specctra/motor-driver.dsn`：Specctra DSN 样例，用于演示只有布局与网表、没有走线的转换结果。
 - `public/samples/eagle/SOT23-3.brd` / `SOT23-3.sch`：来自 [tedyapo/ugly-smd-adapters](https://github.com/tedyapo/ugly-smd-adapters)（MIT）的 EAGLE 7.3 转接板，用于演示 EAGLE 板图与原理图一起转换。
 - `public/samples/pads/res0805.asc`：按 [tscircuit/padsts](https://github.com/tscircuit/padsts)（MIT）测试资产的格式改写的 PADS Layout ASCII 样例，含 SMD、通孔、走线、过孔、敷铜与丝印，用于演示 PADS 转换。
+- `public/samples/altium/PA6940-project.zip`：把 `public/samples/altium/` 里的 PA6940 工程打成 zip，用于演示压缩包解析。
 
 ## 代码结构
 
@@ -68,6 +70,7 @@ src/lib/download.js     # 浏览器下载辅助函数
 src/lib/eda.js          # EDA -> KiCad 转换引擎：格式识别、按需加载转换器、结果汇总
 src/lib/eagle.js        # EAGLE XML 板图/原理图 -> Circuit JSON 的映射
 src/lib/pads.js         # PADS Layout ASCII -> Circuit JSON 的映射
+src/lib/archive.js      # zip 压缩包展开与成员筛选（大小/数量/嵌套限制）
 src/lib/preview.js      # 只读预览模型：PCB/原理图几何、图层、网络索引与搜索（无 Vue 依赖）
 src/router.js           # 极简 hash 路由（GitHub Pages 子路径下无需重写规则）
 src/pages/              # 导航页、解析器页、EDA 转换页

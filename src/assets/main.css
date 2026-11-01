@@ -1023,6 +1023,14 @@ section[id] {
   background: var(--bg-soft);
 }
 
+.file-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
 .file-name {
   flex: 1;
   min-width: 0;
@@ -1030,6 +1038,20 @@ section[id] {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 0.82rem;
+}
+
+.archive-list {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.archive-list summary {
+  cursor: pointer;
+}
+
+.archive-list .loss-list {
+  margin-top: 8px;
 }
 
 .loss-grid {

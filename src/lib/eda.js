@@ -306,6 +306,85 @@ function baseNameOf(sources) {
   return stem || 'converted'
 }
 
+// Some tools export `.PcbDoc` as the plain `|RECORD=Board|` text instead of the
+// OLE compound file. Such exports wrap the Board record - the layer stack alone
+// runs to tens of kilobytes - across several physical lines, each of which
+// restarts with `|RECORD=Board|` but repeats no field of its own. `altiumts`
+// reads each line as a separate record, so the merged board never sees
+// `LAYER*NAME` and every copper layer becomes "absent from the board stack".
+// Re-join the continuations before parsing; binary compound files are untouched.
+const ASCII_PCB_MAGIC = '|RECORD=Board|'
+
+const startsWithAsciiBoard = (bytes) => {
+  if (bytes.length < ASCII_PCB_MAGIC.length) return false
+  for (let index = 0; index < ASCII_PCB_MAGIC.length; index += 1) {
+    if (bytes[index] !== ASCII_PCB_MAGIC.charCodeAt(index)) return false
+  }
+  return true
+}
+
+export function normalizeAltiumAscii(bytes) {
+  // Binary OLE compound files make up the bulk of Altium uploads; a 14-byte
+  // prefix test keeps them from being decoded into a 2x-size string first.
+  if (!startsWithAsciiBoard(bytes)) return bytes
+
+  const lines = decodeLatin1(bytes).split(/\r\n|\r|\n/)
+  const merged = []
+  let joined = 0
+  for (const line of lines) {
+    const previous = merged[merged.length - 1]
+    // A wrapped fragment repeats only the record banner; a Board record that
+    // starts a new one always carries its own UNIQUEID. Drop the repeated
+    // banner (and its trailing pipe) so the join leaves one separator.
+    if (
+      previous?.startsWith(ASCII_PCB_MAGIC) &&
+      line.startsWith(ASCII_PCB_MAGIC) &&
+      !/\|UNIQUEID=/i.test(line)
+    ) {
+      merged[merged.length - 1] = previous + line.slice(ASCII_PCB_MAGIC.length)
+      joined += 1
+      continue
+    }
+    merged.push(line)
+  }
+  if (!joined) return bytes
+  return encodeLatin1(merged.join('\r\n'))
+}
+
+function decodeLatin1(bytes) {
+  let text = ''
+  const chunk = 0x8000
+  for (let offset = 0; offset < bytes.length; offset += chunk) {
+    text += String.fromCharCode(...bytes.subarray(offset, offset + chunk))
+  }
+  return text
+}
+
+// Re-encode byte-for-byte so a re-joined document keeps its original encoding.
+function encodeLatin1(text) {
+  const bytes = new Uint8Array(text.length)
+  for (let index = 0; index < text.length; index += 1) {
+    bytes[index] = text.charCodeAt(index) & 0xff
+  }
+  return bytes
+}
+
+// The project-level merge joins the board's net table with the schematic's net
+// graph. On designs whose schematic has the same net under two labels (a local
+// label plus a global one) it ends up emitting a single `source_trace` that
+// claims every net and every port at once. `circuit-json-to-kicad` refuses to
+// pick a net for a pad connected to more than one (`multiple KiCad nets`), so
+// the whole board fails to export. Detection is deliberately narrow: one trace,
+// several nets, several ports.
+export function hasOversharedTrace(circuitJson) {
+  return circuitJson.some(
+    (element) =>
+      element.type === 'source_trace' &&
+      (element.connected_source_net_ids?.length ?? 0) > 1 &&
+      (element.connected_source_port_ids?.length ?? 0) > 1,
+  )
+}
+
 async function convertAltium(sources, warnings) {
   const [{ parseAltiumFile }, altium] = await Promise.all([
     import('altiumts'),
@@ -314,7 +393,7 @@ async function convertAltium(sources, warnings) {
 
   const documents = { pcb: null, schematics: [] }
   for (const source of sources) {
-    const parsed = parseAltiumFile(source.bytes)
+    const parsed = parseAltiumFile(normalizeAltiumAscii(source.bytes))
     if (source.format.kind === 'pcb') {
       if (documents.pcb) {
         throw new EdaConversionError('一次只能转换一块板:检测到多个 .PcbDoc,请分批转换。')
@@ -325,16 +404,39 @@ async function convertAltium(sources, warnings) {
     }
   }
 
+  const convertProject = () =>
+    altium.convertAltiumProjectToCircuitJson({
+      ...(documents.pcb ? { pcb: { document: documents.pcb } } : {}),
+      schematics: documents.schematics.map((document) => ({ document })),
+    })
+
   let circuitJson
   if (!documents.pcb && documents.schematics.length === 1) {
     circuitJson = altium.convertAltiumSchDocToCircuitJson(documents.schematics[0])
   } else if (!documents.pcb && documents.schematics.length === 0) {
     throw new EdaConversionError('没有找到可转换的 Altium 文档。')
   } else {
-    circuitJson = altium.convertAltiumProjectToCircuitJson({
-      ...(documents.pcb ? { pcb: { document: documents.pcb } } : {}),
-      schematics: documents.schematics.map((document) => ({ document })),
-    })
+    circuitJson = convertProject()
+    if (documents.pcb && documents.schematics.length && hasOversharedTrace(circuitJson)) {
+      // Convert the two sides on their own and stack the results. The upstream
+      // project converter gives each document its own id prefix so ids across
+      // documents stay unique; reproduce those prefixes here or every schematic
+      // would emit the same `schematic_sheet_id` and the KiCad writer would
+      // produce one duplicated sheet per input document.
+      circuitJson = [
+        ...altium.convertAltiumPcbDocToCircuitJson(documents.pcb, { idPrefix: 'pcb' }),
+        ...documents.schematics.flatMap((document, index) =>
+          altium.convertAltiumSchDocToCircuitJson(document, {
+            idPrefix: `schematic_${index + 1}`,
+          }),
+        ),
+      ]
+      warnings.push({
+        level: 'warn',
+        message:
+          '板图与原理图的网络表在工程级合并时被串成了同一个网络(上游转换器的已知问题),已改为分别转换再合并:两侧的网络名和网络标签保持正确,但 KiCad 里封装与符号不会按位号自动绑定,需要手动关联。',
+      })
+    }
   }
 
   const summary = summarize(circuitJson)

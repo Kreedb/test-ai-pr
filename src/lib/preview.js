@@ -12,6 +12,56 @@ const TOP = 'top'
 const BOTTOM = 'bottom'
 const INNER = /^(?:inner|in)(\d+)(?:\.cu)?$/i
 
+// `circuit-json-to-kicad` scales schematic coordinates by 15 to get millimetres
+// and draws schematic text at 1.27 mm, so text drawn at the default size has to
+// be 1.27 / 15 model units to match the exported `.kicad_sch`.
+export const SCHEMATIC_TEXT_SIZE = 1.27 / 15
+
+/**
+ * Font size, in schematic model units, of a `schematic_text`. `keepsOwnSize`
+ * mirrors the writer: it honours `font_size` only while the schematic also keeps
+ * its component-level graphics, and redraws everything else at the 1.27 mm
+ * default. Net labels and pin numbers have no size of their own.
+ */
+export function schematicTextSize(element, keepsOwnSize = false) {
+  return (keepsOwnSize && element?.font_size) || SCHEMATIC_TEXT_SIZE
+}
+
+const COMPONENT_PRIMITIVE_TYPES = new Set([
+  'schematic_path',
+  'schematic_circle',
+  'schematic_arc',
+  'schematic_line',
+  'schematic_rect',
+])
+
+// `circuit-json-to-kicad` only keeps a text's own `font_size` when it also keeps
+// standalone graphics (`preserveStandaloneGraphics`): some component must be
+// drawn from its own primitives instead of a library symbol. EAGLE schematics
+// qualify; Altium ones are all library symbols, so the writer redraws their text
+// at the 1.27 mm default and the preview has to do the same or every label ends
+// up a couple of times the size of the exported one.
+function keepsTextSizes(index) {
+  const primitiveOwners = new Set()
+  const symbolOwners = new Set()
+  for (const elements of index.groups.values()) {
+    for (const element of elements) {
+      const owner = element.schematic_component_id
+      if (!owner) continue
+      if (element.schematic_symbol_id) symbolOwners.add(owner)
+      else if (COMPONENT_PRIMITIVE_TYPES.has(element.type)) primitiveOwners.add(owner)
+    }
+  }
+  return index.list('schematic_component').some(
+    (component) =>
+      component.is_box_with_pins === false &&
+      !component.symbol_name &&
+      !('schematic_symbol_id' in component) &&
+      !symbolOwners.has(component.schematic_component_id) &&
+      primitiveOwners.has(component.schematic_component_id),
+  )
+}
+
 const COPPER_RANK = new Map([[TOP, 0]])
 for (let index = 1; index <= 16; index += 1) COPPER_RANK.set(`inner${index}`, index)
 COPPER_RANK.set(BOTTOM, 99)
@@ -508,6 +558,7 @@ function buildSchematic(index) {
   const sheets = declaredSheets.length ? declaredSheets : [{ schematic_sheet_id: undefined, name: '图纸 1' }]
   const sheetIds = new Set(sheets.map((sheet) => sheet.schematic_sheet_id).filter(Boolean))
   const defaultSheet = sheets[0].schematic_sheet_id
+  const keepsOwnTextSizes = keepsTextSizes(index)
 
   // Elements that name a sheet the converter never declared stay visible on the
   // first sheet rather than disappearing.
@@ -574,6 +625,7 @@ function buildSchematic(index) {
       element,
       sheet: sheetOf(element),
       componentId: element.schematic_component_id,
+      fontSize: schematicTextSize(element, keepsOwnTextSizes),
     })
   }
 

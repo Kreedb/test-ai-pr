@@ -151,7 +151,7 @@ const pinSummary = (item) => {
       v-for="item in rendered"
       :key="item.id"
       :class="classesOf(item)"
-      @click.stop="emit('select', item)"
+      @click.stop="emit('select', item, $event)"
     >
       <title>{{ item.kind === 'pad' ? pinSummary(item) : item.net ? `网络 ${item.net}` : item.kind }}</title>
 

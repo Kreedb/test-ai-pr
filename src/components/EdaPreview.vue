@@ -157,8 +157,10 @@ function selectNet(name, { jumpTo = '' } = {}) {
         : '')
   if (destination && tabs.value.some((entry) => entry.id === destination)) {
     tab.value = destination
-    if (destination === 'schematic' && net?.schematicPins.length) {
-      const sheetId = net.schematicPins[0].sheet || net.labels[0]?.sheet
+    if (destination === 'schematic') {
+      // A net can reach the schematic through a label alone, in which case
+      // that label decides which sheet to show.
+      const sheetId = net?.schematicPins[0]?.sheet || net?.labels[0]?.sheet
       const index = schematic.value?.sheets.findIndex((sheet) => sheet.id === sheetId) ?? -1
       if (index >= 0) activeSheetIndex.value = index
     }
@@ -176,23 +178,76 @@ function jumpToOtherView() {
   selectNet(activeNet.value.name, { jumpTo: destination })
 }
 
-const canJumpToOtherView = computed(() => {
-  const net = activeNet.value
-  if (!net) return false
-  return tab.value === 'pcb' ? net.schematicPins.length > 0 || net.labels.length > 0 : net.pcbPads.length > 0
-})
+const canJumpToOtherView = computed(() =>
+  tab.value === 'pcb' ? netHasSchematic(activeNet.value?.name) : netHasPcb(activeNet.value?.name),
+)
 
-function onPcbSelect(item) {
+/** Whether the named net has anything to frame in the PCB view. */
+function netHasPcb(name) {
+  const net = name ? netByName(name) : null
+  return Boolean(net?.pcbPads.length) && tabs.value.some((entry) => entry.id === 'pcb')
+}
+
+/** Whether the named net has anything to frame in the schematic view. */
+function netHasSchematic(name) {
+  const net = name ? netByName(name) : null
+  const reachable = Boolean(net?.schematicPins.length || net?.labels.length)
+  return reachable && tabs.value.some((entry) => entry.id === 'schematic')
+}
+
+// Ctrl/Cmd+click is the familiar "open the other side" gesture in EDA tools:
+// it selects the net here and jumps straight to its counterpart.
+function wantsJump(event) {
+  return Boolean(event?.ctrlKey || event?.metaKey)
+}
+
+function onPcbSelect(item, event) {
   if (!item) return
+  if (item.net && wantsJump(event) && netHasSchematic(item.net)) {
+    selectNet(item.net, { jumpTo: 'schematic' })
+    return
+  }
   selectedPcbId.value = item.id
   selectedComponentId.value = item.componentId || ''
   if (item.net) activeNetName.value = item.net
 }
 
-function onSchematicSelect(item) {
+function onSchematicSelect(item, event) {
   if (!item) return
+  if (item.net && wantsJump(event) && netHasPcb(item.net)) {
+    selectNet(item.net, { jumpTo: 'pcb' })
+    return
+  }
   if (item.componentId) selectedComponentId.value = item.componentId
   if (item.net) activeNetName.value = item.net
+}
+
+// Net names in the net table follow the same gesture: a plain click selects the
+// net where it is drawn, Ctrl/Cmd+click opens the other view.
+function onNetNameClick(name, event) {
+  if (wantsJump(event)) {
+    if (tab.value === 'pcb' && netHasSchematic(name)) {
+      selectNet(name, { jumpTo: 'schematic' })
+      return
+    }
+    if (tab.value === 'schematic' && netHasPcb(name)) {
+      selectNet(name, { jumpTo: 'pcb' })
+      return
+    }
+  }
+  // Keep the current view while the net is drawn there; a net that only exists
+  // on the other side still takes the user to it.
+  const here =
+    tab.value === 'pcb' ? netHasPcb(name) : netHasSchematic(name)
+  selectNet(name, { jumpTo: here ? tab.value : '' })
+}
+
+// Endpoint chips jump to their own side by default; Ctrl/Cmd flips them to the
+// other view when the net reaches it.
+function onEndpointClick(name, side, event) {
+  const other = side === 'pcb' ? 'schematic' : 'pcb'
+  const otherHasNet = other === 'pcb' ? netHasPcb(name) : netHasSchematic(name)
+  selectNet(name, { jumpTo: wantsJump(event) && otherHasNet ? other : side })
 }
 
 function onSearchSelect(entry) {
@@ -280,6 +335,7 @@ const selectedLabel = computed(() => {
     </div>
     <p class="muted small">
       直接渲染转换得到的 Circuit JSON：滚轮缩放、拖拽平移，点击元件或焊盘可定位，网络可在 PCB 与原理图之间互相跳转。
+      按住 Ctrl（macOS 为 ⌘）点击焊盘、引脚或网络名，可直接跳到另一视图的同名网络。
     </p>
 
     <div class="preview-toolbar">
@@ -440,7 +496,12 @@ const selectedLabel = computed(() => {
 
       <ul v-if="activeNet && (activeNetPcbPads.length || activeNetSchematicPins.length)" class="net-endpoints">
         <li v-for="pad in activeNetPcbPads" :key="`pad-${pad.id}`">
-          <button type="button" class="linkish mono" @click="selectNet(activeNet.name, { jumpTo: 'pcb' })">
+          <button
+            type="button"
+            class="linkish mono"
+            title="Ctrl/⌘+点击跳到原理图"
+            @click="onEndpointClick(activeNet.name, 'pcb', $event)"
+          >
             {{ pad.refdes || '?' }}{{ pad.pin !== '' ? `.${pad.pin}` : '' }}
           </button>
           <span class="muted small">PCB 焊盘</span>
@@ -449,7 +510,8 @@ const selectedLabel = computed(() => {
           <button
             type="button"
             class="linkish mono"
-            @click="selectNet(activeNet.name, { jumpTo: 'schematic' })"
+            title="Ctrl/⌘+点击跳到 PCB"
+            @click="onEndpointClick(activeNet.name, 'schematic', $event)"
           >
             {{ pin.refdes || '?' }}{{ pin.pin !== '' ? `.${pin.pin}` : '' }}
           </button>
@@ -473,7 +535,16 @@ const selectedLabel = computed(() => {
               :key="net.id"
               :class="{ 'row-active': net.name === activeNetName }"
             >
-              <td class="mono">{{ net.name }}</td>
+              <td class="mono">
+                <button
+                  type="button"
+                  class="linkish mono"
+                  title="Ctrl/⌘+点击跳到另一视图的同名网络"
+                  @click="onNetNameClick(net.name, $event)"
+                >
+                  {{ net.name }}
+                </button>
+              </td>
               <td>{{ net.pcbPads.length }}</td>
               <td>{{ net.schematicPins.length }}</td>
               <td class="row-actions">

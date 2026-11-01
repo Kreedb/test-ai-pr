@@ -15,6 +15,8 @@ const props = defineProps({
 
 const MIN_SCALE = 0.02
 const MAX_SCALE = 60
+// Pointer travel, in CSS pixels, before a press counts as a pan instead of a click.
+const DRAG_THRESHOLD = 3
 
 const wrapper = ref(null)
 const size = ref({ width: 0, height: 0 })
@@ -115,28 +117,49 @@ function onWheel(event) {
 
 function onPointerDown(event) {
   if (event.button !== 0) return
-  dragging.value = true
-  userAdjusted.value = true
+  // The zoom overlay floats inside the container; pressing one of its buttons
+  // must not arm a pan.
+  if (event.target?.closest?.('.preview-zoom')) return
   dragStart = {
     x: event.clientX,
     y: event.clientY,
     center: { ...center.value },
+    captured: false,
   }
-  wrapper.value?.setPointerCapture?.(event.pointerId)
 }
 
+// Capturing the pointer on pointerdown retargets the following pointerup and
+// click to the container, so the zoom buttons and the canvas items would never
+// see their clicks. Capture only once the pointer has travelled far enough to
+// be a drag; a plain click then stays a click.
 function onPointerMove(event) {
-  if (!dragging.value || !dragStart) return
+  if (!dragStart) return
+  const dx = event.clientX - dragStart.x
+  const dy = event.clientY - dragStart.y
+  if (!dragStart.captured) {
+    if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return
+    dragStart.captured = true
+    dragging.value = true
+    userAdjusted.value = true
+    try {
+      wrapper.value?.setPointerCapture?.(event.pointerId)
+    } catch {
+      // The pointer can already be gone (a cancelled touch, an OS gesture);
+      // the pan still works without capture until the pointer leaves.
+    }
+  }
   center.value = {
-    x: dragStart.center.x - (event.clientX - dragStart.x) * scale.value,
-    y: dragStart.center.y + (event.clientY - dragStart.y) * scale.value,
+    x: dragStart.center.x - dx * scale.value,
+    y: dragStart.center.y + dy * scale.value,
   }
 }
 
 function onPointerUp(event) {
+  if (dragStart?.captured && wrapper.value?.hasPointerCapture?.(event.pointerId)) {
+    wrapper.value.releasePointerCapture(event.pointerId)
+  }
   dragging.value = false
   dragStart = null
-  wrapper.value?.releasePointerCapture?.(event.pointerId)
 }
 
 onMounted(() => {
@@ -177,6 +200,7 @@ defineExpose({ fit, focus, zoomBy })
     @pointermove="onPointerMove"
     @pointerup="onPointerUp"
     @pointerleave="onPointerUp"
+    @pointercancel="onPointerUp"
   >
     <svg :viewBox="viewBox" role="img" aria-label="设计预览">
       <g :transform="`scale(1 -1)`">

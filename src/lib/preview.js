@@ -12,6 +12,16 @@ const TOP = 'top'
 const BOTTOM = 'bottom'
 const INNER = /^(?:inner|in)(\d+)(?:\.cu)?$/i
 
+// `circuit-json-to-kicad` scales schematic coordinates by 15 to get millimetres
+// and draws schematic text at 1.27 mm, so text with no size of its own has to be
+// 1.27 / 15 model units to match the exported `.kicad_sch`.
+export const SCHEMATIC_TEXT_SIZE = 1.27 / 15
+
+/** Font size, in schematic model units, of an element that carries text. */
+export function schematicTextSize(element) {
+  return element?.font_size || SCHEMATIC_TEXT_SIZE
+}
+
 const COPPER_RANK = new Map([[TOP, 0]])
 for (let index = 1; index <= 16; index += 1) COPPER_RANK.set(`inner${index}`, index)
 COPPER_RANK.set(BOTTOM, 99)

@@ -1,6 +1,8 @@
 <script setup>
 import { computed } from 'vue'
 
+import { SCHEMATIC_TEXT_SIZE, schematicTextSize } from '@/lib/preview'
+
 // Read-only schematic canvas. Coordinates are Circuit JSON schematic units
 // with Y up; PreviewViewport flips the world group for the DOM.
 const props = defineProps({
@@ -15,6 +17,13 @@ const WIRE_COLOR = '#4ade80'
 const SYMBOL_COLOR = '#cbd5e1'
 const PIN_COLOR = '#93c5fd'
 const ACTIVE_COLOR = '#ffb340'
+
+// Pin numbers have no size in the model; KiCad draws them at its default text
+// size, which is the same 1.27 mm the writer uses for every other schematic
+// label.
+const TEXT_SIZE = SCHEMATIC_TEXT_SIZE
+
+const textSizeOf = schematicTextSize
 
 const items = computed(() => props.sheet.items)
 
@@ -86,6 +95,7 @@ const labelText = (item) => {
     x: element.anchor_position?.x ?? element.center?.x ?? 0,
     y: element.anchor_position?.y ?? element.center?.y ?? 0,
     text: item.text,
+    size: textSizeOf(element),
     anchor: element.anchor_side === 'right' ? 'end' : 'start',
   }
 }
@@ -97,7 +107,7 @@ const textOf = (item) => {
     x: position.x,
     y: position.y,
     text: element.text,
-    size: Math.max(element.font_size || 0.5, 0.25),
+    size: textSizeOf(element),
     color: element.color || '#94a3b8',
     rotation: element.rotation || 0,
     anchor:
@@ -116,7 +126,7 @@ const textOf = (item) => {
       v-for="item in graphics"
       :key="item.id"
       :class="classesOf(item)"
-      @click.stop="emit('select', item)"
+      @click.stop="emit('select', item, $event)"
     >
       <line
         v-if="item.element.x1 !== undefined"
@@ -151,7 +161,7 @@ const textOf = (item) => {
       v-for="item in wires"
       :key="item.id"
       :class="classesOf(item)"
-      @click.stop="emit('select', item)"
+      @click.stop="emit('select', item, $event)"
     >
       <title>{{ item.net ? `网络 ${item.net}` : '导线' }}</title>
       <line
@@ -179,7 +189,7 @@ const textOf = (item) => {
       v-for="item in components"
       :key="item.id"
       :class="classesOf(item)"
-      @click.stop="emit('select', item)"
+      @click.stop="emit('select', item, $event)"
     >
       <title>{{ [item.refdes, item.value].filter(Boolean).join(' · ') }}</title>
       <rect
@@ -199,7 +209,7 @@ const textOf = (item) => {
       v-for="item in pins"
       :key="item.id"
       :class="classesOf(item)"
-      @click.stop="emit('select', item)"
+      @click.stop="emit('select', item, $event)"
     >
       <title>{{ [item.refdes, item.pin, item.net].filter(Boolean).join(' · ') }}</title>
       <line
@@ -220,8 +230,8 @@ const textOf = (item) => {
       <g :transform="`translate(${pinStub(item).x1} ${pinStub(item).y1}) scale(1 -1)`">
         <text
           x="0"
-          y="-0.12"
-          :font-size="Math.max(Math.min(pinStub(item).size.width || 1, pinStub(item).size.height || 1) * 0.3, 0.18)"
+          :y="-TEXT_SIZE"
+          :font-size="TEXT_SIZE"
           fill="#cbd5e1"
           text-anchor="middle"
         >
@@ -248,14 +258,14 @@ const textOf = (item) => {
       v-for="item in labels"
       :key="item.id"
       :class="classesOf(item)"
-      @click.stop="emit('select', item)"
+      @click.stop="emit('select', item, $event)"
     >
       <title>{{ item.text }}</title>
       <g :transform="`translate(${labelText(item).x} ${labelText(item).y}) scale(1 -1)`">
         <text
           x="0"
           y="0"
-          :font-size="Math.max((item.element.font_size || 1) * 0.9, 0.4)"
+          :font-size="labelText(item).size"
           :fill="item.net && item.net === activeNet ? ACTIVE_COLOR : WIRE_COLOR"
           :text-anchor="labelText(item).anchor"
         >

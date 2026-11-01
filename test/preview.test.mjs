@@ -14,10 +14,12 @@ import { fileURLToPath } from 'node:url'
 
 import { convertEda } from '../src/lib/eda.js'
 import {
+  SCHEMATIC_TEXT_SIZE,
   buildPreviewModel,
   buildSearchIndex,
   indexComponents,
   indexNets,
+  schematicTextSize,
   searchPreview,
 } from '../src/lib/preview.js'
 
@@ -144,6 +146,19 @@ test('search ranks exact and prefix matches above substring hits', async () => {
 
   assert.deepEqual(searchPreview(entries, '   '), [])
   assert.deepEqual(searchPreview(entries, 'no-such-net'), [])
+})
+
+test('schematic text uses the size the KiCad writer draws', () => {
+  // `circuit-json-to-kicad` scales schematic coordinates by 15 and draws text
+  // at 1.27 mm, so text with no size of its own must be 1.27 / 15 model units.
+  // The preview used to floor text at 0.25 (symbol text) and 0.4 (net labels),
+  // which made labels several times larger than the symbols they annotate.
+  assert.ok(Math.abs(SCHEMATIC_TEXT_SIZE * 15 - 1.27) < 1e-9)
+  // A size the converter knows (EAGLE's 1.778 mm refdes text) is kept; a
+  // missing or falsy one falls back to the KiCad default.
+  assert.equal(schematicTextSize({ font_size: 1.778 / 15 }), 1.778 / 15)
+  assert.equal(schematicTextSize({}), SCHEMATIC_TEXT_SIZE)
+  assert.equal(schematicTextSize({ font_size: 0 }), SCHEMATIC_TEXT_SIZE)
 })
 
 test('preview survives a hand-built model with missing optional fields', () => {

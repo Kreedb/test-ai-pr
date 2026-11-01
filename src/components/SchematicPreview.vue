@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 
-import { SCHEMATIC_TEXT_SIZE, schematicTextSize } from '@/lib/preview'
+import { SCHEMATIC_TEXT_SIZE } from '@/lib/preview'
 
 // Read-only schematic canvas. Coordinates are Circuit JSON schematic units
 // with Y up; PreviewViewport flips the world group for the DOM.
@@ -22,8 +22,6 @@ const ACTIVE_COLOR = '#ffb340'
 // size, which is the same 1.27 mm the writer uses for every other schematic
 // label.
 const TEXT_SIZE = SCHEMATIC_TEXT_SIZE
-
-const textSizeOf = schematicTextSize
 
 const items = computed(() => props.sheet.items)
 
@@ -95,7 +93,8 @@ const labelText = (item) => {
     x: element.anchor_position?.x ?? element.center?.x ?? 0,
     y: element.anchor_position?.y ?? element.center?.y ?? 0,
     text: item.text,
-    size: textSizeOf(element),
+    // The writer draws every net label at 1.27 mm, whatever the source says.
+    size: TEXT_SIZE,
     anchor: element.anchor_side === 'right' ? 'end' : 'start',
   }
 }
@@ -107,7 +106,7 @@ const textOf = (item) => {
     x: position.x,
     y: position.y,
     text: element.text,
-    size: textSizeOf(element),
+    size: item.fontSize,
     color: element.color || '#94a3b8',
     rotation: element.rotation || 0,
     anchor:

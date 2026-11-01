@@ -35,6 +35,12 @@ const eagleProject = () =>
 const padsProject = () =>
   convertEda([{ name: 'res0805.asc', bytes: read('public/samples/pads/res0805.asc') }])
 
+const altiumProject = () =>
+  convertEda([
+    { name: 'PA6940.PcbDoc', bytes: read('public/samples/altium/PA6940.PcbDoc') },
+    { name: 'M8_Y-adapter.SchDoc', bytes: read('public/samples/altium/M8_Y-adapter.SchDoc') },
+  ])
+
 test('preview model covers both sides of an EAGLE project', async () => {
   const result = await eagleProject()
   const model = buildPreviewModel(result.circuitJson)
@@ -154,11 +160,34 @@ test('schematic text uses the size the KiCad writer draws', () => {
   // The preview used to floor text at 0.25 (symbol text) and 0.4 (net labels),
   // which made labels several times larger than the symbols they annotate.
   assert.ok(Math.abs(SCHEMATIC_TEXT_SIZE * 15 - 1.27) < 1e-9)
-  // A size the converter knows (EAGLE's 1.778 mm refdes text) is kept; a
-  // missing or falsy one falls back to the KiCad default.
-  assert.equal(schematicTextSize({ font_size: 1.778 / 15 }), 1.778 / 15)
-  assert.equal(schematicTextSize({}), SCHEMATIC_TEXT_SIZE)
-  assert.equal(schematicTextSize({ font_size: 0 }), SCHEMATIC_TEXT_SIZE)
+
+  // The writer keeps a text's own `font_size` (EAGLE's 1.778 mm refdes, for
+  // example) only on the path where it also keeps standalone graphics; a
+  // missing or falsy size always falls back to the KiCad default.
+  assert.equal(schematicTextSize({ font_size: 1.778 / 15 }, true), 1.778 / 15)
+  assert.equal(schematicTextSize({ font_size: 1.778 / 15 }, false), SCHEMATIC_TEXT_SIZE)
+  assert.equal(schematicTextSize({}, true), SCHEMATIC_TEXT_SIZE)
+  assert.equal(schematicTextSize({ font_size: 0 }, true), SCHEMATIC_TEXT_SIZE)
+})
+
+test('schematic text keeps its size only where the writer keeps it', async () => {
+  // `circuit-json-to-kicad` only honours `font_size` while it also keeps
+  // standalone graphics (`preserveStandaloneGraphics`). EAGLE components are
+  // drawn from their own primitives, so the preview keeps the sizes EAGLE
+  // states; Altium components are all library symbols, so the writer redraws
+  // every text at 1.27 mm and the preview must not scale by the raw
+  // `font_size` (0.15..0.55 model units, i.e. up to 8 mm).
+  const eagle = buildPreviewModel((await eagleProject()).circuitJson)
+  for (const text of eagle.schematic.items.filter((item) => item.kind === 'text')) {
+    assert.equal(text.fontSize, text.element.font_size, `EAGLE text ${text.id} lost its size`)
+  }
+
+  const altium = buildPreviewModel((await altiumProject()).circuitJson)
+  const altiumTexts = altium.schematic.items.filter((item) => item.kind === 'text')
+  assert.ok(altiumTexts.length > 0)
+  for (const text of altiumTexts) {
+    assert.equal(text.fontSize, SCHEMATIC_TEXT_SIZE, `Altium text ${text.id} kept its size`)
+  }
 })
 
 test('preview survives a hand-built model with missing optional fields', () => {

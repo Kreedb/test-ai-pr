@@ -360,3 +360,20 @@ test('component-owned text is always written at the KiCad property size', async 
   const sizes = new Set([...sch.content.matchAll(/\(size ([\d.]+) ([\d.]+)\)/g)].map((match) => match[1]))
   assert.deepEqual([...sizes], ['1.27'])
 })
+
+test('KiCad power symbols are rewritten to a token KiCad 9 accepts', async () => {
+  const result = await coreBoardProject()
+  const schematics = result.files.filter((file) => file.name.endsWith('.kicad_sch'))
+  assert.ok(schematics.length > 0)
+  // `(power global)` makes KiCad 9 drop every symbol and net in the file, so the
+  // literal must not survive anywhere.
+  for (const file of schematics) {
+    assert.ok(!file.content.includes('(power global)'), `${file.name} still has (power global)`)
+  }
+  // The F405 project has 17 power symbols; each one must still be emitted.
+  const powerSymbols = schematics.reduce(
+    (total, file) => total + [...file.content.matchAll(/\(power\)/g)].length,
+    0,
+  )
+  assert.equal(powerSymbols, 17)
+})

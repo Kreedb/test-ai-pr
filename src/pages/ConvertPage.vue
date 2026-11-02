@@ -48,35 +48,47 @@ const SAMPLES = [
 const LOSS_GROUPS = [
   {
     id: 'altiumPcb',
-    title: 'Altium PCB（.PcbDoc）→ .kicad_pcb',
+    source: 'Altium PCB',
+    target: '.kicad_pcb',
     items: LOSS_NOTES.altiumPcb,
   },
   {
     id: 'altiumSch',
-    title: 'Altium 原理图（.SchDoc）→ .kicad_sch',
+    source: 'Altium 原理图',
+    target: '.kicad_sch',
     items: LOSS_NOTES.altiumSch,
   },
   {
     id: 'dsn',
-    title: 'Specctra DSN / SES → .kicad_pcb',
+    source: 'Specctra DSN / SES',
+    target: '.kicad_pcb',
     items: LOSS_NOTES.dsn,
   },
   {
     id: 'eaglePcb',
-    title: 'EAGLE 板图（.brd）→ .kicad_pcb',
+    source: 'EAGLE 板图',
+    target: '.kicad_pcb',
     items: LOSS_NOTES.eaglePcb,
   },
   {
     id: 'eagleSch',
-    title: 'EAGLE 原理图（.sch）→ .kicad_sch',
+    source: 'EAGLE 原理图',
+    target: '.kicad_sch',
     items: LOSS_NOTES.eagleSch,
   },
   {
     id: 'pads',
-    title: 'PADS Layout ASCII（.asc）→ .kicad_pcb',
+    source: 'PADS Layout ASCII',
+    target: '.kicad_pcb',
     items: LOSS_NOTES.pads,
   },
 ]
+
+// One row per (source, lossy category), so the table can be scanned by format or
+// by what kind of information is at risk rather than read as six bullet lists.
+const LOSS_ROWS = LOSS_GROUPS.flatMap((group) =>
+  group.items.map((item) => ({ source: group.source, target: group.target, ...item })),
+)
 
 const entries = ref([])
 const dragging = ref(false)
@@ -513,16 +525,28 @@ function clearAll() {
       </div>
       <p class="muted small">
         所有来源先解析成统一的中间模型 Circuit JSON，再统一写出 KiCad（.kicad_pcb / .kicad_sch / .kicad_pro），
-        因此新增一种来源只需要补一个解析器。下列内容在导出的 KiCad 文件里会被简化或丢失，
+        因此新增一种来源只需要补一个解析器。下表按“来源 + 信息类别”列出会被简化或丢失的内容，
         请在 KiCad 打开后逐项核对，再重新灌注敷铜、补 3D 模型和设计规则。
       </p>
-      <div class="loss-grid">
-        <div v-for="group in LOSS_GROUPS" :key="group.id" class="panel">
-          <h3>{{ group.title }}</h3>
-          <ul class="loss-list">
-            <li v-for="item in group.items" :key="item">{{ item }}</li>
-          </ul>
-        </div>
+      <div class="table-wrap loss-table-wrap">
+        <table class="data-table loss-table">
+          <thead>
+            <tr>
+              <th>来源</th>
+              <th>输出</th>
+              <th>信息类别</th>
+              <th>影响</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(row, index) in LOSS_ROWS" :key="index">
+              <td class="nowrap">{{ row.source }}</td>
+              <td class="mono small nowrap">{{ row.target }}</td>
+              <td class="nowrap">{{ row.category }}</td>
+              <td class="small">{{ row.detail }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </section>
 

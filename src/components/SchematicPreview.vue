@@ -23,6 +23,21 @@ const ACTIVE_COLOR = '#ffb340'
 // label.
 const TEXT_SIZE = SCHEMATIC_TEXT_SIZE
 
+// Strokes are drawn at a constant screen width (`non-scaling-stroke`), so lines
+// stay readable at every zoom instead of turning into bars once the viewport
+// magnifies a schematic. The values are CSS pixels, not model units: with
+// `non-scaling-stroke` the browser reads `stroke-width` in screen space.
+const WIRE_STROKE = 1.5
+const SYMBOL_STROKE = 1.2
+const PIN_STROKE = 1.2
+
+// Marks that do grow with the drawing, because they are physical copper in
+// KiCad: a junction is 0.9144 mm across and a pin end about 0.6 mm. Sizing them
+// in model units keeps that ratio at any zoom; the old 0.15 model-unit radius
+// was a 4.5 mm dot, five times a real junction.
+const JUNCTION_RADIUS = 0.9144 / 2 / 15
+const PIN_DOT_RADIUS = 0.3 / 15
+
 const items = computed(() => props.sheet.items)
 
 function classesOf(item) {
@@ -134,7 +149,8 @@ const textOf = (item) => {
         :x2="item.element.x2"
         :y2="item.element.y2"
         :stroke="SYMBOL_COLOR"
-        :stroke-width="Math.max(item.element.stroke_width || 0.05, 0.02)"
+        :stroke-width="SYMBOL_STROKE"
+        vector-effect="non-scaling-stroke"
         stroke-linecap="round"
       />
       <polyline
@@ -142,7 +158,8 @@ const textOf = (item) => {
         :points="item.element.points.map((point) => `${point.x},${point.y}`).join(' ')"
         fill="none"
         :stroke="SYMBOL_COLOR"
-        :stroke-width="Math.max(item.element.stroke_width || 0.05, 0.02)"
+        :stroke-width="SYMBOL_STROKE"
+        vector-effect="non-scaling-stroke"
         stroke-linecap="round"
       />
       <circle
@@ -152,7 +169,8 @@ const textOf = (item) => {
         :r="item.element.radius"
         fill="none"
         :stroke="SYMBOL_COLOR"
-        :stroke-width="Math.max(item.element.stroke_width || 0.05, 0.02)"
+        :stroke-width="SYMBOL_STROKE"
+        vector-effect="non-scaling-stroke"
       />
     </g>
 
@@ -171,7 +189,8 @@ const textOf = (item) => {
         :x2="edge.to.x"
         :y2="edge.to.y"
         :stroke="item.net && item.net === activeNet ? ACTIVE_COLOR : WIRE_COLOR"
-        stroke-width="0.14"
+        :stroke-width="WIRE_STROKE"
+        vector-effect="non-scaling-stroke"
         stroke-linecap="round"
       />
       <circle
@@ -179,7 +198,7 @@ const textOf = (item) => {
         :key="`j-${index}`"
         :cx="junction.x"
         :cy="junction.y"
-        :r="0.15"
+        :r="JUNCTION_RADIUS"
         :fill="item.net && item.net === activeNet ? ACTIVE_COLOR : WIRE_COLOR"
       />
     </g>
@@ -199,7 +218,7 @@ const textOf = (item) => {
         :height="componentRect(item).height"
         fill="rgba(91, 140, 255, 0.06)"
         :stroke="SYMBOL_COLOR"
-        stroke-width="0.08"
+        :stroke-width="SYMBOL_STROKE"
         vector-effect="non-scaling-stroke"
       />
     </g>
@@ -217,13 +236,13 @@ const textOf = (item) => {
         :x2="pinStub(item).x2"
         :y2="pinStub(item).y2"
         :stroke="PIN_COLOR"
-        stroke-width="0.09"
+        :stroke-width="PIN_STROKE"
         vector-effect="non-scaling-stroke"
       />
       <circle
         :cx="pinStub(item).x1"
         :cy="pinStub(item).y1"
-        :r="0.09"
+        :r="PIN_DOT_RADIUS"
         :fill="item.net && item.net === activeNet ? ACTIVE_COLOR : PIN_COLOR"
       />
       <g :transform="`translate(${pinStub(item).x1} ${pinStub(item).y1}) scale(1 -1)`">

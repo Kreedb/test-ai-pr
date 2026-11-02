@@ -71,57 +71,62 @@ export const SOURCE_FORMATS = [
   },
 ]
 
-// What each supported path is known to lose. These lists are shown verbatim on
-// the page; keep them in sync with the converters' documented coverage.
+// What each supported path is known to lose, one row per lossy category. These
+// rows are what the page's loss table shows; keep them in sync with the
+// converters' documented coverage. `category` is shared across formats so the
+// same kind of loss reads the same way everywhere, and `detail` stays short
+// because the table is for scanning, not for exhaustive documentation.
 export const LOSS_NOTES = {
   altiumPcb: [
-    '只支持最多 10 层铜层(顶层、8 层内层、底层);层数更多的板会直接转换失败。',
-    '3D 模型(STEP/嵌入式模型)不会写入 .kicad_pcb,KiCad 里需要手动重新指定。',
-    '设计规则(线宽、间距、差分对、规则优先级)、网络类、Room、层叠材料的设置不导出。',
-    '敷铜以 KiCad zone 输出,但填充算法和优先级会重新计算,需要在 KiCad 里重新灌注。',
-    '封装按焊盘几何重建,不引用任何 KiCad 封装库;元件库名、封装名、BOM 字段会丢。',
-    '丝印/装配层的文字会换成 KiCad 字体,字号、对齐和旋转可能有细微偏差。',
-    '尺寸标注、钻孔表、Gerber/装配输出设置、板级变体(variant)配置不导出。',
+    {
+      category: '层数上限',
+      detail: '最多 10 层铜层；层数更多的板直接转换失败。',
+    },
+    { category: '设计规则', detail: '线宽、间距、差分对、规则优先级、网络类、Room、层叠材料不导出。' },
+    { category: '敷铜', detail: '以 zone 输出，填充算法与优先级重算，需在 KiCad 重新灌注。' },
+    { category: '封装与库', detail: '按焊盘几何重建，不引用封装库；库名、封装名、BOM 字段丢失。' },
+    { category: '3D 模型', detail: 'STEP 与嵌入式模型不写入，需手动重新指定。' },
+    { category: '文字与丝印', detail: '换成 KiCad 字体，字号、对齐、旋转有细微偏差。' },
+    { category: '其他标注', detail: '尺寸标注、钻孔表、Gerber/装配输出设置、板级变体不导出。' },
   ],
   altiumSch: [
-    '元件符号重建为通用符号(电阻、电容、二极管等)或“方框 + 引脚”形式,厂商符号的图形、引脚长度和样式会简化。',
-    '多张原理图会输出为根图 + 每张子图的层次结构,KiCad 里按同名网络标签保持跨图连接。',
-    '总线、总线入口、图纸符号(sheet symbol)与端口会扁平化或转为普通标签。',
-    'ERC 标记、掩膜(blanket)、参数集、设计变体、PCB 注释不导出。',
-    '文字字体、字号、颜色、线宽按近似值输出,注释框和图片可能丢失。',
-    '封装映射只保留名称,符号与封装的绑定需要在 KiCad 里重新确认。',
+    { category: '符号图形', detail: '重建为通用符号或“方框 + 引脚”，厂商图形、引脚长度与样式被简化。' },
+    { category: '层次结构', detail: '输出根图 + 子图；总线、总线入口、图纸符号与端口扁平化为普通标签。' },
+    { category: '设计数据', detail: 'ERC 标记、掩膜、参数集、设计变体、PCB 注释不导出。' },
+    { category: '文字与图形', detail: '字体、字号、颜色、线宽按近似值输出，注释框和图片可能丢失。' },
+    { category: '封装与库', detail: '封装映射只保留名称，符号与封装的绑定需在 KiCad 重新确认。' },
   ],
   dsn: [
-    'DSN 只包含布局(元件位置、焊盘、板框)和网表;走线要另外上传同一工程自动布线后的 .ses。',
-    'DSN 里的 rule / clearance 段(默认线宽、间距)不会被导出,需要在 KiCad 里重新设置设计规则。',
-    '没有丝印、阻焊/助焊层图形和铜皮。',
-    '焊盘只按 DSN 中声明的形状与尺寸重建,焊盘叠层和自定义焊盘会简化。',
+    { category: '走线', detail: 'DSN 只有布局与网表；走线需另传同一工程的 .ses。' },
+    { category: '设计规则', detail: 'rule / clearance 段（默认线宽、间距）不导出，需在 KiCad 重设。' },
+    { category: '层与图形', detail: '没有丝印、阻焊/助焊层图形和铜皮。' },
+    { category: '焊盘', detail: '只按 DSN 声明的形状与尺寸重建，焊盘叠层与自定义焊盘简化。' },
   ],
   eaglePcb: [
-    '只导出 Dimension 层的主板框,其余闭合轮廓按板内开槽处理;弧形板框会退化成折线。',
-    '设计规则、网络类、层叠材料和盲埋孔定义不导出;过孔只按 extent 还原起始/结束层。',
-    '铜皮(多边形覆铜)以 KiCad zone 输出,但隔离带和灌注参数会重算,需要在 KiCad 里重新灌注。',
-    '焊盘叠层的热焊盘/反焊盘、自定义焊盘(只支持方、圆、椭圆)会简化;八角焊盘按方焊盘输出。',
-    '元件属性(manufacturer、MPN、自定义属性)和 3D 封装数据不导出;KiCad 封装的 Value 字段为空,原理图里的符号值仍会保留。',
-    'Document(48)等非丝印层的说明文字不导出,避免把工艺备注印到板子上。',
-    '丝印按线条和文字重建,EAGLE 矢量字体会被 KiCad 字体替换,弧形导线按直线近似。',
+    { category: '板框', detail: '只导出 Dimension 层主板框，其余闭合轮廓当作开槽；弧形板框退化为折线。' },
+    { category: '设计规则', detail: '规则、网络类、层叠材料、盲埋孔定义不导出；过孔只按 extent 还原起止层。' },
+    { category: '敷铜', detail: '以 zone 输出，隔离带与灌注参数重算，需在 KiCad 重新灌注。' },
+    { category: '焊盘', detail: '热焊盘/反焊盘与自定义焊盘简化，仅支持方、圆、椭圆；八角焊盘按方形输出。' },
+    { category: '封装与库', detail: '元件属性与 3D 数据不导出；封装 Value 为空，原理图符号值保留。' },
+    { category: '文字与丝印', detail: '丝印按线条与文字重建，矢量字体替换为 KiCad 字体，弧线按直线近似。' },
+    { category: '其他标注', detail: 'Document(48) 等非丝印层说明文字不导出，避免工艺备注印上板。' },
   ],
   eagleSch: [
-    '元件符号按 EAGLE 库里的线条、圆和多边形重建;引脚名称/编号默认隐藏,符号样式会与原图有差异。',
-    '多张图纸会输出为独立子图,同名网络按全局标签合并;EAGLE 的模块(module)和总线不导出。',
-    '网络标签只来自 EAGLE 的 label,自动显示的 N$ 网络名不会额外生成标签。',
-    '图纸边框、标题栏和 EAGLE 的 plain 图形不导出。',
-    '元件属性、designator 显示样式和 EAGLE 矢量文字字体不保留。',
+    { category: '符号图形', detail: '按库中线条、圆、多边形重建；引脚名称/编号默认隐藏，样式与原图有差异。' },
+    { category: '层次结构', detail: '多张图纸输出为独立子图，同名网络按全局标签合并；模块与总线不导出。' },
+    { category: '网络标签', detail: '只来自 EAGLE 的 label，自动显示的 N$ 网络名不额外生成标签。' },
+    { category: '文字与图形', detail: '图纸边框、标题栏与 plain 图形不导出；矢量字体与 designator 样式不保留。' },
+    { category: '封装与库', detail: '元件属性不保留。' },
   ],
   pads: [
-    '只读 ASCII 导出文件(.asc),二进制 .pcb 数据库与 PADS Logic 原理图不支持;导出时请勾选 Parts、Nets、Decals、Copper 等全部内容。',
-    '内层铜箔按 net/面积输出为 KiCad zone,但隔离带、热焊盘参数和灌注结果会重算,需要在 KiCad 里重新灌注。',
-    '热焊盘(RT/ST)、反焊盘(RA/SA)和环形焊盘(A)不输出;焊盘叠层只取元件面那一层。',
-    '内层(-1)焊盘与内层走线没有对应的单层信息,会落到最近的铜层或跳过。',
-    '设计规则、网络类、层叠材料、盲埋孔定义、装配/阻焊/助焊层图形和文本不导出。',
-    '走线只在同层、相邻的连续线段之间成对连线;弧线走线会断成折线,圆弧板框同样按折线输出。',
-    '元件属性(制造商、MPN)、3D 模型和封装库名不导出,KiCad 里需要重新关联。',
-    '丝印文字用 KiCad 字体重排,PADS 的矢量字体、字宽比例和对齐方式会有偏差。',
+    { category: '输入范围', detail: '只读 ASCII .asc；二进制 .pcb 与 PADS Logic 原理图不支持，导出时需勾选全部内容。' },
+    { category: '敷铜', detail: '内层铜箔按 net/面积输出为 zone，隔离带、热焊盘参数与灌注结果重算，需重新灌注。' },
+    { category: '焊盘', detail: '热焊盘(RT/ST)、反焊盘(RA/SA)、环形焊盘(A)不输出；叠层只取元件面那一层。' },
+    { category: '内层', detail: '内层(-1)焊盘与内层走线缺少单层信息，会落到最近铜层或被跳过。' },
+    { category: '走线', detail: '只在同层相邻线段间成对连线；弧线走线与圆弧板框断成折线。' },
+    { category: '设计数据', detail: '设计规则、网络类、层叠材料、盲埋孔、装配/阻焊/助焊层图形与文本不导出。' },
+    { category: '封装与库', detail: '元件属性、3D 模型、封装库名不导出，需在 KiCad 重新关联。' },
+    { category: '文字与丝印', detail: '用 KiCad 字体重排，矢量字体、字宽比例与对齐方式有偏差。' },
   ],
 }
 

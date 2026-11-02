@@ -49,6 +49,16 @@ test('only supported formats are convertible and every one has losses documented
   }
 })
 
+test('every loss row explains why it cannot be lossless', () => {
+  for (const group of LOSS_GROUPS) {
+    for (const item of group.items) {
+      assert.ok(item.category, `${group.source} has a loss without a category`)
+      assert.ok(item.detail, `${group.source} / ${item.category} has no impact`)
+      assert.ok(item.reason, `${group.source} / ${item.category} has no reason`)
+    }
+  }
+})
+
 test('every sample listed by a format exists on disk', () => {
   assert.ok(SAMPLES.length > 0)
   for (const sample of SAMPLES) {

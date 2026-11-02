@@ -8,8 +8,12 @@
 // Format-specific work lives in `./formats/<id>.js`; this file owns the shared
 // upload limits, format validation and result envelope.
 
-import { baseNameOf, EdaConversionError, toKicadFiles } from './eda-shared.js'
-import { fillAltiumSchematicValues } from './formats/altium.js'
+import {
+  baseNameOf,
+  EdaConversionError,
+  fillSchematicValues,
+  toKicadFiles,
+} from './eda-shared.js'
 import {
   CONVERTIBLE_FORMATS,
   FORMATS_BY_ID,
@@ -86,7 +90,7 @@ export async function convertEda(sources) {
   const warnings = []
   const { circuitJson, summary } = await format.convert(prepared, warnings)
 
-  if (formatId === 'altium') fillAltiumSchematicValues(circuitJson)
+  if (formatId === 'altium' || formatId === 'eagle') fillSchematicValues(circuitJson)
   const files = await toKicadFiles(circuitJson, summary, baseNameOf(prepared))
   return finish(files, circuitJson, formatId, summary, warnings, started, prepared)
 }

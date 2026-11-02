@@ -14,15 +14,29 @@ export const specctra = {
       source: 'Specctra DSN / SES',
       target: '.kicad_pcb',
       items: [
-        { category: '走线', detail: 'DSN 只有布局与网表；走线需另传同一工程的 .ses。' },
+        {
+          category: '走线',
+          detail: 'DSN 的 wiring 段若为空则只有布局与网表；自动布线结果需另传同一工程的 .ses。',
+          reason:
+            'DSN 的 wiring 段可以带已有布线,但不是必需内容,没有时转换器只能输出空走线,补 .ses 才能还原自动布线结果。',
+        },
         {
           category: '设计规则',
           detail: 'rule / clearance 段（默认线宽、间距）不导出，需在 KiCad 重设。',
+          reason:
+            'dsnts 不解析 DSN 的 rule 段,Circuit JSON 也没有线宽、间距与差分对字段。',
         },
-        { category: '层与图形', detail: '没有丝印、阻焊/助焊层图形和铜皮。' },
+        {
+          category: '层与图形',
+          detail: '内层走线与焊盘会落到 top/bottom；没有丝印、阻焊/助焊层图形和铜皮。',
+          reason:
+            'dsn-to-circuit-json 的 mapLayer 只产出 top/bottom(内层被折叠),DSN 也没有丝印/阻焊/助焊图形和 copper pour/plane 语义。',
+        },
         {
           category: '焊盘',
           detail: '只按 DSN 声明的形状与尺寸重建，焊盘叠层与自定义焊盘简化。',
+          reason:
+            'dsn-to-circuit-json 只处理 circle/rect,polygon 会压成外接矩形、path 当矩形;逐层焊盘栈与自定义焊盘没有对应字段。',
         },
       ],
     },

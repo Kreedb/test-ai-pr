@@ -945,6 +945,11 @@ function addPlacedPart(placement, decal, netByTerminal, ctx) {
     rotation: placement.rotation,
     position_mode: 'none',
     obstructs_within_bounds: false,
+    // The decal name is the only footprint identity PADS exports; keep it as
+    // the KiCad footprint link instead of the generic tscircuit name.
+    ...(placement.decalName
+      ? { metadata: { kicad_footprint: { footprintName: placement.decalName } } }
+      : {}),
   })
 }
 

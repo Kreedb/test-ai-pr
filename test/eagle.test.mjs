@@ -125,6 +125,27 @@ test('schematic pin positions match the EAGLE wire endpoints', () => {
   }
 })
 
+test('EAGLE part values reach the exported schematic and footprint', async () => {
+  // EAGLE keeps the value in `display_value`, while `circuit-json-to-kicad`
+  // reads `manufacturer_part_number` for generic chips; without the bridge both
+  // the symbol Value and the footprint Value stayed empty.
+  const result = await convertEda([
+    { name: 'SOT23-3.brd', bytes: sample('SOT23-3.brd') },
+    { name: 'SOT23-3.sch', bytes: sample('SOT23-3.sch') },
+  ])
+
+  const sheet = result.files.find((file) => file.name === 'sheet_1.kicad_sch')
+  assert.ok(sheet, 'expected the child schematic')
+  assert.match(sheet.content, /\(property "Value" "SOT23-3"/)
+
+  const pcb = result.files.find((file) => file.name.endsWith('.kicad_pcb')).content
+  assert.match(pcb, /\(property "Value" "SOT23-3"/)
+  assert.match(pcb, /\(property "MPN" "SOT23-3"/)
+  // The EAGLE library/package pair is the only footprint identity the file
+  // provides, so it becomes the KiCad footprint link.
+  assert.match(pcb, /\(footprint\s+"generic_smd:SOT23-3"/)
+})
+
 test('mirrored elements keep their layer, pad positions and nets', async () => {
   // Minimal EAGLE 7 board: two parts from one package, the second mirrored and
   // rotated 90 degrees, one through-hole pad each and a GND signal between them.

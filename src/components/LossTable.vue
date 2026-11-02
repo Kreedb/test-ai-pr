@@ -17,6 +17,7 @@ const rows = LOSS_GROUPS.flatMap((group) =>
           <th>输出</th>
           <th>信息类别</th>
           <th>影响</th>
+          <th>无法无损转换的原因</th>
         </tr>
       </thead>
       <tbody>
@@ -25,6 +26,7 @@ const rows = LOSS_GROUPS.flatMap((group) =>
           <td class="mono small nowrap">{{ row.target }}</td>
           <td class="nowrap">{{ row.category }}</td>
           <td class="small">{{ row.detail }}</td>
+          <td class="small">{{ row.reason }}</td>
         </tr>
       </tbody>
     </table>

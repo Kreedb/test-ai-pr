@@ -1068,6 +1068,11 @@ section[id] {
   min-width: 320px;
 }
 
+.loss-table td:nth-child(5) {
+  color: var(--muted);
+  min-width: 280px;
+}
+
 .loss-list {
   margin: 0;
   padding-left: 18px;

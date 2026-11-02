@@ -14,13 +14,17 @@ import { fileURLToPath } from 'node:url'
 
 import { convertEda } from '../src/lib/eda.js'
 import {
+  MAX_PX_PER_MM,
+  SCHEMATIC_MM_PER_UNIT,
   SCHEMATIC_TEXT_SIZE,
   buildPreviewModel,
   buildSearchIndex,
   indexComponents,
   indexNets,
+  pxPerMm,
   schematicTextSize,
   searchPreview,
+  zoomScaleLimits,
 } from '../src/lib/preview.js'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
@@ -168,6 +172,36 @@ test('schematic text uses the size the KiCad writer draws', () => {
   assert.equal(schematicTextSize({ font_size: 1.778 / 15 }, false), SCHEMATIC_TEXT_SIZE)
   assert.equal(schematicTextSize({}, true), SCHEMATIC_TEXT_SIZE)
   assert.equal(schematicTextSize({ font_size: 0 }, true), SCHEMATIC_TEXT_SIZE)
+})
+
+test('schematic zoom is not 15x weaker than the board', () => {
+  // The viewport caps zoom in screen pixels per millimetre and converts with
+  // `mmPerUnit`. Schematic units are 1/15 mm, so a bare model-units-per-pixel
+  // cap stopped the schematic at 4 px/mm while the board reached 60: 1.27 mm
+  // text stayed five pixels tall however far the wheel turned.
+  assert.equal(SCHEMATIC_MM_PER_UNIT, 15)
+  assert.equal(SCHEMATIC_TEXT_SIZE * SCHEMATIC_MM_PER_UNIT, 1.27)
+
+  const board = zoomScaleLimits(1)
+  const schematic = zoomScaleLimits(SCHEMATIC_MM_PER_UNIT)
+
+  // Both tabs must reach the same physical magnification at the cap.
+  assert.equal(pxPerMm(board.zoomIn, 1), MAX_PX_PER_MM)
+  assert.equal(pxPerMm(schematic.zoomIn, SCHEMATIC_MM_PER_UNIT), MAX_PX_PER_MM)
+
+  // At that cap a default 1.27 mm label is 300+ pixels tall, not five.
+  const labelPx = 1.27 * MAX_PX_PER_MM
+  assert.ok(labelPx > 300, `label would be ${labelPx}px tall`)
+
+  // The old cap was one number in model units, so the schematic (1/15 mm units)
+  // topped out at 60/15 = 4 px/mm while the board reached 60 px/mm.
+  assert.equal(pxPerMm(1 / 60, 1), 60)
+  assert.equal(pxPerMm(1 / 60, SCHEMATIC_MM_PER_UNIT), 4)
+
+  // The cap still has to stop somewhere: a 60x board zoom is now the floor of
+  // what the schematic gets, not its ceiling.
+  assert.ok(MAX_PX_PER_MM > 60, `cap ${MAX_PX_PER_MM} must exceed the old 60x`)
+  assert.ok(pxPerMm(schematic.zoomOut, SCHEMATIC_MM_PER_UNIT) > 0)
 })
 
 test('schematic text keeps its size only where the writer keeps it', async () => {

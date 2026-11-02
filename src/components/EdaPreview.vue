@@ -5,6 +5,7 @@ import PcbPreview from '@/components/PcbPreview.vue'
 import PreviewViewport from '@/components/PreviewViewport.vue'
 import SchematicPreview from '@/components/SchematicPreview.vue'
 import {
+  SCHEMATIC_MM_PER_UNIT,
   buildPreviewModel,
   buildSearchIndex,
   indexComponents,
@@ -439,6 +440,7 @@ const selectedLabel = computed(() => {
           v-if="(tab === 'pcb' && pcb) || (tab === 'schematic' && activeSheet)"
           ref="viewport"
           :bounds="tab === 'pcb' ? pcb?.boardBounds || pcb?.bounds : activeSheet?.bounds"
+          :mm-per-unit="tab === 'pcb' ? 1 : SCHEMATIC_MM_PER_UNIT"
           :fit-key="`${tab}-${activeSheetIndex}-${fitKey}`"
         >
           <PcbPreview

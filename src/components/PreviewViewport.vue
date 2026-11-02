@@ -1,20 +1,29 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
+import { pxPerMm, zoomScaleLimits } from '@/lib/preview'
+
 // Pan/zoom container for the schematic and board previews.
 //
-// The content is rendered in model coordinates (millimetres, Y up) and flipped
-// once by the wrapping group, so children can draw with the same numbers the
-// converter produced. The view state is a centre point plus "millimetres per
-// pixel", which survives container resizes without a refit.
+// The content is rendered in model coordinates and flipped once by the wrapping
+// group, so children can draw with the same numbers the converter produced. The
+// view state is a centre point plus "model units per pixel", which survives
+// container resizes without a refit.
 const props = defineProps({
   bounds: { type: Object, default: null },
+  // Millimetres per model unit. Board coordinates are already millimetres
+  // (`1`); `circuit-json-to-kicad` multiplies schematic coordinates by 15 to get
+  // millimetres, so one schematic unit is 15 mm.
+  mmPerUnit: { type: Number, default: 1 },
   // Bumping this value re-fits the view, e.g. when the visible tab changes.
   fitKey: { type: [String, Number], default: 0 },
 })
 
-const MIN_SCALE = 0.02
-const MAX_SCALE = 60
+// Zoom limits in screen pixels per millimetre, so both tabs magnify the same
+// amount. The old cap was 60 model units per pixel, which is 60 px/mm on the
+// board but only 4 px/mm on the schematic: 1.27 mm schematic text came out five
+// pixels tall and fine detail was unreadable however far the wheel turned.
+const scaleLimits = computed(() => zoomScaleLimits(props.mmPerUnit))
 // Pointer travel, in CSS pixels, before a press counts as a pan instead of a click.
 const DRAG_THRESHOLD = 3
 
@@ -38,9 +47,9 @@ const viewBox = computed(() => {
 })
 
 const zoomLabel = computed(() => {
-  // Screen pixels per millimetre.
-  const pxPerMm = 1 / scale.value
-  return pxPerMm >= 1 ? `${pxPerMm.toFixed(1)}×` : `${(pxPerMm * 100).toFixed(0)}%`
+  // Screen pixels per millimetre, i.e. the same number on both tabs.
+  const value = pxPerMm(scale.value, props.mmPerUnit)
+  return value >= 1 ? `${value.toFixed(1)}×` : `${(value * 100).toFixed(0)}%`
 })
 
 function measure() {
@@ -51,9 +60,9 @@ function measure() {
 }
 
 // Frame the given world bounds with a little air around them. Small objects (a
-// single pad, one net) stop zooming in at MAX_SCALE so a click does not fill the
-// canvas with a 0.5 mm pad; the same bounds as the wheel keep large boards from
-// being cropped by the fit.
+// single pad, one net) stop zooming in at the maximum zoom so a click does not
+// fill the canvas with a 0.5 mm pad; the same bounds as the wheel keep large
+// boards from being cropped by the fit.
 function fitTo(bounds, { padding = 1.12 } = {}) {
   measure()
   const width = bounds ? bounds.width ?? bounds.maxX - bounds.minX : 0
@@ -62,14 +71,17 @@ function fitTo(bounds, { padding = 1.12 } = {}) {
     // A single point (an unconnected pin) has nothing to frame: centre on it at
     // a readable zoom instead of leaving the scale at whatever it was.
     center.value = { x: bounds?.minX ?? 0, y: bounds?.minY ?? 0 }
-    scale.value = 1 / 8
+    scale.value = Math.min(
+      Math.max(1 / (8 * props.mmPerUnit), scaleLimits.value.zoomIn),
+      scaleLimits.value.zoomOut,
+    )
     return
   }
   const fitScale = Math.max(
     (width * padding) / size.value.width,
     (height * padding) / size.value.height,
   )
-  scale.value = Math.min(Math.max(fitScale, 1 / MAX_SCALE), 1 / MIN_SCALE)
+  scale.value = Math.min(Math.max(fitScale, scaleLimits.value.zoomIn), scaleLimits.value.zoomOut)
   center.value = {
     x: (bounds.minX + bounds.maxX) / 2,
     y: (bounds.minY + bounds.maxY) / 2,
@@ -88,7 +100,10 @@ function zoomBy(factor) {
 
 // Zoom around a point given in CSS pixels inside the canvas.
 function zoomAt(factor, pixel) {
-  const next = Math.min(Math.max(scale.value / factor, 1 / MAX_SCALE), 1 / MIN_SCALE)
+  const next = Math.min(
+    Math.max(scale.value / factor, scaleLimits.value.zoomIn),
+    scaleLimits.value.zoomOut,
+  )
   const worldX = center.value.x + (pixel.x - size.value.width / 2) * scale.value
   const worldY = center.value.y - (pixel.y - size.value.height / 2) * scale.value
   scale.value = next

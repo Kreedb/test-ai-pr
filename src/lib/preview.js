@@ -17,6 +17,34 @@ const INNER = /^(?:inner|in)(\d+)(?:\.cu)?$/i
 // be 1.27 / 15 model units to match the exported `.kicad_sch`.
 export const SCHEMATIC_TEXT_SIZE = 1.27 / 15
 
+// Millimetres per schematic model unit. `circuit-json-to-kicad` multiplies
+// schematic coordinates by this to get millimetres; the board is already in
+// millimetres, so its factor is 1.
+export const SCHEMATIC_MM_PER_UNIT = 15
+
+// Zoom limits in screen pixels per millimetre. Stating them physically is what
+// keeps the schematic readable: a limit in model units per pixel is 15x weaker
+// on the schematic, which left 1.27 mm text five pixels tall at the old cap.
+export const MAX_PX_PER_MM = 240
+export const MIN_PX_PER_MM = 0.02
+
+/**
+ * The viewport's allowed `scale` range, in model units per pixel, for a model
+ * whose coordinates are `mmPerUnit` millimetres. Zooming in makes `scale`
+ * smaller, so `zoomIn` is the lower numeric bound and `zoomOut` the upper one.
+ */
+export function zoomScaleLimits(mmPerUnit = 1) {
+  return {
+    zoomIn: 1 / (MAX_PX_PER_MM * mmPerUnit),
+    zoomOut: 1 / (MIN_PX_PER_MM * mmPerUnit),
+  }
+}
+
+/** Screen pixels per millimetre for a viewport `scale` of the given model. */
+export function pxPerMm(scale, mmPerUnit = 1) {
+  return 1 / (scale * mmPerUnit)
+}
+
 /**
  * Font size, in schematic model units, of a `schematic_text`. `keepsOwnSize`
  * mirrors the writer: it honours `font_size` only while the schematic also keeps

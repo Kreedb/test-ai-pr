@@ -68,17 +68,23 @@ src/lib/esi.js          # ESI XML -> SII 生成器，以及 SII -> ESI XML 导�
 src/lib/editor.js       # 解析结果的可编辑模型：字符串/名称同步、列表增删、导出参数
 src/lib/format.js       # 显示格式化与字段解析辅助函数
 src/lib/download.js     # 浏览器下载辅助函数
-src/lib/eda.js          # EDA -> KiCad 转换引擎：格式识别、按需加载转换器、结果汇总
+src/lib/eda.js          # EDA -> KiCad 转换入口：上传限制、格式校验、结果封装
+src/lib/eda-shared.js   # 转换器共享的错误、识别辅助、结果汇总与 KiCad 写出
+src/lib/formats/        # 每种来源一个模块：元数据、有损说明、样例、识别与转换入口
+src/lib/formats/index.js # 显式格式注册表：支持矩阵、有损表与样例按钮的唯一来源
 src/lib/eagle.js        # EAGLE XML 板图/原理图 -> Circuit JSON 的映射
 src/lib/pads.js         # PADS Layout ASCII -> Circuit JSON 的映射
 src/lib/archive.js      # zip 压缩包展开与成员筛选（大小/数量/嵌套限制）
 src/lib/preview.js      # 只读预览模型：PCB/原理图几何、图层、网络索引与搜索（无 Vue 依赖）
+src/routes.js           # 页面、导航、首页工具卡片的单一配置源
 src/router.js           # 极简 hash 路由（GitHub Pages 子路径下无需重写规则）
 src/pages/              # 导航页、解析器页、EDA 转换页
-src/components/         # 可编辑表格、PDO、DC、十六进制视图、设计预览（视图、画布、图层）
+src/components/         # 可编辑表格、PDO、DC、十六进制视图、设计预览、格式支持与有损表
 src/App.vue             # 页面外壳：品牌、导航、路由出口、页脚
 public/samples/         # 示例 EEPROM 转储、ESI XML、Altium / Specctra / EAGLE / PADS 工程文件
 ```
+
+新增 EDA 来源时，只需在 `src/lib/formats/` 下新建模块并在 `src/lib/formats/index.js` 加一行导入；新增页面时只需在 `src/routes.js` 加一条记录。协作约定见 [CONTRIBUTING.md](CONTRIBUTING.md)，包括分支命名、提交格式、验证命令与扩展点。
 
 解析规则参考 ETG.1000.6（固定头、类别、General、FMMU）、ETG.2010（Strings、DC、PDO）与 ETG.2000（EtherCATInfo XML）。所有多字节字段按小端处理。
 

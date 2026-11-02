@@ -1,19 +1,13 @@
 <script setup>
 import { computed } from 'vue'
 
-import ConvertPage from '@/pages/ConvertPage.vue'
-import HomePage from '@/pages/HomePage.vue'
-import ParserPage from '@/pages/ParserPage.vue'
-import { routes, useRoute } from '@/router'
-
-const pages = {
-  '/': HomePage,
-  '/parser': ParserPage,
-  '/convert': ConvertPage,
-}
+import { useRoute } from '@/router'
+import { routes } from '@/routes'
 
 const path = useRoute()
-const page = computed(() => pages[path.value] || HomePage)
+const page = computed(
+  () => routes.find((route) => route.path === path.value)?.component || routes[0].component,
+)
 const active = computed(() => routes.find((route) => route.path === path.value))
 </script>
 

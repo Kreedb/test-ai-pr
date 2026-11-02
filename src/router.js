@@ -1,12 +1,10 @@
 import { onUnmounted, ref } from 'vue'
 
+import { routes } from '@/routes'
+
 // Minimal hash router. The site is a GitHub Pages project page served from a
 // subpath, so hash routes avoid any server-side rewrite rules.
-export const routes = [
-  { path: '/', label: '首页' },
-  { path: '/parser', label: 'EEPROM 解析器' },
-  { path: '/convert', label: 'EDA 转 KiCad' },
-]
+export { routes }
 
 function currentPath() {
   const raw = window.location.hash.replace(/^#/, '')

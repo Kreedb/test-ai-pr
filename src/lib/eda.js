@@ -268,12 +268,12 @@ function toKicadFiles(circuitJson, summary, baseName) {
       files.push({ name, content, size: new TextEncoder().encode(content).length })
     }
 
-    // `circuit-json-to-kicad` writes power symbols as `(power global)`. That is
-    // not a KiCad token: 9.x accepts `(power)` or `(power local)` and aborts the
-    // whole schematic (0 symbols, 0 nets) on `global`. A power symbol's value is
-    // its net name and power nets are global anyway, so drop the invalid suffix
-    // and keep the symbol. Rewrite the serialized text because the token comes
-    // from kicadts, not from a field on the converter.
+    // `circuit-json-to-kicad` writes power symbols as `(power global)`. KiCad 9's
+    // parser only understands bare `(power)` and aborts the whole schematic
+    // (0 symbols, 0 nets) on the extra token; `(power global)`/`(power local)`
+    // were added in KiCad 10. Bare `(power)` also means a global power symbol in
+    // 10, so drop the suffix and keep the symbol. Rewrite the serialized text
+    // because the token comes from kicadts, not from a field on the converter.
     const repairSchematicText = (content) =>
       content.replace(/^(\s*)\(power global\)$/gm, '$1(power)')
 

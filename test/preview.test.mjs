@@ -397,6 +397,45 @@ test('schematic preview draws the value of parts without value texts', async () 
     ),
     'inductor value is missing',
   )
+
+  // An unresolved Altium formula is not a value; it must not be drawn as if it
+  // were one.
+  const led = connectors.items.find(
+    (item) => item.kind === 'component' && item.refdes === 'D1',
+  )
+  assert.ok(led, 'expected D1 on the first sheet')
+  assert.equal(led.value, '')
+  assert.ok(
+    !connectors.items.some(
+      (item) => item.kind === 'text' && item.componentId === led.id && item.element.text.includes('='),
+    ),
+    'unresolved formula was drawn',
+  )
+})
+
+test('synthesized value text uses the writer height fallback', () => {
+  // The writer places Value at `size.height / 2 + 3`, falling back to 1 when the
+  // symbol has no size. The preview must use the same fallback or unsized parts
+  // draw their value almost on top of the body.
+  const model = buildPreviewModel([
+    {
+      type: 'source_component',
+      source_component_id: 's1',
+      name: 'X1',
+      display_value: 'ABC',
+    },
+    {
+      type: 'schematic_component',
+      schematic_component_id: 'sc1',
+      source_component_id: 's1',
+      center: { x: 0, y: 0 },
+    },
+  ])
+  const value = model.schematic.sheets[0].items.find(
+    (item) => item.kind === 'text' && item.element.text === 'ABC',
+  )
+  assert.ok(value, 'value text is missing')
+  assert.ok(Math.abs(value.element.position.y + 0.7) < 1e-9)
 })
 
 test('Altium parts without value texts still export a filled KiCad Value', async () => {
@@ -423,6 +462,14 @@ test('Altium parts without value texts still export a filled KiCad Value', async
   assert.ok(f405, 'expected the F405 connector sheet')
   assert.match(f405.content, /\(property "Value" "UPZ2012E221"/)
   assert.match(f405.content, /\(property "Value" "SMAJ5.0A"/)
+  // Formula-valued fields cannot be evaluated and must stay empty instead of
+  // leaking the expression into the exported schematic.
+  for (const file of (await coreBoardProject()).files.filter((entry) => entry.name.endsWith('.kicad_sch'))) {
+    assert.ok(
+      !file.content.includes('(property "Value" "='),
+      `${file.name} exported an unresolved Value expression`,
+    )
+  }
 })
 
 test('KiCad power symbols are rewritten to a token KiCad 9 accepts', async () => {

@@ -313,6 +313,8 @@ class ProjectIndex {
 // display rating. Reading `display_value` for everything would show an EAGLE
 // device name in the preview that the exported `.kicad_sch` leaves blank.
 function writerValueOf(component) {
+  const displayValue = component.display_value
+  const resolvedValue = displayValue && !String(displayValue).trim().startsWith('=') ? displayValue : ''
   switch (component.ftype) {
     case 'simple_resistor':
       return component.display_resistance || 'R'
@@ -329,9 +331,12 @@ function writerValueOf(component) {
     case 'simple_switch':
       return component.manufacturer_part_number || ''
     default:
-      return component.display_value || ''
+      return resolvedValue
   }
 }
+
+const resolvedSymbolValue = (value) =>
+  value && !String(value).trim().startsWith('=') ? value : ''
 
 function pcbElementBounds(element) {
   switch (element.type) {
@@ -647,7 +652,9 @@ function buildSchematic(index) {
       sheet: sheetOf(component),
       componentId: component.schematic_component_id,
       refdes: index.nameOf(component.source_component_id),
-      value: component.symbol_display_value || index.valueOf(component.source_component_id),
+      value:
+        resolvedSymbolValue(component.symbol_display_value) ||
+        index.valueOf(component.source_component_id),
     })
     const ports = []
     for (const port of index.list('schematic_port')) {
@@ -697,7 +704,10 @@ function buildSchematic(index) {
   // Altium only emits designator/value `schematic_text` for some symbols; the
   // KiCad writer fills in the rest from the source component. Draw those
   // properties here too, otherwise a resistor's value (`4k7`), a capacitor's
-  // (`100n`) or an inductor's never reaches the preview.
+  // (`100n`) or an inductor's never reaches the preview. This is a best-effort
+  // approximation of the writer: it ignores symbol-primitive text positions and
+  // `placeValueAtNamePosition`, but uses the writer's `height || 1` fallback so
+  // unsized symbols do not overlap their value.
   const textsByComponent = new Map()
   for (const item of items) {
     if (item.kind !== 'text' || !item.element.schematic_component_id) continue
@@ -708,7 +718,7 @@ function buildSchematic(index) {
   for (const item of items.filter((entry) => entry.kind === 'component')) {
     const element = item.element
     const center = element.center || { x: 0, y: 0 }
-    const height = element.size?.height || 0.4
+    const height = element.size?.height || 1
     const taken = textsByComponent.get(item.id) || new Set()
     // KiCad places the reference above and the value below the body, 3 mm away
     // from the edge (0.2 schematic model units).

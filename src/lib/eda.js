@@ -267,7 +267,10 @@ function summarize(circuitJson) {
 // value text in `display_value` and leaves that field unset, so an inductor such
 // as `UPZ2012E221` and every diode/LED reached KiCad with an empty Value. Copy
 // the display value into the field the writer reads; this is the same text the
-// source schematic shows.
+// source schematic shows. The writer also derives the library symbol id, the
+// footprint name and the PCB `MPN` property from this field, so those now carry
+// the schematic value too. That is intentional: the value is the only part
+// identity the source provides for these generic types.
 const VALUE_FROM_DISPLAY_TYPES = new Set([
   'simple_chip',
   'simple_connector',
@@ -276,11 +279,18 @@ const VALUE_FROM_DISPLAY_TYPES = new Set([
   'simple_switch',
 ])
 
+// An Altium field can contain a formula (`='LED-'+Color`) that the converter
+// cannot evaluate. Exporting the literal expression is worse than leaving the
+// Value empty, so only resolved text is copied.
+const isUnresolvedExpression = (value) => String(value).trim().startsWith('=')
+
 export function fillAltiumSchematicValues(circuitJson) {
   for (const element of circuitJson) {
     if (element.type !== 'source_component' || element.manufacturer_part_number) continue
     if (!VALUE_FROM_DISPLAY_TYPES.has(element.ftype)) continue
-    if (element.display_value) element.manufacturer_part_number = element.display_value
+    if (element.display_value && !isUnresolvedExpression(element.display_value)) {
+      element.manufacturer_part_number = element.display_value
+    }
   }
   return circuitJson
 }

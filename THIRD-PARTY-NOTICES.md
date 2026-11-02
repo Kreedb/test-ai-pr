@@ -23,7 +23,7 @@ EAGLE XML 与 PADS Layout ASCII 的字段映射是本仓库自己的代码（`sr
 | `circuit-json-to-connectivity-map` | 0.0.36 | MIT | 网络连通性 |
 | `earcut` | 3.2.4 | ISC | 多边形三角化 |
 | `fast-xml-parser` | 5.11.x | MIT | EAGLE XML 解析 |
-| `fflate` | 0.8.3 | MIT | 多文件打包下载 |
+| `fflate` | 0.8.3 | MIT | 多文件打包下载、zip 压缩包展开 |
 | `graphics-debug` | 0.0.101 | MIT | DSN 转换器的调试图形 |
 | `zod` | 3.25.76 | MIT | Circuit JSON 校验 |
 | `vue` | 3.5.x | MIT | 前端框架 |
@@ -43,6 +43,7 @@ EAGLE XML 与 PADS Layout ASCII 的字段映射是本仓库自己的代码（`sr
 | `public/samples/specctra/motor-driver.dsn` | [tscircuit/dsn-to-circuit-json](https://github.com/tscircuit/dsn-to-circuit-json) 的测试资产 | MIT，Copyright (c) 2025 tscircuit Inc. |
 | `public/samples/eagle/SOT23-3.brd`、`SOT23-3.sch` | [tedyapo/ugly-smd-adapters](https://github.com/tedyapo/ugly-smd-adapters) 的 SOT23-3 转接板 | MIT，Copyright (c) 2016 Theodore C. Yapo |
 | `public/samples/pads/res0805.asc` | 按 [tscircuit/padsts](https://github.com/tscircuit/padsts) 测试资产的格式改写的 PADS Layout ASCII 样例 | MIT，Copyright (c) 2025 tscircuit Inc. |
+| `public/samples/altium/PA6940-project.zip` | 由 `public/samples/altium/` 里的 PA6940 工程文件重新打包 | 同上（luxonis/oak-hardware，MIT） |
 | `test/fixtures/pads/*.asc` | [tscircuit/padsts](https://github.com/tscircuit/padsts) 的 `tests/fixtures` PADS ASCII 回归资产 | MIT，Copyright (c) 2025 tscircuit Inc. |
 | `public/samples/akd-eeprom.bin` | [ethercrab-rs/ethercrab](https://github.com/ethercrab-rs/ethercrab) 测试数据 | 见上游仓库 |
 | `public/samples/limx-tron2.bin`、`limx-tron2.xml` | Limx Dynamics Tron2 EEPROM 转储与 TwinCAT ESI | 见上游 |

@@ -2,6 +2,11 @@
 import { computed, ref, shallowRef } from 'vue'
 
 import EdaPreview from '@/components/EdaPreview.vue'
+import {
+  SKIP_REASON_LABELS,
+  expandArchive,
+  isZipArchive,
+} from '@/lib/archive'
 import { downloadBlob, fileBaseName } from '@/lib/download'
 import {
   LOSS_NOTES,
@@ -33,6 +38,10 @@ const SAMPLES = [
   {
     label: 'PADS ASCII（0805 + 排针）',
     files: ['samples/pads/res0805.asc'],
+  },
+  {
+    label: 'Altium 工程压缩包（.zip）',
+    files: ['samples/altium/PA6940-project.zip'],
   },
 ]
 
@@ -76,6 +85,10 @@ const error = ref('')
 const errorDetail = ref('')
 const sampleLabel = ref('')
 const result = shallowRef(null)
+// Files that came out of a zip, grouped by the archive they arrived in, so the
+// page can say where a document came from after the archive itself is gone.
+const archives = ref([])
+const archiveNotes = ref([])
 
 // Formats that actually produce output. Everything else is either a project
 // side file the converters cannot read, or listed as not yet supported.
@@ -143,12 +156,76 @@ const outputTotal = computed(() =>
   result.value ? result.value.files.reduce((sum, file) => sum + file.size, 0) : 0,
 )
 
+// Which archive a document came from, keyed by the (possibly de-duplicated)
+// name the entry list uses.
+const archiveByEntry = computed(() => {
+  const map = new Map()
+  for (const archive of archives.value) {
+    for (const name of archive.files) map.set(name, archive.name)
+  }
+  return map
+})
+
 const projectName = computed(() => {
   const outcome = result.value
   if (!outcome) return 'converted'
   const base = outcome.files.find((file) => file.name.endsWith('.kicad_pcb'))?.name
   return fileBaseName(base || outcome.files[0].name, 'converted')
 })
+
+// Turn a batch of `{ name, bytes }` documents into entries, opening any archive
+// along the way. `useAfter` is the byte budget already spent by entries that
+// stay; archives never reach the converters, so the members of one replace its
+// own compressed size in the running total.
+async function collectEntries(documents, { useAfter, taken }) {
+  const added = []
+  const opened = []
+  const notes = []
+  const duplicates = new Set()
+  let used = useAfter
+
+  for (const { name, bytes } of documents) {
+    used += bytes.length
+    if (!isZipArchive(name, bytes)) {
+      added.push({ name, bytes })
+      continue
+    }
+
+    const { files: members, skipped } = await expandArchive(name, bytes, {
+      maxFileBytes: MAX_INPUT_BYTES,
+      maxTotalBytes: Math.max(0, MAX_TOTAL_BYTES - used + bytes.length),
+    })
+    const landed = []
+    let imported = 0
+    for (const member of members) {
+      if (taken.has(member.name)) {
+        duplicates.add(member.name)
+        continue
+      }
+      taken.add(member.name)
+      imported += member.bytes.length
+      added.push(member)
+      landed.push(member.name)
+    }
+    // The archive itself is dropped, so its members only add their own size.
+    used += imported - bytes.length
+    if (landed.length) opened.push({ name, files: landed })
+    if (skipped.length) {
+      const shown = skipped.slice(0, 4)
+      const summary = shown
+        .map((item) => `${item.name}（${SKIP_REASON_LABELS[item.reason]}）`)
+        .join('、')
+      const rest = skipped.length > shown.length ? ` 等 ${skipped.length} 个文件` : ''
+      notes.push(`${name}：${summary}${rest} 已跳过。`)
+    }
+  }
+  if (duplicates.size) notes.push(`${[...duplicates].join('、')} 与已有文件重名，已跳过。`)
+  if (used > MAX_TOTAL_BYTES) {
+    throw new Error(`解压后合计 ${formatBytes(used)}，超过 ${formatBytes(MAX_TOTAL_BYTES)} 上限，请分批转换。`)
+  }
+
+  return { added, opened, notes }
+}
 
 async function addFiles(fileList) {
   const files = Array.from(fileList || [])
@@ -161,26 +238,32 @@ async function addFiles(fileList) {
     // be refused without being buffered first.
     const pending = []
     let total = entries.value.reduce((sum, entry) => sum + entry.bytes.length, 0)
+    const taken = new Set(entries.value.map((entry) => entry.name))
     for (const file of files) {
       if (!file.size) throw new Error(`${file.name} 是空文件`)
       if (file.size > MAX_INPUT_BYTES) {
         throw new Error(`${file.name} 超过 ${formatBytes(MAX_INPUT_BYTES)} 上限，请先拆分工程。`)
       }
-      if (entries.value.some((entry) => entry.name === file.name)) continue
-      if (pending.some((item) => item.name === file.name)) continue
+      if (taken.has(file.name)) continue
       total += file.size
       if (total > MAX_TOTAL_BYTES) {
         throw new Error(`本次上传合计超过 ${formatBytes(MAX_TOTAL_BYTES)} 上限，请分批转换。`)
       }
+      taken.add(file.name)
       pending.push(file)
     }
-    const added = await Promise.all(
+
+    const existing = entries.value.reduce((sum, entry) => sum + entry.bytes.length, 0)
+    const documents = await Promise.all(
       pending.map(async (file) => ({
         name: file.name,
         bytes: new Uint8Array(await file.arrayBuffer()),
       })),
     )
+    const { added, opened, notes } = await collectEntries(documents, { useAfter: existing, taken })
     entries.value.push(...added)
+    archives.value.push(...opened)
+    archiveNotes.value.push(...notes)
     sampleLabel.value = ''
     result.value = null
   } catch (cause) {
@@ -201,7 +284,11 @@ function onFileChange(event) {
 }
 
 function removeEntry(index) {
-  entries.value.splice(index, 1)
+  const [removed] = entries.value.splice(index, 1)
+  for (const archive of archives.value) {
+    archive.files = archive.files.filter((name) => name !== removed.name)
+  }
+  archives.value = archives.value.filter((archive) => archive.files.length)
   sampleLabel.value = ''
   result.value = null
 }
@@ -211,14 +298,22 @@ async function loadSample(sample) {
   error.value = ''
   errorDetail.value = ''
   try {
-    const files = await Promise.all(
+    const fetched = await Promise.all(
       sample.files.map(async (path) => {
         const response = await fetch(`${import.meta.env.BASE_URL}${path}`)
         if (!response.ok) throw new Error(`示例文件加载失败（HTTP ${response.status}）`)
         return { name: path.split('/').pop(), bytes: new Uint8Array(await response.arrayBuffer()) }
       }),
     )
-    entries.value = files
+    // Samples go through the same expansion path as uploads, so a zipped
+    // example exercises the archive reader too.
+    const { added, opened, notes } = await collectEntries(fetched, {
+      useAfter: 0,
+      taken: new Set(),
+    })
+    entries.value = added
+    archives.value = opened
+    archiveNotes.value = notes
     sampleLabel.value = sample.label
     result.value = null
   } catch (cause) {
@@ -261,6 +356,8 @@ async function downloadArchive() {
 
 function clearAll() {
   entries.value = []
+  archives.value = []
+  archiveNotes.value = []
   result.value = null
   sampleLabel.value = ''
   error.value = ''
@@ -286,24 +383,48 @@ function clearAll() {
         <input
           type="file"
           multiple
-          accept=".PcbDoc,.SchDoc,.pcbdoc,.schdoc,.PrjPcb,.prjpcb,.dsn,.ses,.asc,.brd,.sch,.edif"
+          accept=".PcbDoc,.SchDoc,.pcbdoc,.schdoc,.PrjPcb,.prjpcb,.dsn,.ses,.asc,.brd,.sch,.edif,.zip"
           @change="onFileChange"
         />
-        <span class="drop-title">拖拽 Altium / Specctra / EAGLE / PADS 文件到这里,或点击选择文件</span>
+        <span class="drop-title">
+          拖拽 Altium / Specctra / EAGLE / PADS 文件或 .zip 压缩包到这里,或点击选择文件
+        </span>
         <span class="drop-hint">
-          支持 .PcbDoc、.SchDoc、.dsn、.ses、.brd、.sch、.asc,可一次选择整个工程 · 单个文件最大
+          支持 .PcbDoc、.SchDoc、.dsn、.ses、.brd、.sch、.asc,可一次选择整个工程,也可以直接给一个 .zip;
+          压缩包会在浏览器里解开,只取其中能转换的文件 · 单个文件最大
           {{ formatBytes(MAX_INPUT_BYTES) }},合计最大 {{ formatBytes(MAX_TOTAL_BYTES) }}
         </span>
       </label>
 
       <ul v-if="entries.length" class="file-list">
         <li v-for="(entry, index) in entries" :key="entry.name" class="file-row">
-          <span class="file-name mono">{{ entry.name }}</span>
+          <div class="file-main">
+            <span class="file-name mono">{{ entry.name }}</span>
+            <span v-if="archiveByEntry.get(entry.name)" class="muted small">
+              来自 {{ archiveByEntry.get(entry.name) }}
+            </span>
+          </div>
           <span class="chip">{{ formatLabel(formatOf(entry).id) }}</span>
           <span class="muted small nowrap">{{ formatBytes(entry.bytes.length) }}</span>
           <button type="button" class="btn ghost small" @click="removeEntry(index)">移除</button>
         </li>
       </ul>
+
+      <p v-for="(note, index) in archiveNotes" :key="`note-${index}`" class="warn-inline">
+        {{ note }}
+      </p>
+
+      <details v-if="archives.length" class="archive-list">
+        <summary>
+          来自压缩包：{{ archives.map((archive) => archive.name).join('、') }}
+        </summary>
+        <ul class="loss-list">
+          <li v-for="archive in archives" :key="archive.name">
+            <span class="mono">{{ archive.name }}</span>
+            <span class="muted small">（{{ archive.files.length }} 个文件）</span>
+          </li>
+        </ul>
+      </details>
 
       <p v-if="mixedFormats" class="warn-inline">
         当前混选了不同来源的文件，请只保留同一类（Altium、Specctra、EAGLE 或 PADS）。
@@ -435,7 +556,8 @@ function clearAll() {
       </div>
       <p class="export-note">
         转换器来自 tscircuit 的开源项目：altium-to-circuit-json、dsn-to-circuit-json、circuit-json-to-kicad（均为 MIT）。
-        EAGLE XML 与 PADS Layout ASCII 由本仓库的 src/lib/eagle.js、src/lib/pads.js 解析（fast-xml-parser，MIT）。
+        EAGLE XML 与 PADS Layout ASCII 由本仓库的 src/lib/eagle.js、src/lib/pads.js 解析（fast-xml-parser，MIT），
+        zip 压缩包由 src/lib/archive.js 用 fflate（MIT）在本地解开。
         文件不会上传到任何服务器。
       </p>
     </section>

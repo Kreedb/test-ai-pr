@@ -261,6 +261,30 @@ function summarize(circuitJson) {
   }
 }
 
+// `circuit-json-to-kicad` reads the Value property of a generic chip, diode,
+// LED, switch or connector from `manufacturer_part_number`, not from the
+// component's display value. `altium-to-circuit-json` keeps the schematic's
+// value text in `display_value` and leaves that field unset, so an inductor such
+// as `UPZ2012E221` and every diode/LED reached KiCad with an empty Value. Copy
+// the display value into the field the writer reads; this is the same text the
+// source schematic shows.
+const VALUE_FROM_DISPLAY_TYPES = new Set([
+  'simple_chip',
+  'simple_connector',
+  'simple_diode',
+  'simple_led',
+  'simple_switch',
+])
+
+export function fillAltiumSchematicValues(circuitJson) {
+  for (const element of circuitJson) {
+    if (element.type !== 'source_component' || element.manufacturer_part_number) continue
+    if (!VALUE_FROM_DISPLAY_TYPES.has(element.ftype)) continue
+    if (element.display_value) element.manufacturer_part_number = element.display_value
+  }
+  return circuitJson
+}
+
 function toKicadFiles(circuitJson, summary, baseName) {
   return import('circuit-json-to-kicad').then((kicad) => {
     const files = []
@@ -680,6 +704,7 @@ export async function convertEda(sources) {
           ? await convertPads(prepared, warnings)
           : await convertSpecctra(prepared, warnings)
 
+  if (formatId === 'altium') fillAltiumSchematicValues(circuitJson)
   const files = await toKicadFiles(circuitJson, summary, baseNameOf(prepared))
   return finish(files, circuitJson, formatId, summary, warnings, started, prepared)
 }

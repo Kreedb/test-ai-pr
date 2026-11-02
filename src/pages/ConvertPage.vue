@@ -1,7 +1,10 @@
 <script setup>
 import { computed, ref, shallowRef } from 'vue'
 
+import ConvertDropZone from '@/components/ConvertDropZone.vue'
 import EdaPreview from '@/components/EdaPreview.vue'
+import LossTable from '@/components/LossTable.vue'
+import SupportMatrix from '@/components/SupportMatrix.vue'
 import {
   SKIP_REASON_LABELS,
   expandArchive,
@@ -9,94 +12,12 @@ import {
 } from '@/lib/archive'
 import { downloadBlob, fileBaseName } from '@/lib/download'
 import {
-  LOSS_NOTES,
   MAX_INPUT_BYTES,
   MAX_TOTAL_BYTES,
-  SOURCE_FORMATS,
   convertEda,
-  detectSource,
 } from '@/lib/eda'
+import { CONVERTIBLE_FORMATS, SAMPLES, detectSource, formatLabel } from '@/lib/formats/index.js'
 import { formatBytes } from '@/lib/format'
-
-const SAMPLES = [
-  {
-    label: 'STM32F411 四层板（Altium 项目）',
-    files: [
-      'samples/altium/stm32-f411-4layer/STM32F411.PcbDoc',
-      'samples/altium/stm32-f411-4layer/STM32F411.SchDoc',
-    ],
-  },
-  {
-    label: 'STM32F405RGT6 核心板（Altium 项目）',
-    files: [
-      'samples/altium/stm32f405-core/STM32F405RGT6.PcbDoc',
-      'samples/altium/stm32f405-core/00_connectors_power.SchDoc',
-      'samples/altium/stm32f405-core/01_stm32f4_min_system.SchDoc',
-      'samples/altium/stm32f405-core/02_other.SchDoc',
-    ],
-  },
-  {
-    label: 'Specctra DSN',
-    files: ['samples/specctra/motor-driver.dsn'],
-  },
-  {
-    label: 'EAGLE SOT23-3（PCB + 原理图）',
-    files: ['samples/eagle/SOT23-3.brd', 'samples/eagle/SOT23-3.sch'],
-  },
-  {
-    label: 'PADS ASCII（0805 + 排针）',
-    files: ['samples/pads/res0805.asc'],
-  },
-  {
-    label: 'Altium 工程压缩包（.zip）',
-    files: ['samples/altium/stm32-f411-4layer.zip'],
-  },
-]
-
-const LOSS_GROUPS = [
-  {
-    id: 'altiumPcb',
-    source: 'Altium PCB',
-    target: '.kicad_pcb',
-    items: LOSS_NOTES.altiumPcb,
-  },
-  {
-    id: 'altiumSch',
-    source: 'Altium 原理图',
-    target: '.kicad_sch',
-    items: LOSS_NOTES.altiumSch,
-  },
-  {
-    id: 'dsn',
-    source: 'Specctra DSN / SES',
-    target: '.kicad_pcb',
-    items: LOSS_NOTES.dsn,
-  },
-  {
-    id: 'eaglePcb',
-    source: 'EAGLE 板图',
-    target: '.kicad_pcb',
-    items: LOSS_NOTES.eaglePcb,
-  },
-  {
-    id: 'eagleSch',
-    source: 'EAGLE 原理图',
-    target: '.kicad_sch',
-    items: LOSS_NOTES.eagleSch,
-  },
-  {
-    id: 'pads',
-    source: 'PADS Layout ASCII',
-    target: '.kicad_pcb',
-    items: LOSS_NOTES.pads,
-  },
-]
-
-// One row per (source, lossy category), so the table can be scanned by format or
-// by what kind of information is at risk rather than read as six bullet lists.
-const LOSS_ROWS = LOSS_GROUPS.flatMap((group) =>
-  group.items.map((item) => ({ source: group.source, target: group.target, ...item })),
-)
 
 const entries = ref([])
 const dragging = ref(false)
@@ -110,12 +31,7 @@ const result = shallowRef(null)
 const archives = ref([])
 const archiveNotes = ref([])
 
-// Formats that actually produce output. Everything else is either a project
-// side file the converters cannot read, or listed as not yet supported.
-const CONVERTIBLE_FORMATS = ['altium', 'specctra', 'eagle', 'pads']
-
 const formatOf = (source) => detectSource(source.name, source.bytes)
-const formatLabel = (id) => SOURCE_FORMATS.find((format) => format.id === id)?.label || '未知格式'
 const entryNames = (list) => list.map((entry) => entry.name).join('、')
 
 // Project side files (`.PrjPcb`, `.PcbLib`, `.OutJob`) carry nothing the
@@ -293,16 +209,6 @@ async function addFiles(fileList) {
   }
 }
 
-function onDrop(event) {
-  dragging.value = false
-  addFiles(event.dataTransfer?.files)
-}
-
-function onFileChange(event) {
-  addFiles(event.target.files)
-  event.target.value = ''
-}
-
 function removeEntry(index) {
   const [removed] = entries.value.splice(index, 1)
   for (const archive of archives.value) {
@@ -393,28 +299,12 @@ function clearAll() {
         <span v-if="entries.length" class="badge">{{ entries.length }} 个文件</span>
       </div>
 
-      <label
-        class="drop-zone"
-        :class="{ dragging }"
-        @dragover.prevent="dragging = true"
-        @dragleave.prevent="dragging = false"
-        @drop.prevent="onDrop"
-      >
-        <input
-          type="file"
-          multiple
-          accept=".PcbDoc,.SchDoc,.pcbdoc,.schdoc,.PrjPcb,.prjpcb,.dsn,.ses,.asc,.brd,.sch,.edif,.zip"
-          @change="onFileChange"
-        />
-        <span class="drop-title">
-          拖拽 Altium / Specctra / EAGLE / PADS 文件或 .zip 压缩包到这里,或点击选择文件
-        </span>
-        <span class="drop-hint">
-          支持 .PcbDoc、.SchDoc、.dsn、.ses、.brd、.sch、.asc,可一次选择整个工程,也可以直接给一个 .zip;
-          压缩包会在浏览器里解开,只取其中能转换的文件 · 单个文件最大
-          {{ formatBytes(MAX_INPUT_BYTES) }},合计最大 {{ formatBytes(MAX_TOTAL_BYTES) }}
-        </span>
-      </label>
+      <ConvertDropZone
+        v-model:dragging="dragging"
+        :max-input-bytes="MAX_INPUT_BYTES"
+        :max-total-bytes="MAX_TOTAL_BYTES"
+        @files="addFiles"
+      />
 
       <ul v-if="entries.length" class="file-list">
         <li v-for="(entry, index) in entries" :key="entry.name" class="file-row">
@@ -536,56 +426,12 @@ function clearAll() {
         因此新增一种来源只需要补一个解析器。下表按“来源 + 信息类别”列出会被简化或丢失的内容，
         请在 KiCad 打开后逐项核对，再重新灌注敷铜、补 3D 模型和设计规则。
       </p>
-      <div class="table-wrap loss-table-wrap">
-        <table class="data-table loss-table">
-          <thead>
-            <tr>
-              <th>来源</th>
-              <th>输出</th>
-              <th>信息类别</th>
-              <th>影响</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(row, index) in LOSS_ROWS" :key="index">
-              <td class="nowrap">{{ row.source }}</td>
-              <td class="mono small nowrap">{{ row.target }}</td>
-              <td class="nowrap">{{ row.category }}</td>
-              <td class="small">{{ row.detail }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <LossTable />
     </section>
 
     <section class="card">
       <h2>支持的格式</h2>
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>来源</th>
-              <th>扩展名</th>
-              <th>可转换内容</th>
-              <th>状态</th>
-              <th>说明</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="format in SOURCE_FORMATS" :key="format.id">
-              <td class="nowrap">{{ format.label }}</td>
-              <td class="mono small">{{ format.extensions.join(' / ') }}</td>
-              <td class="nowrap">{{ format.converts }}</td>
-              <td>
-                <span class="chip" :class="format.status === 'supported' ? 'accent' : ''">
-                  {{ format.status === 'supported' ? '已支持' : '计划中' }}
-                </span>
-              </td>
-              <td class="small">{{ format.note }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <SupportMatrix />
       <p class="export-note">
         转换器来自 tscircuit 的开源项目：altium-to-circuit-json、dsn-to-circuit-json、circuit-json-to-kicad（均为 MIT）。
         EAGLE XML 与 PADS Layout ASCII 由本仓库的 src/lib/eagle.js、src/lib/pads.js 解析（fast-xml-parser，MIT），

@@ -361,6 +361,117 @@ test('component-owned text is always written at the KiCad property size', async 
   assert.deepEqual([...sizes], ['1.27'])
 })
 
+test('schematic preview draws the value of parts without value texts', async () => {
+  // `altium-to-circuit-json` emits designator/value texts for some symbols but
+  // not for ordinary resistors, capacitors and inductors; the KiCad writer fills
+  // their Value property from the component itself. The preview used to draw
+  // only `schematic_text`, so `4k7`, `100n` and inductor part numbers vanished.
+  const model = buildPreviewModel((await altiumProject()).circuitJson)
+  const sheet = model.schematic.sheets[0]
+  const componentTexts = (refdes) => {
+    const component = sheet.items.find((item) => item.kind === 'component' && item.refdes === refdes)
+    assert.ok(component, `expected ${refdes} on the sheet`)
+    return sheet.items
+      .filter((item) => item.kind === 'text' && item.componentId === component.id)
+      .map((item) => item.element.text)
+  }
+
+  assert.ok(componentTexts('R1').includes('1k'), 'resistor value is missing')
+  assert.ok(componentTexts('C16').includes('100n'), 'capacitor value is missing')
+  assert.ok(componentTexts('R2').includes('4k7'), 'resistor value is missing')
+
+  // An inductor is a generic chip in the converter, so only its display value
+  // carries the part number: the preview must still show it.
+  const f405 = buildPreviewModel((await coreBoardProject()).circuitJson)
+  const connectors = f405.schematic.sheets.find((entry) => entry.name === '00_connectors_power')
+  const inductor = connectors.items.find(
+    (item) => item.kind === 'component' && item.refdes === 'L1',
+  )
+  assert.ok(inductor, 'expected L1 on the first sheet')
+  assert.ok(
+    connectors.items.some(
+      (item) =>
+        item.kind === 'text' &&
+        item.componentId === inductor.id &&
+        item.element.text === 'UPZ2012E221',
+    ),
+    'inductor value is missing',
+  )
+
+  // An unresolved Altium formula is not a value; it must not be drawn as if it
+  // were one.
+  const led = connectors.items.find(
+    (item) => item.kind === 'component' && item.refdes === 'D1',
+  )
+  assert.ok(led, 'expected D1 on the first sheet')
+  assert.equal(led.value, '')
+  assert.ok(
+    !connectors.items.some(
+      (item) => item.kind === 'text' && item.componentId === led.id && item.element.text.includes('='),
+    ),
+    'unresolved formula was drawn',
+  )
+})
+
+test('synthesized value text uses the writer height fallback', () => {
+  // The writer places Value at `size.height / 2 + 3`, falling back to 1 when the
+  // symbol has no size. The preview must use the same fallback or unsized parts
+  // draw their value almost on top of the body.
+  const model = buildPreviewModel([
+    {
+      type: 'source_component',
+      source_component_id: 's1',
+      name: 'X1',
+      display_value: 'ABC',
+    },
+    {
+      type: 'schematic_component',
+      schematic_component_id: 'sc1',
+      source_component_id: 's1',
+      center: { x: 0, y: 0 },
+    },
+  ])
+  const value = model.schematic.sheets[0].items.find(
+    (item) => item.kind === 'text' && item.element.text === 'ABC',
+  )
+  assert.ok(value, 'value text is missing')
+  assert.ok(Math.abs(value.element.position.y + 0.7) < 1e-9)
+})
+
+test('Altium parts without value texts still export a filled KiCad Value', async () => {
+  // `altium-to-circuit-json` puts the schematic value in `display_value`, while
+  // `circuit-json-to-kicad` reads `manufacturer_part_number` for generic chips,
+  // diodes and LEDs. Without the bridge the exported Value was empty for every
+  // inductor, diode and LED.
+  const f411 = (await altiumProject()).files.find((file) => file.name === 'stm32f411_2.kicad_sch')
+  assert.ok(f411, 'expected the F411 child schematic')
+  for (const [refdes, value] of [
+    ['D1', 'GREEN'],
+    ['U1', 'ams1117'],
+  ]) {
+    assert.match(
+      f411.content,
+      new RegExp(`\\(property "Reference" "${refdes}"[\\s\\S]*?\\(property "Value" "${value}"`),
+      `${refdes} lost its value`,
+    )
+  }
+
+  const f405 = (await coreBoardProject()).files.find(
+    (file) => file.name === '00_connectors_power.kicad_sch',
+  )
+  assert.ok(f405, 'expected the F405 connector sheet')
+  assert.match(f405.content, /\(property "Value" "UPZ2012E221"/)
+  assert.match(f405.content, /\(property "Value" "SMAJ5.0A"/)
+  // Formula-valued fields cannot be evaluated and must stay empty instead of
+  // leaking the expression into the exported schematic.
+  for (const file of (await coreBoardProject()).files.filter((entry) => entry.name.endsWith('.kicad_sch'))) {
+    assert.ok(
+      !file.content.includes('(property "Value" "='),
+      `${file.name} exported an unresolved Value expression`,
+    )
+  }
+})
+
 test('KiCad power symbols are rewritten to a token KiCad 9 accepts', async () => {
   const result = await coreBoardProject()
   const schematics = result.files.filter((file) => file.name.endsWith('.kicad_sch'))

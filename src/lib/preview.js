@@ -238,6 +238,7 @@ class ProjectIndex {
     this.pcbPortNet = new Map()
     this.schematicPortNet = new Map()
     this.componentName = new Map()
+    this.componentValue = new Map()
 
     const nets = this.list('source_net')
     for (const net of nets) {
@@ -281,6 +282,7 @@ class ProjectIndex {
         component.source_component_id,
         component.display_name || component.name || component.source_component_id || '',
       )
+      this.componentValue.set(component.source_component_id, writerValueOf(component))
     }
   }
 
@@ -299,7 +301,42 @@ class ProjectIndex {
   nameOf(sourceComponentId) {
     return this.componentName.get(sourceComponentId) || ''
   }
+
+  valueOf(sourceComponentId) {
+    return this.componentValue.get(sourceComponentId) || ''
+  }
 }
+
+// Mirrors `circuit-json-to-kicad`'s `getComponentMetadata`: a generic chip,
+// diode, LED, switch or connector takes its Value from
+// `manufacturer_part_number`, while a resistor/capacitor/inductor uses its
+// display rating. Reading `display_value` for everything would show an EAGLE
+// device name in the preview that the exported `.kicad_sch` leaves blank.
+function writerValueOf(component) {
+  const displayValue = component.display_value
+  const resolvedValue = displayValue && !String(displayValue).trim().startsWith('=') ? displayValue : ''
+  switch (component.ftype) {
+    case 'simple_resistor':
+      return component.display_resistance || 'R'
+    case 'simple_capacitor':
+      return component.display_capacitance || 'C'
+    case 'simple_inductor':
+      return component.display_inductance || 'L'
+    case 'simple_potentiometer':
+      return component.display_max_resistance || ''
+    case 'simple_chip':
+    case 'simple_connector':
+    case 'simple_diode':
+    case 'simple_led':
+    case 'simple_switch':
+      return component.manufacturer_part_number || ''
+    default:
+      return resolvedValue
+  }
+}
+
+const resolvedSymbolValue = (value) =>
+  value && !String(value).trim().startsWith('=') ? value : ''
 
 function pcbElementBounds(element) {
   switch (element.type) {
@@ -615,7 +652,9 @@ function buildSchematic(index) {
       sheet: sheetOf(component),
       componentId: component.schematic_component_id,
       refdes: index.nameOf(component.source_component_id),
-      value: component.symbol_display_value || '',
+      value:
+        resolvedSymbolValue(component.symbol_display_value) ||
+        index.valueOf(component.source_component_id),
     })
     const ports = []
     for (const port of index.list('schematic_port')) {
@@ -660,6 +699,56 @@ function buildSchematic(index) {
       componentId: element.schematic_component_id,
       fontSize: schematicTextSize(element, keepsOwnTextSizes),
     })
+  }
+
+  // Altium only emits designator/value `schematic_text` for some symbols; the
+  // KiCad writer fills in the rest from the source component. Draw those
+  // properties here too, otherwise a resistor's value (`4k7`), a capacitor's
+  // (`100n`) or an inductor's never reaches the preview. This is a best-effort
+  // approximation of the writer: it ignores symbol-primitive text positions and
+  // `placeValueAtNamePosition`, but uses the writer's `height || 1` fallback so
+  // unsized symbols do not overlap their value.
+  const textsByComponent = new Map()
+  for (const item of items) {
+    if (item.kind !== 'text' || !item.element.schematic_component_id) continue
+    let texts = textsByComponent.get(item.element.schematic_component_id)
+    if (!texts) textsByComponent.set(item.element.schematic_component_id, (texts = new Set()))
+    texts.add(String(item.element.text ?? '').trim())
+  }
+  for (const item of items.filter((entry) => entry.kind === 'component')) {
+    const element = item.element
+    const center = element.center || { x: 0, y: 0 }
+    const height = element.size?.height || 1
+    const taken = textsByComponent.get(item.id) || new Set()
+    // KiCad places the reference above and the value below the body, 3 mm away
+    // from the edge (0.2 schematic model units).
+    const properties = [
+      { text: item.refdes, y: center.y + height / 2 + 0.2 },
+      { text: item.value, y: center.y - height / 2 - 0.2 },
+    ]
+    for (const property of properties) {
+      const text = String(property.text || '').trim()
+      if (!text || taken.has(text)) continue
+      taken.add(text)
+      const id = `schematic_text_${item.id}_${text}`
+      add({
+        kind: 'text',
+        id,
+        element: {
+          type: 'schematic_text',
+          schematic_text_id: id,
+          schematic_component_id: item.id,
+          schematic_sheet_id: element.schematic_sheet_id,
+          text,
+          position: { x: center.x, y: property.y },
+          rotation: 0,
+          anchor: 'center',
+        },
+        sheet: item.sheet,
+        componentId: item.id,
+        fontSize: SCHEMATIC_TEXT_SIZE,
+      })
+    }
   }
 
   for (const element of index.list('schematic_trace')) {

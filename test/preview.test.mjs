@@ -170,6 +170,10 @@ test('complex STM32 samples keep their four-layer stack and sheet hierarchy', as
   assert.equal(core.files.filter((file) => file.name.endsWith('.kicad_sch')).length, 4)
   const coreModel = buildPreviewModel(core.circuitJson)
   assert.equal(coreModel.schematic.sheets.length, 3)
+  assert.deepEqual(
+    coreModel.schematic.sheets.map((sheet) => sheet.name).sort(),
+    ['00_connectors_power', '01_stm32f4_min_system', '02_other'],
+  )
   assert.equal(coreModel.pcb.components.length, core.summary.board.components)
 })
 
@@ -351,7 +355,8 @@ test('component-owned text is always written at the KiCad property size', async 
     }
   }
 
-  const sch = (await altiumProject()).files.find((file) => file.name === 'altium_schematic.kicad_sch')
+  const sch = (await altiumProject()).files.find((file) => file.name === 'stm32f411_2.kicad_sch')
+  assert.ok(sch, 'expected the child schematic sheet')
   const sizes = new Set([...sch.content.matchAll(/\(size ([\d.]+) ([\d.]+)\)/g)].map((match) => match[1]))
   assert.deepEqual([...sizes], ['1.27'])
 })

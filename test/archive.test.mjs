@@ -138,16 +138,16 @@ test('an archive with nothing usable fails with the reason', async () => {
 })
 
 test('a sample archive converts end to end through the archive path', async () => {
-  const bytes = sample('public/samples/altium/PA6940-project.zip')
-  const { files } = await expandArchive('PA6940-project.zip', bytes, {
+  const bytes = sample('public/samples/altium/stm32-f411-4layer.zip')
+  const { files } = await expandArchive('stm32-f411-4layer.zip', bytes, {
     maxFileBytes: 40 * 1024 * 1024,
     maxTotalBytes: 120 * 1024 * 1024,
   })
-  assert.deepEqual(namesOf(files), ['M8_Y-adapter.SchDoc', 'PA6940.PcbDoc', 'Project_Information.SchDoc'])
+  assert.deepEqual(namesOf(files), ['STM32F411.PcbDoc', 'STM32F411.SchDoc'])
   const outcome = await convertEda(files)
   assert.ok(outcome.summary.board, 'expected a board in the conversion summary')
   assert.ok(outcome.summary.schematic, 'expected a schematic in the conversion summary')
-  assert.equal(outcome.files[0].name, 'PA6940.kicad_pcb')
+  assert.equal(outcome.files[0].name, 'STM32F411.kicad_pcb')
   // The sample project merges cleanly, so the board and schematic keep shared
   // nets and the fallback warning must not fire.
   assert.equal(
@@ -169,7 +169,7 @@ const ASCII_PCB = [
 
 test('wrapped ASCII Board records are re-joined, real records are not', () => {
   // Binary OLE files keep their bytes untouched.
-  const binary = sample('public/samples/altium/PA6940.PcbDoc')
+  const binary = sample('public/samples/altium/stm32-f411-4layer/STM32F411.PcbDoc')
   assert.equal(normalizeAltiumAscii(binary), binary)
 
   const joined = decode(normalizeAltiumAscii(encode(ASCII_PCB)))
@@ -199,8 +199,8 @@ test('an already-normalised ASCII document is returned unchanged', () => {
 // reaches more than one net, which is exactly what the overshared trace does.
 // The page falls back to converting each side on its own when it sees one.
 test('the overshared project trace is recognised, a healthy project is not', async () => {
-  const bytes = sample('public/samples/altium/PA6940-project.zip')
-  const { files } = await expandArchive('PA6940-project.zip', bytes)
+  const bytes = sample('public/samples/altium/stm32-f411-4layer.zip')
+  const { files } = await expandArchive('stm32-f411-4layer.zip', bytes)
   const outcome = await convertEda(files)
   assert.equal(hasOversharedTrace(outcome.circuitJson), false)
 

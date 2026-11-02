@@ -48,11 +48,16 @@ export function pxPerMm(scale, mmPerUnit = 1) {
 /**
  * Font size, in schematic model units, of a `schematic_text`. `keepsOwnSize`
  * mirrors the writer: it honours `font_size` only while the schematic also keeps
- * its component-level graphics, and redraws everything else at the 1.27 mm
- * default. Net labels and pin numbers have no size of their own.
+ * its standalone graphics, and redraws everything else at the 1.27 mm default.
+ * A text owned by a component is written as that component's property, whose
+ * size is fixed regardless of `font_size`. Net labels and pin numbers have no
+ * size of their own.
  */
 export function schematicTextSize(element, keepsOwnSize = false) {
-  return (keepsOwnSize && element?.font_size) || SCHEMATIC_TEXT_SIZE
+  // Component-owned text becomes a symbol property and trace text becomes an
+  // inline label; both are written at the fixed 1.27 mm size.
+  const isStandalone = !element?.schematic_component_id && !element?.source_trace_id
+  return (keepsOwnSize && isStandalone && element?.font_size) || SCHEMATIC_TEXT_SIZE
 }
 
 const COMPONENT_PRIMITIVE_TYPES = new Set([

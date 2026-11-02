@@ -20,11 +20,19 @@ import { formatBytes } from '@/lib/format'
 
 const SAMPLES = [
   {
-    label: 'OAK PA6940（Altium 项目）',
+    label: 'STM32F411 四层板（Altium 项目）',
     files: [
-      'samples/altium/PA6940.PcbDoc',
-      'samples/altium/M8_Y-adapter.SchDoc',
-      'samples/altium/Project_Information.SchDoc',
+      'samples/altium/stm32-f411-4layer/STM32F411.PcbDoc',
+      'samples/altium/stm32-f411-4layer/STM32F411.SchDoc',
+    ],
+  },
+  {
+    label: 'STM32F405RGT6 核心板（Altium 项目）',
+    files: [
+      'samples/altium/stm32f405-core/STM32F405RGT6.PcbDoc',
+      'samples/altium/stm32f405-core/00_connectors_power.SchDoc',
+      'samples/altium/stm32f405-core/01_stm32f4_min_system.SchDoc',
+      'samples/altium/stm32f405-core/02_other.SchDoc',
     ],
   },
   {
@@ -41,7 +49,7 @@ const SAMPLES = [
   },
   {
     label: 'Altium 工程压缩包（.zip）',
-    files: ['samples/altium/PA6940-project.zip'],
+    files: ['samples/altium/stm32-f411-4layer.zip'],
   },
 ]
 

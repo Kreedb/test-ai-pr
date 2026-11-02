@@ -397,6 +397,10 @@ async function convertAltium(sources, warnings) {
   ])
 
   const documents = { pcb: null, schematics: [] }
+  // Prefer the source document name over the converter's generic fallback so a
+  // multi-page project shows one readable tab per page instead of repeated
+  // "Altium schematic" labels.
+  const sheetNameOf = (name) => String(name || '').split('/').pop().replace(/\.[^.]+$/, '')
   for (const source of sources) {
     const parsed = parseAltiumFile(normalizeAltiumAscii(source.bytes))
     if (source.format.kind === 'pcb') {
@@ -405,19 +409,24 @@ async function convertAltium(sources, warnings) {
       }
       documents.pcb = parsed.document
     } else {
-      documents.schematics.push(parsed.document)
+      documents.schematics.push({ document: parsed.document, sheetName: sheetNameOf(source.name) })
     }
   }
 
   const convertProject = () =>
     altium.convertAltiumProjectToCircuitJson({
       ...(documents.pcb ? { pcb: { document: documents.pcb } } : {}),
-      schematics: documents.schematics.map((document) => ({ document })),
+      schematics: documents.schematics.map(({ document, sheetName }) => ({
+        document,
+        options: { sheetName },
+      })),
     })
 
   let circuitJson
   if (!documents.pcb && documents.schematics.length === 1) {
-    circuitJson = altium.convertAltiumSchDocToCircuitJson(documents.schematics[0])
+    circuitJson = altium.convertAltiumSchDocToCircuitJson(documents.schematics[0].document, {
+      sheetName: documents.schematics[0].sheetName,
+    })
   } else if (!documents.pcb && documents.schematics.length === 0) {
     throw new EdaConversionError('没有找到可转换的 Altium 文档。')
   } else {
@@ -430,9 +439,10 @@ async function convertAltium(sources, warnings) {
       // produce one duplicated sheet per input document.
       circuitJson = [
         ...altium.convertAltiumPcbDocToCircuitJson(documents.pcb, { idPrefix: 'pcb' }),
-        ...documents.schematics.flatMap((document, index) =>
+        ...documents.schematics.flatMap(({ document, sheetName }, index) =>
           altium.convertAltiumSchDocToCircuitJson(document, {
             idPrefix: `schematic_${index + 1}`,
+            sheetName,
           }),
         ),
       ]

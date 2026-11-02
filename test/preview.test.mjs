@@ -41,9 +41,28 @@ const padsProject = () =>
 
 const altiumProject = () =>
   convertEda([
-    { name: 'PA6940.PcbDoc', bytes: read('public/samples/altium/PA6940.PcbDoc') },
-    { name: 'M8_Y-adapter.SchDoc', bytes: read('public/samples/altium/M8_Y-adapter.SchDoc') },
+    {
+      name: 'STM32F411.PcbDoc',
+      bytes: read('public/samples/altium/stm32-f411-4layer/STM32F411.PcbDoc'),
+    },
+    {
+      name: 'STM32F411.SchDoc',
+      bytes: read('public/samples/altium/stm32-f411-4layer/STM32F411.SchDoc'),
+    },
   ])
+
+const coreBoardProject = () =>
+  convertEda(
+    [
+      'STM32F405RGT6.PcbDoc',
+      '00_connectors_power.SchDoc',
+      '01_stm32f4_min_system.SchDoc',
+      '02_other.SchDoc',
+    ].map((name) => ({
+      name,
+      bytes: read('public/samples/altium/stm32f405-core', name),
+    })),
+  )
 
 test('preview model covers both sides of an EAGLE project', async () => {
   const result = await eagleProject()
@@ -126,6 +145,38 @@ test('layer toggles only offer copper layers that carry geometry', async () => {
   }
 })
 
+test('complex STM32 samples keep their four-layer stack and sheet hierarchy', async () => {
+  // The F411 sample is a real four-layer board: both inner planes have to reach
+  // the preview, not just top/bottom.
+  const f411 = await altiumProject()
+  const f411Model = buildPreviewModel(f411.circuitJson)
+  const f411Copper = f411Model.pcb.layers
+    .filter((layer) => layer.group === 'copper')
+    .map((layer) => layer.id)
+  assert.deepEqual(f411Copper, ['top', 'inner1', 'inner2', 'bottom'])
+  // Both inner layers carry real copper (the ground/power pours), so the
+  // four-layer claim is not just a stack setting on the board.
+  for (const layer of ['inner1', 'inner2']) {
+    assert.ok(
+      f411Model.pcb.items.some((item) => item.layers.includes(layer)),
+      `expected copper on ${layer}`,
+    )
+  }
+
+  // The F405 core board carries three schematic pages, so the output has a root
+  // sheet plus one child sheet per source page.
+  const core = await coreBoardProject()
+  assert.equal(core.summary.schematic.sheets, 3)
+  assert.equal(core.files.filter((file) => file.name.endsWith('.kicad_sch')).length, 4)
+  const coreModel = buildPreviewModel(core.circuitJson)
+  assert.equal(coreModel.schematic.sheets.length, 3)
+  assert.deepEqual(
+    coreModel.schematic.sheets.map((sheet) => sheet.name).sort(),
+    ['00_connectors_power', '01_stm32f4_min_system', '02_other'],
+  )
+  assert.equal(coreModel.pcb.components.length, core.summary.board.components)
+})
+
 test('PADS boards preview without a schematic and keep silkscreen text', async () => {
   const result = await padsProject()
   const model = buildPreviewModel(result.circuitJson)
@@ -172,6 +223,13 @@ test('schematic text uses the size the KiCad writer draws', () => {
   assert.equal(schematicTextSize({ font_size: 1.778 / 15 }, false), SCHEMATIC_TEXT_SIZE)
   assert.equal(schematicTextSize({}, true), SCHEMATIC_TEXT_SIZE)
   assert.equal(schematicTextSize({ font_size: 0 }, true), SCHEMATIC_TEXT_SIZE)
+
+  // Only a truly standalone text keeps its size. Component-owned text becomes
+  // a symbol property and trace text an inline label; KiCad writes both at the
+  // fixed 1.27 mm default even when standalone graphics are preserved.
+  const sized = { font_size: 1.778 / 15 }
+  assert.equal(schematicTextSize({ ...sized, schematic_component_id: 'c1' }, true), SCHEMATIC_TEXT_SIZE)
+  assert.equal(schematicTextSize({ ...sized, source_trace_id: 't1' }, true), SCHEMATIC_TEXT_SIZE)
 })
 
 test('schematic zoom is not 15x weaker than the board', () => {
@@ -206,21 +264,27 @@ test('schematic zoom is not 15x weaker than the board', () => {
 
 test('schematic text keeps its size only where the writer keeps it', async () => {
   // `circuit-json-to-kicad` only honours `font_size` while it also keeps
-  // standalone graphics (`preserveStandaloneGraphics`). EAGLE components are
-  // drawn from their own primitives, so the preview keeps the sizes EAGLE
-  // states; Altium components are all library symbols, so the writer redraws
-  // every text at 1.27 mm and the preview must not scale by the raw
-  // `font_size` (0.15..0.55 model units, i.e. up to 8 mm).
+  // standalone graphics (`preserveStandaloneGraphics`). Component-owned texts
+  // become KiCad properties, which are always written at 1.27 mm, so the
+  // preview must not scale by the raw `font_size` (0.15..0.55 model units).
   const eagle = buildPreviewModel((await eagleProject()).circuitJson)
   for (const text of eagle.schematic.items.filter((item) => item.kind === 'text')) {
-    assert.equal(text.fontSize, text.element.font_size, `EAGLE text ${text.id} lost its size`)
+    if (text.element.schematic_component_id) {
+      assert.equal(text.fontSize, SCHEMATIC_TEXT_SIZE, `EAGLE text ${text.id} kept its size`)
+    } else {
+      assert.equal(text.fontSize, text.element.font_size, `EAGLE text ${text.id} lost its size`)
+    }
   }
 
   const altium = buildPreviewModel((await altiumProject()).circuitJson)
   const altiumTexts = altium.schematic.items.filter((item) => item.kind === 'text')
   assert.ok(altiumTexts.length > 0)
   for (const text of altiumTexts) {
-    assert.equal(text.fontSize, SCHEMATIC_TEXT_SIZE, `Altium text ${text.id} kept its size`)
+    if (text.element.schematic_component_id || text.element.source_trace_id) {
+      assert.equal(text.fontSize, SCHEMATIC_TEXT_SIZE, `Altium text ${text.id} kept its size`)
+    } else {
+      assert.equal(text.fontSize, text.element.font_size, `Altium text ${text.id} lost its size`)
+    }
   }
 })
 
@@ -271,4 +335,28 @@ test('preview survives a hand-built model with missing optional fields', () => {
   assert.equal(model.pcb.items.find((item) => item.kind === 'pad').refdes, 'R1')
   assert.ok(model.schematic.items.some((item) => item.kind === 'label' && item.text === 'ORPHAN'))
   assert.deepEqual(indexNets(model), [])
+})
+
+test('component-owned text is always written at the KiCad property size', async () => {
+  // The F411 sample has one component drawn from primitives, which turns on
+  // `preserveStandaloneGraphics`. Its designator/value texts would then look
+  // like they keep their source size, but the writer emits them as symbol
+  // properties at 1.27 mm. Only standalone texts may keep `font_size`.
+  const model = buildPreviewModel((await altiumProject()).circuitJson)
+  const texts = model.schematic.items.filter((item) => item.kind === 'text')
+  assert.ok(texts.length > 0)
+  for (const text of texts) {
+    if (text.element.schematic_component_id || text.element.source_trace_id) {
+      assert.equal(
+        text.fontSize,
+        SCHEMATIC_TEXT_SIZE,
+        `Altium text ${text.id} should use the KiCad property size`,
+      )
+    }
+  }
+
+  const sch = (await altiumProject()).files.find((file) => file.name === 'stm32f411_2.kicad_sch')
+  assert.ok(sch, 'expected the child schematic sheet')
+  const sizes = new Set([...sch.content.matchAll(/\(size ([\d.]+) ([\d.]+)\)/g)].map((match) => match[1]))
+  assert.deepEqual([...sizes], ['1.27'])
 })

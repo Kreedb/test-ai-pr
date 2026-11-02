@@ -53,11 +53,12 @@ EAGLE XML 与 PADS ASCII 分别由仓库内的 `src/lib/eagle.js`、`src/lib/pad
 
 - `public/samples/akd-eeprom.bin`：Kollmorgen AKD 驱动的 EEPROM 转储（来自 [ethercrab](https://github.com/ethercrab-rs/ethercrab) 的测试数据）。
 - `public/samples/limx-tron2.bin` / `public/samples/limx-tron2.xml`：Limx Tron2 的 EEPROM 转储与对应的 TwinCAT ESI 描述文件。解析再导出后重新编译，结果与 `.bin` 逐字节一致。
-- `public/samples/altium/`：来自 [luxonis/oak-hardware](https://github.com/luxonis/oak-hardware)（MIT）的 PA6940 工程，含一块 PCB 与两张原理图，用于演示工程级转换。
+- `public/samples/altium/stm32-f411-4layer/`：来自 [eylolaycan/stm32-f411c-board](https://github.com/eylolaycan/stm32-f411c-board)（CC0-1.0）的 STM32F411 四层开发板，含一块四层 PCB（顶层、两个内层、底层）与一张原理图，用于演示内层与四层叠层转换。
+- `public/samples/altium/stm32f405-core/`：来自 [YangTiankai/STM32F4-Core-Board](https://github.com/YangTiankai/STM32F4-Core-Board)（GPL-3.0）的 STM32F405RGT6 核心板，含一块 PCB 与三张原理图，用于演示多图层次化工程、板对板连接器与 SBUS/CAN 接口。
 - `public/samples/specctra/motor-driver.dsn`：Specctra DSN 样例，用于演示只有布局与网表、没有走线的转换结果。
 - `public/samples/eagle/SOT23-3.brd` / `SOT23-3.sch`：来自 [tedyapo/ugly-smd-adapters](https://github.com/tedyapo/ugly-smd-adapters)（MIT）的 EAGLE 7.3 转接板，用于演示 EAGLE 板图与原理图一起转换。
 - `public/samples/pads/res0805.asc`：按 [tscircuit/padsts](https://github.com/tscircuit/padsts)（MIT）测试资产的格式改写的 PADS Layout ASCII 样例，含 SMD、通孔、走线、过孔、敷铜与丝印，用于演示 PADS 转换。
-- `public/samples/altium/PA6940-project.zip`：把 `public/samples/altium/` 里的 PA6940 工程打成 zip，用于演示压缩包解析。
+- `public/samples/altium/stm32-f411-4layer.zip`：把 `public/samples/altium/stm32-f411-4layer/` 里的 STM32F411 工程打成 zip，用于演示压缩包解析。
 
 ## 代码结构
 

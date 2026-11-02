@@ -39,11 +39,12 @@ EAGLE XML 与 PADS Layout ASCII 的字段映射是本仓库自己的代码（`sr
 
 | 文件 | 来源 | 许可 |
 | --- | --- | --- |
-| `public/samples/altium/PA6940.PcbDoc`、`M8_Y-adapter.SchDoc`、`Project_Information.SchDoc` | [luxonis/oak-hardware](https://github.com/luxonis/oak-hardware) 的 PA6940 YM8-Adapter 工程 | MIT，Copyright (c) 2020 luxonis |
+| `public/samples/altium/stm32-f411-4layer/STM32F411.PcbDoc`、`STM32F411.SchDoc` | [eylolaycan/stm32-f411c-board](https://github.com/eylolaycan/stm32-f411c-board) 的 STM32F411 四层开发板工程 | CC0-1.0，Copyright (c) 2025 eylolaycan |
+| `public/samples/altium/stm32f405-core/STM32F405RGT6.PcbDoc`、`00_connectors_power.SchDoc`、`01_stm32f4_min_system.SchDoc`、`02_other.SchDoc` | [YangTiankai/STM32F4-Core-Board](https://github.com/YangTiankai/STM32F4-Core-Board) 的 STM32F405RGT6 核心板工程 | GPL-3.0，Copyright (c) YangTiankai |
 | `public/samples/specctra/motor-driver.dsn` | [tscircuit/dsn-to-circuit-json](https://github.com/tscircuit/dsn-to-circuit-json) 的测试资产 | MIT，Copyright (c) 2025 tscircuit Inc. |
 | `public/samples/eagle/SOT23-3.brd`、`SOT23-3.sch` | [tedyapo/ugly-smd-adapters](https://github.com/tedyapo/ugly-smd-adapters) 的 SOT23-3 转接板 | MIT，Copyright (c) 2016 Theodore C. Yapo |
 | `public/samples/pads/res0805.asc` | 按 [tscircuit/padsts](https://github.com/tscircuit/padsts) 测试资产的格式改写的 PADS Layout ASCII 样例 | MIT，Copyright (c) 2025 tscircuit Inc. |
-| `public/samples/altium/PA6940-project.zip` | 由 `public/samples/altium/` 里的 PA6940 工程文件重新打包 | 同上（luxonis/oak-hardware，MIT） |
+| `public/samples/altium/stm32-f411-4layer.zip` | 由 `public/samples/altium/stm32-f411-4layer/` 里的 STM32F411 工程文件重新打包 | 同上（eylolaycan/stm32-f411c-board，CC0-1.0） |
 | `test/fixtures/pads/*.asc` | [tscircuit/padsts](https://github.com/tscircuit/padsts) 的 `tests/fixtures` PADS ASCII 回归资产 | MIT，Copyright (c) 2025 tscircuit Inc. |
 | `public/samples/akd-eeprom.bin` | [ethercrab-rs/ethercrab](https://github.com/ethercrab-rs/ethercrab) 测试数据 | 见上游仓库 |
 | `public/samples/limx-tron2.bin`、`limx-tron2.xml` | Limx Dynamics Tron2 EEPROM 转储与 TwinCAT ESI | 见上游 |

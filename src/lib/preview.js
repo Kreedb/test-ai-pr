@@ -46,6 +46,23 @@ export function pxPerMm(scale, mmPerUnit = 1) {
 }
 
 /**
+ * Mirrors PCB geometry about the vertical centre of its bounds, which is what
+ * turning the board over looks like in a flat preview.
+ */
+export function pcbFlipTransform(bounds, flipped = false) {
+  if (!flipped) return ''
+  const centerX = ((bounds?.minX ?? 0) + (bounds?.maxX ?? 0)) / 2
+  return `translate(${centerX * 2} 0) scale(-1 1)`
+}
+
+/** The same mirror as `pcbFlipTransform`, applied to a bounds object. */
+export function pcbFlipBounds(bounds, boardBounds) {
+  if (!bounds || !boardBounds) return bounds
+  const centerX = (boardBounds.minX + boardBounds.maxX) / 2
+  return { ...bounds, minX: centerX * 2 - bounds.maxX, maxX: centerX * 2 - bounds.minX }
+}
+
+/**
  * Font size, in schematic model units, of a `schematic_text`. `keepsOwnSize`
  * mirrors the writer: it honours `font_size` only while the schematic also keeps
  * its standalone graphics, and redraws everything else at the 1.27 mm default.

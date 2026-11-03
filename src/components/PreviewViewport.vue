@@ -119,6 +119,12 @@ function focus(bounds) {
   fitTo(bounds)
 }
 
+// Keep the same area visible when the caller mirrors the content about
+// `centerX`; without this a panned view jumps to the other side of the board.
+function flipX(centerX) {
+  center.value = { ...center.value, x: centerX * 2 - center.value.x }
+}
+
 function onWheel(event) {
   event.preventDefault()
   const rect = wrapper.value?.getBoundingClientRect()
@@ -202,7 +208,7 @@ watch(
   () => fit(),
 )
 
-defineExpose({ fit, focus, zoomBy })
+defineExpose({ fit, focus, flipX, zoomBy })
 </script>
 
 <template>

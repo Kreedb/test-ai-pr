@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import PcbPreview from '@/components/PcbPreview.vue'
 import PreviewViewport from '@/components/PreviewViewport.vue'
@@ -11,6 +11,7 @@ import {
   indexComponents,
   indexNets,
   padBounds,
+  pcbFlipBounds,
   searchPreview,
   unionBounds,
 } from '@/lib/preview'
@@ -43,6 +44,8 @@ const selectedPcbId = ref('')
 const query = ref('')
 const fitKey = ref(0)
 const viewport = ref(null)
+const card = ref(null)
+const pcbFlipped = ref(false)
 
 const activeSheet = computed(() => schematic.value?.sheets[activeSheetIndex.value] || null)
 
@@ -128,7 +131,11 @@ function isolateLayer(id) {
 
 function focusBounds(bounds) {
   if (!bounds) return
-  viewport.value?.focus(bounds)
+  const shown =
+    tab.value === 'pcb' && pcbFlipped.value
+      ? pcbFlipBounds(bounds, pcb.value?.boardBounds || pcb.value?.bounds)
+      : bounds
+  viewport.value?.focus(shown)
 }
 
 /** Bounds of a net inside the currently visible view, padded for its pins. */
@@ -298,10 +305,43 @@ function setTab(next) {
   clearSelection()
 }
 
+function togglePcbFlip() {
+  pcbFlipped.value = !pcbFlipped.value
+  const bounds = pcb.value?.boardBounds || pcb.value?.bounds
+  if (bounds) viewport.value?.flipX((bounds.minX + bounds.maxX) / 2)
+}
+
+// Space flips the board like LCEDA's editor. Inputs and buttons keep their own
+// Space behaviour (typing, activation) and are ignored here.
+function onKeydown(event) {
+  if (
+    event.code !== 'Space' ||
+    event.repeat ||
+    event.shiftKey ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.altKey
+  ) {
+    return
+  }
+  if (tab.value !== 'pcb' || !pcb.value) return
+  if (event.target?.closest?.('input, textarea, select, button, a, summary, [contenteditable]')) return
+  // Leave Space to page scrolling unless the PCB canvas itself is on screen; the
+  // card also holds the net table below the canvas.
+  const rect = card.value?.querySelector('.preview-viewport')?.getBoundingClientRect()
+  if (!rect || rect.bottom < 0 || rect.top > window.innerHeight) return
+  event.preventDefault()
+  togglePcbFlip()
+}
+
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+
 // Re-fit when the model changes, e.g. after a second conversion.
 watch(model, () => {
   activeSheetIndex.value = 0
   hiddenLayers.value = new Set()
+  pcbFlipped.value = false
   clearSelection()
   fitKey.value += 1
 })
@@ -329,14 +369,14 @@ const selectedLabel = computed(() => {
 </script>
 
 <template>
-  <section class="card preview-card">
+  <section ref="card" class="card preview-card">
     <div class="card-head">
       <h2>设计预览</h2>
       <span class="badge">只读</span>
     </div>
     <p class="muted small">
       直接渲染转换得到的 Circuit JSON：滚轮缩放、拖拽平移，点击元件或焊盘可定位，网络可在 PCB 与原理图之间互相跳转。
-      按住 Ctrl（macOS 为 ⌘）点击焊盘、引脚或网络名，可直接跳到另一视图的同名网络。
+      按住 Ctrl（macOS 为 ⌘）点击焊盘、引脚或网络名，可直接跳到另一视图的同名网络；PCB 视图按空格键翻转正反面。
     </p>
 
     <div class="preview-toolbar">
@@ -354,6 +394,17 @@ const selectedLabel = computed(() => {
           {{ entry.label }}
         </button>
       </div>
+
+      <button
+        v-if="tab === 'pcb' && pcb"
+        type="button"
+        class="btn small ghost"
+        :aria-pressed="pcbFlipped"
+        :title="pcbFlipped ? '空格键翻到正面' : '空格键翻到背面'"
+        @click="togglePcbFlip"
+      >
+        翻转正反面
+      </button>
 
       <div class="preview-search">
         <input
@@ -449,6 +500,7 @@ const selectedLabel = computed(() => {
             :visible-layers="visibleLayers"
             :active-net="netNeedle"
             :selected-component-id="selectedComponentId"
+            :flipped="pcbFlipped"
             @select="onPcbSelect"
           />
           <SchematicPreview

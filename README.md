@@ -1,6 +1,6 @@
-# EtherCAT 工具箱
+# convbin
 
-一个在浏览器中运行的 EtherCAT 工具，基于 Vite + Vue 3（Composition API，`<script setup>`）。所有数据只在本地处理，不会上传。
+一个在浏览器中运行的二进制工具箱，当前包含 EtherCAT SII/ESI 与 EDA 格式转换工具，基于 Vite + Vue 3（Composition API，`<script setup>`）。所有数据只在本地处理，不会上传。
 
 线上地址：https://kreedb.github.io/test-ai-pr/
 
@@ -76,7 +76,8 @@ src/lib/eagle.js        # EAGLE XML 板图/原理图 -> Circuit JSON 的映射
 src/lib/pads.js         # PADS Layout ASCII -> Circuit JSON 的映射
 src/lib/archive.js      # zip 压缩包展开与成员筛选（大小/数量/嵌套限制）
 src/lib/preview.js      # 只读预览模型：PCB/原理图几何、图层、网络索引与搜索（无 Vue 依赖）
-src/routes.js           # 页面、导航、首页工具卡片的单一配置源
+src/lib/route-path.js   # hash 路径归一化与路由匹配（无 Vue 依赖，供路由与链接共用）
+src/routes.js           # 按 src/pages/*Page.vue 自动收集路由、导航与首页工具卡片
 src/router.js           # 极简 hash 路由（GitHub Pages 子路径下无需重写规则）
 src/pages/              # 导航页、解析器页、EDA 转换页
 src/components/         # 可编辑表格、PDO、DC、十六进制视图、设计预览、格式支持与有损表
@@ -84,7 +85,7 @@ src/App.vue             # 页面外壳：品牌、导航、路由出口、页脚
 public/samples/         # 示例 EEPROM 转储、ESI XML、Altium / Specctra / EAGLE / PADS 工程文件
 ```
 
-新增 EDA 来源时，只需在 `src/lib/formats/` 下新建模块并在 `src/lib/formats/index.js` 加一行导入；新增页面时只需在 `src/routes.js` 加一条记录。协作约定见 [CONTRIBUTING.md](CONTRIBUTING.md)，包括分支命名、提交格式、验证命令与扩展点。
+新增 EDA 来源时，只需在 `src/lib/formats/` 下新建模块并在 `src/lib/formats/index.js` 加一行导入；新增页面时只需在 `src/pages/` 下新建 `NamePage.vue` 并在页面里导出 `route`，路径与所有链接都会自动派生。协作约定见 [CONTRIBUTING.md](CONTRIBUTING.md)，包括分支命名、提交格式、验证命令与扩展点。
 
 解析规则参考 ETG.1000.6（固定头、类别、General、FMMU）、ETG.2010（Strings、DC、PDO）与 ETG.2000（EtherCATInfo XML）。所有多字节字段按小端处理。
 

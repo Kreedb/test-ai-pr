@@ -21,6 +21,8 @@ import {
   buildSearchIndex,
   indexComponents,
   indexNets,
+  pcbFlipBounds,
+  pcbFlipTransform,
   pxPerMm,
   schematicTextSize,
   searchPreview,
@@ -271,6 +273,18 @@ test('schematic zoom is not 15x weaker than the board', () => {
   // what the schematic gets, not its ceiling.
   assert.ok(MAX_PX_PER_MM > 60, `cap ${MAX_PX_PER_MM} must exceed the old 60x`)
   assert.ok(pxPerMm(schematic.zoomOut, SCHEMATIC_MM_PER_UNIT) > 0)
+})
+
+test('pcb flip mirrors the board around its outline centre', () => {
+  const bounds = { minX: 10, maxX: 30 }
+  assert.equal(pcbFlipTransform(bounds, false), '')
+  assert.equal(pcbFlipTransform(bounds, true), 'translate(40 0) scale(-1 1)')
+  assert.equal(pcbFlipTransform(null, true), 'translate(0 0) scale(-1 1)')
+
+  // Cross-probe focus has to follow the mirrored geometry, or it frames the
+  // same net on the far side of the board.
+  assert.deepEqual(pcbFlipBounds({ minX: 12, maxX: 16 }, bounds), { minX: 24, maxX: 28 })
+  assert.equal(pcbFlipBounds(null, bounds), null)
 })
 
 test('schematic text keeps its size only where the writer keeps it', async () => {

@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 
-import { copperLayerLabel } from '@/lib/preview'
+import { copperLayerLabel, pcbFlipTransform } from '@/lib/preview'
 
 // Read-only PCB canvas drawn from the preview model. Coordinates are
 // millimetres with Y up; PreviewViewport flips the world group, so everything
@@ -11,6 +11,7 @@ const props = defineProps({
   visibleLayers: { type: Object, required: true },
   activeNet: { type: String, default: '' },
   selectedComponentId: { type: String, default: '' },
+  flipped: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['select'])
@@ -30,6 +31,13 @@ const layerColors = computed(() => {
 })
 
 const colorOf = (layer) => layerColors.value.get(layer) || '#e05a5a'
+
+const flipTransform = computed(() =>
+  pcbFlipTransform(props.model.boardBounds || props.model.bounds, props.flipped),
+)
+
+// Keep label text readable after the board itself is mirrored.
+const textTransform = (x, y) => `translate(${x} ${y}) scale(${props.flipped ? -1 : 1} -1)`
 
 function visible(item) {
   return item.layers.some((layer) => props.visibleLayers.has(layer))
@@ -146,7 +154,7 @@ const pinSummary = (item) => {
 </script>
 
 <template>
-  <g class="pcb">
+  <g class="pcb" :transform="flipTransform">
     <g
       v-for="item in rendered"
       :key="item.id"
@@ -276,7 +284,7 @@ const pinSummary = (item) => {
         />
         <g
           v-else-if="item.element.text"
-          :transform="`translate(${item.element.anchor_position?.x ?? 0} ${item.element.anchor_position?.y ?? 0}) scale(1 -1)`"
+          :transform="textTransform(item.element.anchor_position?.x ?? 0, item.element.anchor_position?.y ?? 0)"
         >
           <text
             x="0"
@@ -328,7 +336,7 @@ const pinSummary = (item) => {
       </template>
 
       <template v-else-if="item.kind === 'text'">
-        <g :transform="`translate(${item.element.anchor_position?.x ?? 0} ${item.element.anchor_position?.y ?? 0}) scale(1 -1)`">
+        <g :transform="textTransform(item.element.anchor_position?.x ?? 0, item.element.anchor_position?.y ?? 0)">
           <text
             x="0"
             y="0"
@@ -346,7 +354,7 @@ const pinSummary = (item) => {
       <g
         v-for="label in refdesLabels"
         :key="label.id"
-        :transform="`translate(${label.x} ${label.y}) scale(1 -1)`"
+        :transform="textTransform(label.x, label.y)"
       >
         <text x="0" y="0" :font-size="label.size" text-anchor="middle" fill="#9fb2c8" opacity="0.9">
           {{ label.text }}

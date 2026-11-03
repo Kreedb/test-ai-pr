@@ -446,9 +446,12 @@ function pcbElementBounds(element) {
 }
 
 function pcbItem(index, element, kind, layers) {
+  // Circuit JSON ids are unique per element type only, and converters reuse
+  // plain tokens (`pad1`) across types; prefix with the kind so selection and
+  // the render keys stay distinct.
   return {
     kind,
-    id: element[`${element.type}_id`] || element.type,
+    id: `${kind}:${element[`${element.type}_id`] || element.type}`,
     element,
     layers,
     bounds: pcbElementBounds(element),
@@ -523,8 +526,10 @@ function buildPcb(index) {
   for (const element of index.list('pcb_component')) {
     const item = pcbItem(index, element, 'component', [element.layer === BOTTOM ? 'silk-bottom' : 'silk-top'])
     item.refdes = index.nameOf(element.source_component_id)
-    item.componentId = item.id
-    refdesByComponent.set(item.id, item.refdes)
+    // `componentId` is the join key with pads and the click selection, so it
+    // stays the raw Circuit JSON id (the item `id` is kind-prefixed).
+    item.componentId = element.pcb_component_id
+    refdesByComponent.set(item.componentId, item.refdes)
     items.push(item)
   }
   // Pads are created before the components they belong to, so the reference
@@ -855,7 +860,7 @@ export function indexNets(model) {
   for (const net of model.nets || []) ensure(net.name, net.key)
 
   const componentById = new Map()
-  for (const component of model.pcb?.components || []) componentById.set(component.id, component)
+  for (const component of model.pcb?.components || []) componentById.set(component.componentId, component)
 
   for (const pad of model.pcb?.pads || []) {
     if (!pad.net) continue

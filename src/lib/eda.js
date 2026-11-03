@@ -92,17 +92,17 @@ export async function convertEda(sources) {
 
   if (formatId === 'altium' || formatId === 'eagle') fillSchematicValues(circuitJson)
   const files = await toKicadFiles(circuitJson, summary, baseNameOf(prepared))
-  return finish(files, circuitJson, formatId, summary, warnings, started, prepared)
+  return finish(files, circuitJson, formatId, summary, warnings, started)
 }
 
-function finish(files, circuitJson, source, summary, warnings, started, prepared) {
+function finish(files, circuitJson, source, summary, warnings, started) {
   if (!files.length) {
     throw new EdaConversionError('转换器没有产生任何 KiCad 文件,原始文档可能不包含设计内容。')
   }
   if (
     summary.board &&
     summary.board.tracks === 0 &&
-    !warnings.some((warning) => warning.code === 'no-routing' || warning.level === 'info')
+    !warnings.some((warning) => warning.code === 'no-routing')
   ) {
     warnings.push({
       level: 'warn',
@@ -117,6 +117,5 @@ function finish(files, circuitJson, source, summary, warnings, started, prepared
     summary,
     warnings,
     elapsedMs: Math.round(performance.now() - started),
-    sourceNames: prepared.map((source) => source.name),
   }
 }

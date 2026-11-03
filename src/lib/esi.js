@@ -879,9 +879,8 @@ function optionValue(options, key, fallback) {
   return value === undefined || value === null ? fallback : value
 }
 
-// Builds an EtherCATInfo document from a parsed SII image. Every field can be
-// overridden through `options`, which is what the parser page uses to export
-// its edited model.
+// Builds an EtherCATInfo document from a parsed SII image, honoring the
+// parser page's `vendorName`, `configData`, and `bootStrap` overrides.
 export function generateEsiXml(result, options = {}) {
   if (!result || !result.info) throw new Error('没有可导出的解析结果')
 

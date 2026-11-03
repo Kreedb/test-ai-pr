@@ -1,5 +1,5 @@
 <script setup>
-import { DATA_TYPE_NAMES, PDO_FLAG_BITS, PDO_SYNC_NAMES, setBits } from '@/lib/sii'
+import { DATA_TYPE_NAMES, PDO_FLAG_BITS, PDO_SYNC_NAMES, setBits } from 'sii-parser'
 import { hex, parseDecValue, parseHexValue } from '@/lib/format'
 
 defineProps({

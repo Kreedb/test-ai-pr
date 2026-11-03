@@ -1,139 +1,53 @@
 # convbin
 
-一个在浏览器中运行的二进制工具箱，当前包含 EtherCAT SII/ESI 与 EDA 格式转换工具，基于 Vite + Vue 3（Composition API，`<script setup>`）。所有数据只在本地处理，不会上传。
+一个在浏览器中运行的二进制工具箱，当前包含 EtherCAT SII/ESI 与 EDA 格式转换工具，基于 Vite + Vue 3。所有数据只在本地处理，不会上传。
 
 线上地址：https://kreedb.github.io/test-ai-pr/
 
 ## 工具
 
-导航页（`#/`）统一管理所有工具，后续新增的工具会继续挂在这里。
+- **EEPROM 解析器**（`#/parser`）：解析 SII EEPROM 转储，编辑字段并导出 ESI XML，内置逐字节往返校验。
+- **EDA 转 KiCad**（`#/convert`）：把 Altium、Specctra、EAGLE XML、PADS ASCII 工程转换成 `.kicad_pcb` / `.kicad_sch` / `.kicad_pro`，带只读设计预览。
 
-### EEPROM 解析器（`#/parser`）
+## 快速开始
 
-- 输入仅支持 `.bin` 格式的 SII EEPROM 转储（最大 512 KiB），可拖拽、选择文件或载入内置示例。
-- 解析 SII 固定头：PDI Control、ESC Configuration、配置站别名、厂商 ID、产品码、修订号、序列号、邮箱配置、EEPROM 大小与版本。
-- 校验固定头 CRC-8（poly `0x07`，init `0xFF`，覆盖前 14 字节）。
-- 遍历并解码类别（Categories）：Strings、General、FMMU、SyncManager、TxPDO / RxPDO 及条目、DC 操作模式；未知/厂商自定义类别保留原始数据。
-- 所有解析出的字段都可以直接编辑，列表支持新增与删除：固定头与身份、邮箱、General、字符串、FMMU、SyncManager、PDO 与条目、DC 操作模式。
-- 名称字段与 SII 字符串表双向同步；在名称字段中输入新名称会自动创建字符串。
-- **导出 ESI XML**（`EtherCATInfo`），可复制或下载。
-- 内置 EEPROM 生成器：每次编辑后把导出的 XML 重新编译成 SII 镜像，并与原始转储逐字节比对，列出差异字节；可下载重新编译的 `.bin`。
-- 只存在于 SII 镜像、无法写入 ESI 的字段以 `*` 标注，并在提示中说明。
-- 原始十六进制视图与原始 `.bin` 下载。
-
-### EDA 转 KiCad（`#/convert`）
-
-- 输入 Altium `.PcbDoc` / `.SchDoc`、Specctra `.dsn` / `.ses`（Allegro、OrCAD PCB Designer、PADS Layout、Xpedition 都能导出）、EAGLE XML `.brd` / `.sch`，或 PADS Layout ASCII `.asc`，可一次选中整个工程。
-- 也可以直接上传 `.zip`：压缩包在浏览器里解开，按扩展名与内容识别其中的工程文件，工程侧文件（`.PrjPcb`、`.PcbLib`、说明文档等）与 `__MACOSX` 之类的系统文件会被忽略；成员文件仍然受单文件与合计大小上限约束，超出上限或嵌套的压缩包会逐个列出并跳过。
-- 输出 `.kicad_pcb`、`.kicad_sch`（层次化工程会输出根图 + 每张子图）与 `.kicad_pro`，多文件时可打包成 zip 下载。
-- PCB 与原理图同时上传时按同一工程对齐元件与网络。
-- 转换结果自带只读预览：直接渲染中间模型里的 PCB 与原理图几何，滚轮缩放、拖拽平移，点击焊盘/符号/引脚即可定位。
-- 预览支持搜索网络名、位号和 `REF.PIN`；PCB 图层可逐个开关或只显示一层；选中网络后在 PCB 与原理图之间互相跳转，两侧同时高亮。预览不回写任何数据。
-- 页面固定列出每个来源可能无法无损转换的内容（层数上限、3D 模型、设计规则、敷铜、符号图形、走线需 SES 等），并逐项注明无法无损转换的原因。
-- 转换在浏览器本地完成，不会上传任何设计文件。
-- 尚未接入 Allegro/OrCAD 二进制 `.brd`、PADS 二进制 `.pcb`、OrCAD Capture `.dsn` 与 PADS Logic 原理图：这些格式的记录布局未公开，需要逆向客户端二进制；页面会提示改用 Specctra DSN、IPC-2581 或 Gerber 导出。
-
-#### 中间格式的选择
-
-所有来源都先解析成 [Circuit JSON](https://github.com/tscircuit/circuit-json)，再由同一个写出器生成 KiCad，
-因此新增一种来源只需要补一个解析器，不需要为每种输入输出组合单独写转换器。
-
-- **为什么内部用 Circuit JSON**：它是带类型定义的 JSON，元件、焊盘、网络、走线、原理图符号都有独立元素和 ID，
-  比 S-expression 更容易做格式识别、无损检查与增量映射；tscircuit 生态里的各种来源解析器和输出器也都围绕它。
-- **为什么对外用 KiCad**：`.kicad_pcb` / `.kicad_sch` 是开放、纯文本、可人工检查的格式，KiCad 本身还能继续导出
-  Gerber、IPC-2581、ODB++、STEP 等制造格式。相比之下 IPC-2581、ODB++、GenCAD 只覆盖板级/制造数据，不带原理图语义；
-  EDIF 只覆盖原理图；Specctra、Altium、PADS 的工程文件都是私有格式，不适合作为通用中转格式。
-- 如果以后需要更多输出（Gerber、BOM、坐标文件），只需再接一个 Circuit JSON 写出器，现有输入解析器不用改。
-
-转换器来自 tscircuit 的开源项目（`altium-to-circuit-json`、`dsn-to-circuit-json`、`circuit-json-to-kicad`），
-EAGLE XML 与 PADS ASCII 分别由仓库内的 `src/lib/eagle.js`、`src/lib/pads.js` 解析；
-许可与示例数据来源见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
-
-## 示例数据
-
-- `public/samples/akd-eeprom.bin`：Kollmorgen AKD 驱动的 EEPROM 转储（来自 [ethercrab](https://github.com/ethercrab-rs/ethercrab) 的测试数据）。
-- `public/samples/limx-tron2.bin` / `public/samples/limx-tron2.xml`：Limx Tron2 的 EEPROM 转储与对应的 TwinCAT ESI 描述文件。解析再导出后重新编译，结果与 `.bin` 逐字节一致。
-- `public/samples/altium/stm32-f411-4layer/`：来自 [eylolaycan/stm32-f411c-board](https://github.com/eylolaycan/stm32-f411c-board)（CC0-1.0）的 STM32F411 四层开发板，含一块四层 PCB（顶层、两个内层、底层）与一张原理图，用于演示内层与四层叠层转换。
-- `public/samples/altium/stm32f405-core/`：来自 [YangTiankai/STM32F4-Core-Board](https://github.com/YangTiankai/STM32F4-Core-Board)（GPL-3.0）的 STM32F405RGT6 核心板，含一块 PCB 与三张原理图，用于演示多图层次化工程、板对板连接器与 SBUS/CAN 接口。
-- `public/samples/specctra/motor-driver.dsn`：Specctra DSN 样例，用于演示只有布局与网表、没有走线的转换结果。
-- `public/samples/eagle/SOT23-3.brd` / `SOT23-3.sch`：来自 [tedyapo/ugly-smd-adapters](https://github.com/tedyapo/ugly-smd-adapters)（MIT）的 EAGLE 7.3 转接板，用于演示 EAGLE 板图与原理图一起转换。
-- `public/samples/pads/res0805.asc`：按 [tscircuit/padsts](https://github.com/tscircuit/padsts)（MIT）测试资产的格式改写的 PADS Layout ASCII 样例，含 SMD、通孔、走线、过孔、敷铜与丝印，用于演示 PADS 转换。
-- `public/samples/altium/stm32-f411-4layer.zip`：把 `public/samples/altium/stm32-f411-4layer/` 里的 STM32F411 工程打成 zip，用于演示压缩包解析。
-
-## 代码结构
-
-```
-src/lib/sii.js          # 纯 JS SII 解析器（无 Vue 依赖）：CRC、固定头、类别、PDO、DC
-src/lib/esi.js          # ESI XML -> SII 生成器，以及 SII -> ESI XML 导出与回归校验
-src/lib/editor.js       # 解析结果的可编辑模型：字符串/名称同步、列表增删、导出参数
-src/lib/format.js       # 显示格式化与字段解析辅助函数
-src/lib/download.js     # 浏览器下载辅助函数
-src/lib/eda.js          # EDA -> KiCad 转换入口：上传限制、格式校验、结果封装
-src/lib/eda-shared.js   # 转换器共享的错误、识别辅助、结果汇总与 KiCad 写出
-src/lib/formats/        # 每种来源一个模块：元数据、有损说明、样例、识别与转换入口
-src/lib/formats/index.js # 显式格式注册表：支持矩阵、有损表与样例按钮的唯一来源
-src/lib/eagle.js        # EAGLE XML 板图/原理图 -> Circuit JSON 的映射
-src/lib/pads.js         # PADS Layout ASCII -> Circuit JSON 的映射
-src/lib/archive.js      # zip 压缩包展开与成员筛选（大小/数量/嵌套限制）
-src/lib/preview.js      # 只读预览模型：PCB/原理图几何、图层、网络索引与搜索（无 Vue 依赖）
-src/lib/route-path.js   # hash 路径归一化与路由匹配（无 Vue 依赖，供路由与链接共用）
-src/routes.js           # 按 src/pages/*Page.vue 自动收集路由、导航与首页工具卡片
-src/router.js           # 极简 hash 路由（GitHub Pages 子路径下无需重写规则）
-src/pages/              # 导航页、解析器页、EDA 转换页
-src/components/         # 可编辑表格、PDO、DC、十六进制视图、设计预览、格式支持与有损表
-src/App.vue             # 页面外壳：品牌、导航、路由出口、页脚
-public/samples/         # 示例 EEPROM 转储、ESI XML、Altium / Specctra / EAGLE / PADS 工程文件
-```
-
-新增 EDA 来源时，只需在 `src/lib/formats/` 下新建模块并在 `src/lib/formats/index.js` 加一行导入；新增页面时只需在 `src/pages/` 下新建 `NamePage.vue` 并在页面里导出 `route`，路径与所有链接都会自动派生。协作约定见 [CONTRIBUTING.md](CONTRIBUTING.md)，包括分支命名、提交格式、验证命令与扩展点。
-
-解析规则参考 ETG.1000.6（固定头、类别、General、FMMU）、ETG.2010（Strings、DC、PDO）与 ETG.2000（EtherCATInfo XML）。所有多字节字段按小端处理。
-
-## Requirements
-
-- Node.js 20.19+ or 22.12+
-- npm 10+
-
-## Getting started
+需要 Node.js 20.19+ 或 22.12+、npm 10+。
 
 ```bash
 npm install
 npm run dev
 ```
 
-The dev server starts on http://localhost:5173/test-ai-pr/ with hot module replacement enabled. The `/test-ai-pr/` prefix comes from the `base` setting described in [Deployment](#deployment).
+开发服务器运行在 http://localhost:5173/test-ai-pr/。常用命令：
 
-## Scripts
+| 命令 | 说明 |
+| --- | --- |
+| `npm run dev` | 启动带 HMR 的开发服务器 |
+| `npm run build` | 构建到 `dist/` |
+| `npm run preview` | 本地预览生产构建 |
+| `npm test` | 运行 `node --test` 回归测试 |
 
-| Command           | Description                                 |
-| ----------------- | ------------------------------------------- |
-| `npm run dev`     | Start the dev server with HMR               |
-| `npm run build`   | Build for production into `dist/`           |
-| `npm run preview` | Serve the production build locally          |
-| `npm test`        | Run the `node --test` regression tests      |
+## 文档
 
-## Deployment
+文档按页面与项目拆分在 [`docs/`](docs/README.md)：
 
-The site is published to GitHub Pages at https://kreedb.github.io/test-ai-pr/.
+- [应用外壳与部署](docs/app/README.md)
+- [EEPROM 解析器](docs/parser/README.md) · [SII 格式与 ESI 映射](docs/parser/sii-format.md)
+- [EDA 转 KiCad](docs/convert/README.md) · [格式支持](docs/convert/formats.md) · [有损转换](docs/convert/losses.md) · [设计预览](docs/convert/preview.md)
+- [协作约定](docs/development/contributing.md) · [代码结构](docs/development/architecture.md) · [测试](docs/development/testing.md)
+- [第三方组件与数据说明](docs/THIRD-PARTY-NOTICES.md)
 
-Deployment is handled by `.github/workflows/deploy.yml`, which runs on every push to `main` and can also be triggered manually from the Actions tab (`workflow_dispatch`). It installs dependencies with `npm ci`, runs `npm run build`, and publishes `dist/` via the GitHub Pages actions.
+## 独立库
 
-Because this is a project site served from a subpath, `vite.config.js` sets `base: '/test-ai-pr/'` so that built asset URLs resolve under `https://kreedb.github.io/test-ai-pr/`. If the site ever moves to a custom domain or a user page repository, change `base` back to `/`.
+`lib/` 下的解析器可以单独安装、单独调用，不依赖主项目：
 
-Navigation uses hash routes (`#/parser`), so no server-side rewrite rules are needed. To preview the production build locally, run `npm run build` followed by `npm run preview` and open http://localhost:4173/test-ai-pr/.
-
-## Path alias
-
-`@` maps to `src/`, configured in both `vite.config.js` and `jsconfig.json`:
-
-```js
-import { parseSii } from '@/lib/sii'
-```
+| 包 | 说明 |
+| --- | --- |
+| [`sii-parser`](lib/sii-parser/README.md) | EtherCAT SII EEPROM 解析器 |
+| [`eagle-to-circuit-json`](lib/eagle-to-circuit-json/README.md) | EAGLE XML 板图/原理图 → Circuit JSON |
+| [`pads-to-circuit-json`](lib/pads-to-circuit-json/README.md) | PADS Layout ASCII → Circuit JSON |
 
 ## License
 
 本项目以 [GNU General Public License v3.0](LICENSE) 发布。集成的第三方转换库与示例数据的许可见
-[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
-
-`package.json` 里的 `overrides` 把 `altiumts` 固定到 npm registry 版本，`.npmrc` 打开 `legacy-peer-deps`，
-两者都是为了让 tscircuit 这些依赖未声明完整的包能直接 `npm ci` 安装。
+[docs/THIRD-PARTY-NOTICES.md](docs/THIRD-PARTY-NOTICES.md)。

@@ -1,0 +1,27 @@
+{
+  "name": "eagle-to-circuit-json",
+  "version": "0.1.0",
+  "description": "EAGLE XML board and schematic to Circuit JSON",
+  "type": "module",
+  "license": "GPL-3.0-only",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "keywords": [
+    "eagle",
+    "cad",
+    "pcb",
+    "circuit-json"
+  ],
+  "dependencies": {
+    "fast-xml-parser": "^5.11.2"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  }
+}

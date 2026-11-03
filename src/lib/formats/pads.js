@@ -72,7 +72,7 @@ export const pads = {
   },
   async convert(sources, warnings) {
     const { looksLikePadsAscii, parsePadsAscii, padsToCircuitJson } = await import(
-      '../pads.js'
+      'pads-to-circuit-json'
     )
     const decoder = new TextDecoder('utf-8', { fatal: false })
     let parsed = null

@@ -8,12 +8,21 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 import { convertEda, detectSource } from '../src/lib/eda.js'
-import { eagleToCircuitJson, looksLikeEagleXml, parseEagleXml } from '../src/lib/eagle.js'
+import { eagleToCircuitJson, looksLikeEagleXml, parseEagleXml } from 'eagle-to-circuit-json'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const sample = (name) => new Uint8Array(readFileSync(join(root, 'public/samples/eagle', name)))
 
 const kicad = await import('kicadts')
+
+// The same project is converted by more than one test, and conversion is the
+// slow part; cache the immutable result.
+let project
+const eagleProject = () =>
+  (project ??= convertEda([
+    { name: 'SOT23-3.brd', bytes: sample('SOT23-3.brd') },
+    { name: 'SOT23-3.sch', bytes: sample('SOT23-3.sch') },
+  ]))
 
 function findBlock(source, start, keyword) {
   const index = source.indexOf(keyword, start)
@@ -52,10 +61,7 @@ test('detects EAGLE XML instead of treating .brd as Allegro', () => {
 })
 
 test('converts an EAGLE project into a KiCad project', async () => {
-  const result = await convertEda([
-    { name: 'SOT23-3.brd', bytes: sample('SOT23-3.brd') },
-    { name: 'SOT23-3.sch', bytes: sample('SOT23-3.sch') },
-  ])
+  const result = await eagleProject()
 
   assert.equal(result.source, 'eagle')
   assert.deepEqual(result.summary.board, {
@@ -129,10 +135,7 @@ test('EAGLE part values reach the exported schematic and footprint', async () =>
   // EAGLE keeps the value in `display_value`, while `circuit-json-to-kicad`
   // reads `manufacturer_part_number` for generic chips; without the bridge both
   // the symbol Value and the footprint Value stayed empty.
-  const result = await convertEda([
-    { name: 'SOT23-3.brd', bytes: sample('SOT23-3.brd') },
-    { name: 'SOT23-3.sch', bytes: sample('SOT23-3.sch') },
-  ])
+  const result = await eagleProject()
 
   const sheet = result.files.find((file) => file.name === 'sheet_1.kicad_sch')
   assert.ok(sheet, 'expected the child schematic')

@@ -8,7 +8,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 import { convertEda, detectSource } from '../src/lib/eda.js'
-import { looksLikePadsAscii, padsToCircuitJson, parsePadsAscii } from '../src/lib/pads.js'
+import { looksLikePadsAscii, padsToCircuitJson, parsePadsAscii } from 'pads-to-circuit-json'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const read = (name) => readFileSync(join(root, 'public/samples/pads', name), 'utf8')
@@ -19,6 +19,11 @@ const sample = (name) => new Uint8Array(readFileSync(join(root, 'public/samples/
 const upstream = (name) => readFileSync(join(root, 'test/fixtures/pads', name), 'utf8')
 
 const kicad = await import('kicadts')
+
+// Three tests read the same converted board; convert it once.
+let project
+const padsProject = () =>
+  (project ??= convertEda([{ name: 'res0805.asc', bytes: sample('res0805.asc') }]))
 
 function findBlock(source, start, keyword) {
   const index = source.indexOf(keyword, start)
@@ -76,7 +81,7 @@ test('parses the PADS header, units and layer count', () => {
 })
 
 test('converts a PADS ASCII board into a KiCad project', async () => {
-  const result = await convertEda([{ name: 'res0805.asc', bytes: sample('res0805.asc') }])
+  const result = await padsProject()
 
   assert.equal(result.source, 'pads')
   assert.equal(result.summary.hasBoard, true)
@@ -98,7 +103,7 @@ test('converts a PADS ASCII board into a KiCad project', async () => {
 })
 
 test('mirrored parts put their pads on the back and swap the pad order', async () => {
-  const result = await convertEda([{ name: 'res0805.asc', bytes: sample('res0805.asc') }])
+  const result = await padsProject()
   const pcb = result.files[0].content
 
   const top = findBlock(pcb, 0, '(footprint')
@@ -134,7 +139,7 @@ test('mirrored parts put their pads on the back and swap the pad order', async (
 })
 
 test('nets, traces and vias keep their layer and net', async () => {
-  const result = await convertEda([{ name: 'res0805.asc', bytes: sample('res0805.asc') }])
+  const result = await padsProject()
   const pcb = result.files[0].content
 
   const via = findBlock(pcb, 0, '(via')

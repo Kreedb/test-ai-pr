@@ -1,4 +1,4 @@
-# 贡献指南
+# 协作约定
 
 本项目是浏览器内运行的 convbin 二进制工具箱，使用 Vite + Vue 3，数据只在本地处理。以下约定用于减少多人并行开发时的合并冲突。
 
@@ -24,10 +24,11 @@ npm run build
 
 - 新增 EDA 来源：在 `src/lib/formats/` 下新建 `<id>.js`，导出元数据、`losses`、`detect`、`convert`，然后在 `src/lib/formats/index.js` 的显式导入列表里加一行。支持矩阵、有损表、样例按钮和格式标签都从注册表派生，不需要改页面。
 - 新增页面：在 `src/pages/` 下新建 `NamePage.vue`，在普通 `<script>` 块里导出 `route`（`label`、`order`，需要首页卡片时再加 `tool`）。路径由文件名自动生成，导航、路由出口和首页工具列表都从页面自身派生。
-- 新增测试：按来源放到 `test/formats/<id>.test.mjs`，公共的样例读取与转换辅助函数放在 `test/helpers/` 下，避免所有格式共用一个巨型测试文件。
+- 新增测试：按来源放到 `test/<id>.test.mjs`，公共的样例读取与转换辅助函数放在 `test/helpers/` 下，避免所有格式共用一个巨型测试文件。
+- 新增可独立发布的解析器：在 `lib/<package-name>/` 下建立独立包（`package.json`、`src/index.js`、`README.md`），用包名在主项目里引用。`lib/` 不允许反向依赖 `src/`，由 `test/lib.test.mjs` 守护。
 
 ## 样式与依赖
 
 - 页面级样式优先写在组件的 `<style scoped>` 里；`src/assets/main.css` 只保留设计变量、基础排版和跨页面共用样式。
-- 新增运行时依赖前先确认许可证与仓库的 GPL-3.0-only 兼容，并更新 `THIRD-PARTY-NOTICES.md`。
+- 新增运行时依赖前先确认许可证与仓库的 GPL-3.0-only 兼容，并更新 `docs/THIRD-PARTY-NOTICES.md`。
 - 不要在 PR 中直接格式化 `package-lock.json`；需要升级时单独提交，并说明升级原因。

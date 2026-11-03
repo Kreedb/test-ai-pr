@@ -1,0 +1,25 @@
+{
+  "name": "sii-parser",
+  "version": "0.1.0",
+  "description": "EtherCAT SII (Slave Information Interface) EEPROM parser",
+  "type": "module",
+  "license": "GPL-3.0-only",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "keywords": [
+    "ethercat",
+    "sii",
+    "eeprom",
+    "esi",
+    "parser"
+  ],
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  }
+}

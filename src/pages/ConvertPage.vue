@@ -448,7 +448,7 @@ function clearAll() {
       <SupportMatrix />
       <p class="export-note">
         转换器来自 tscircuit 的开源项目：altium-to-circuit-json、dsn-to-circuit-json、circuit-json-to-kicad（均为 MIT）。
-        EAGLE XML 与 PADS Layout ASCII 由本仓库的 src/lib/eagle.js、src/lib/pads.js 解析（fast-xml-parser，MIT），
+        EAGLE XML 与 PADS Layout ASCII 由本仓库的 lib/eagle-to-circuit-json、lib/pads-to-circuit-json 解析（fast-xml-parser，MIT），
         zip 压缩包由 src/lib/archive.js 用 fflate（MIT）在本地解开。
         文件不会上传到任何服务器。
       </p>

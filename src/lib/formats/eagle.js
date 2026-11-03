@@ -112,7 +112,7 @@ export const eagle = {
   },
   async convert(sources, warnings) {
     const { looksLikeEagleXml, parseEagleXml, eagleToCircuitJson } = await import(
-      '../eagle.js'
+      'eagle-to-circuit-json'
     )
     const decoder = new TextDecoder('utf-8', { fatal: false })
     let board = null

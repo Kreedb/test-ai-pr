@@ -1,0 +1,53 @@
+name: Bug report
+description: 报告一个可复现的问题
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。请尽量提供可复现的最小样例；设计文件请先确认可以公开，或只描述结构。
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 问题描述
+      description: 发生了什么，期望是什么。
+      placeholder: 上传 xxx 后，页面显示……
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 从打开页面到出现问题的最小步骤。
+      placeholder: |
+        1. 打开 #/convert
+        2. 上传 xxx
+        3. 点击转换
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: 影响范围
+      options:
+        - EEPROM 解析器（#/parser）
+        - EDA 转 KiCad（#/convert）
+        - 设计预览
+        - 构建 / 部署
+        - 文档
+        - 其他
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: 环境
+      description: 浏览器与版本、Node 版本（如果是本地运行）。
+      placeholder: Chrome 130 / Node 22.12
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志或截图
+      description: 控制台报错、截图或转换结果。没有可以留空。
+      render: shell

@@ -1,0 +1,25 @@
+name: Documentation
+description: 文档缺失、过时或不清楚
+title: "[Docs] "
+labels: ["documentation"]
+body:
+  - type: input
+    id: location
+    attributes:
+      label: 文档位置
+      description: 文件路径或页面链接。
+      placeholder: docs/convert/README.md
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: 问题
+      description: 哪一段不准确、缺失或难以理解。
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: 建议内容
+      description: 你期望补充或修改成什么。没有可以留空。

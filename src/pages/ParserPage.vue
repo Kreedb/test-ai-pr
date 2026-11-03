@@ -35,7 +35,7 @@ import {
   PORT_TYPES,
   parseSii,
   setBits,
-} from '@/lib/sii'
+} from 'sii-parser'
 
 const SAMPLES = [
   { file: 'samples/akd-eeprom.bin', label: 'Kollmorgen AKD' },

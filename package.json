@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "license": "GPL-3.0-only",
+  "workspaces": [
+    "lib/*"
+  ],
   "engines": {
     "node": "^20.19.0 || >=22.12.0"
   },
@@ -24,10 +27,13 @@
     "dsn-to-circuit-json": "0.0.8",
     "dsnts": "^0.1.12",
     "earcut": "^3.2.4",
+    "eagle-to-circuit-json": "^0.1.0",
     "fast-xml-parser": "^5.11.2",
     "fflate": "^0.8.2",
     "graphics-debug": "^0.0.101",
     "kicadts": "0.0.63",
+    "pads-to-circuit-json": "^0.1.0",
+    "sii-parser": "^0.1.0",
     "vue": "^3.5.44",
     "zod": "^3.25.76"
   },

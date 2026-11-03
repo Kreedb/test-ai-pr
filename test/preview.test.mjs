@@ -30,16 +30,25 @@ import {
 const root = fileURLToPath(new URL('..', import.meta.url))
 const read = (...parts) => new Uint8Array(readFileSync(join(root, ...parts)))
 
-const eagleProject = () =>
+// Conversions are the slow part of this suite, and every test below reads the
+// same immutable result, so each project is converted once.
+const once = (fn) => {
+  let result
+  return () => (result ??= fn())
+}
+
+const eagleProject = once(() =>
   convertEda([
     { name: 'SOT23-3.brd', bytes: read('public/samples/eagle/SOT23-3.brd') },
     { name: 'SOT23-3.sch', bytes: read('public/samples/eagle/SOT23-3.sch') },
-  ])
+  ]),
+)
 
-const padsProject = () =>
-  convertEda([{ name: 'res0805.asc', bytes: read('public/samples/pads/res0805.asc') }])
+const padsProject = once(() =>
+  convertEda([{ name: 'res0805.asc', bytes: read('public/samples/pads/res0805.asc') }]),
+)
 
-const altiumProject = () =>
+const altiumProject = once(() =>
   convertEda([
     {
       name: 'STM32F411.PcbDoc',
@@ -49,9 +58,10 @@ const altiumProject = () =>
       name: 'STM32F411.SchDoc',
       bytes: read('public/samples/altium/stm32-f411-4layer/STM32F411.SchDoc'),
     },
-  ])
+  ]),
+)
 
-const coreBoardProject = () =>
+const coreBoardProject = once(() =>
   convertEda(
     [
       'STM32F405RGT6.PcbDoc',
@@ -62,7 +72,8 @@ const coreBoardProject = () =>
       name,
       bytes: read('public/samples/altium/stm32f405-core', name),
     })),
-  )
+  ),
+)
 
 test('preview model covers both sides of an EAGLE project', async () => {
   const result = await eagleProject()

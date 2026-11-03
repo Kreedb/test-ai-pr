@@ -1,3 +1,17 @@
+<script>
+export const route = {
+  label: 'EEPROM 解析器',
+  order: 10,
+  tool: {
+    tag: 'SII → 编辑 → ESI XML',
+    title: 'EEPROM 解析器',
+    description:
+      '上传 .bin 格式的 SII EEPROM 转储，解析并可编辑固定头、General、字符串、FMMU、SyncManager、PDO 与 DC，导出 ESI XML，并用内置生成器重新编译校验。',
+    action: '打开解析器',
+  },
+}
+</script>
+
 <script setup>
 import { computed, reactive, ref, shallowRef, watch } from 'vue'
 

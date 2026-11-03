@@ -226,23 +226,6 @@ p {
   font-size: 0.8rem;
 }
 
-.input-divider {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 18px 0 10px;
-  color: var(--muted);
-  font-size: 0.78rem;
-}
-
-.input-divider::before,
-.input-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--border);
-}
-
 .hex-input {
   width: 100%;
   min-height: 140px;
@@ -556,12 +539,6 @@ p {
 
 .data-table tbody tr:hover {
   background: rgba(91, 140, 255, 0.04);
-}
-
-.dc-table th {
-  width: 20%;
-  color: var(--muted);
-  font-weight: 500;
 }
 
 .mono {

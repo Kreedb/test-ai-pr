@@ -1,3 +1,17 @@
+<script>
+export const route = {
+  label: 'EDA 转 KiCad',
+  order: 20,
+  tool: {
+    tag: 'Altium / Specctra / EAGLE / PADS → KiCad',
+    title: 'EDA 转 KiCad',
+    description:
+      '把 Altium .PcbDoc/.SchDoc、Specctra .dsn/.ses、EAGLE XML .brd/.sch 或 PADS Layout ASCII .asc 转成 .kicad_pcb、.kicad_sch 与 .kicad_pro，页面会逐项说明哪些信息可能无法无损转换。',
+    action: '打开转换器',
+  },
+}
+</script>
+
 <script setup>
 import { computed, ref, shallowRef } from 'vue'
 

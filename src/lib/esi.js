@@ -1,7 +1,5 @@
 // EtherCAT ESI (EtherCATInfo XML) to SII EEPROM image generator, plus the
 // reverse export used by the parser to turn a parsed image back into ESI XML.
-// `parseEsiXml` reads a device description into the same model the parser
-// produces, so callers can round-trip ESI XML without the UI.
 //
 // The generated layout follows what TwinCAT's EEPROM export produces for the
 // reference pair `Box 1 (Limx EtherCAT).bin` / `Limx Tron2 Driver_new.xml`:
@@ -597,317 +595,6 @@ function portsToWord(ports) {
   return word
 }
 
-// ---------------------------------------------------------------------------
-// ESI -> editable model
-//
-// `parseEsiXml` normalises one device description into the shape `parseSii`
-// returns, so the XML editor page can drive both sources from one form model.
-// Fields that only exist in ESI (state machine and mailbox timeouts, profile
-// number, SyncManager min/max sizes, CoE SegmentedSdo) are collected under
-// `esi`, together with a count of everything an SII image cannot hold at all.
-// ---------------------------------------------------------------------------
-
-const STATE_MACHINE_TIMEOUT_FIELDS = [
-  ['preopTimeout', 'PreopTimeout'],
-  ['safeopOpTimeout', 'SafeopOpTimeout'],
-  ['backToInitTimeout', 'BackToInitTimeout'],
-  ['backToSafeopTimeout', 'BackToSafeopTimeout'],
-]
-
-const MAILBOX_TIMEOUT_FIELDS = [
-  ['requestTimeout', 'RequestTimeout'],
-  ['responseTimeout', 'ResponseTimeout'],
-]
-
-function readTimeouts(element, fields) {
-  if (!element) return null
-  const timeouts = {}
-  let found = false
-  for (const [key, tag] of fields) {
-    const node = child(element, tag)
-    timeouts[key] = parseNumber(textOf(node))
-    if (node) found = true
-  }
-  return found ? timeouts : null
-}
-
-function countElements(element, name) {
-  let count = 0
-  const stack = [element]
-  while (stack.length) {
-    const node = stack.pop()
-    for (const candidate of node.childNodes) {
-      if (candidate.nodeType !== 1) continue
-      if (elementName(candidate) === name) count += 1
-      stack.push(candidate)
-    }
-  }
-  return count
-}
-
-function readEsiPdo(element, bitSizes, warnings) {
-  const indexElement = child(element, 'Index')
-  const smText = element.getAttribute('Sm')
-  const entries = children(element, 'Entry').map((entry) => {
-    const typeName = textOf(child(entry, 'DataType'))
-    let bitLength = parseNumber(textOf(child(entry, 'BitLen')))
-    if (!bitLength && typeName) {
-      const key = typeName.toUpperCase()
-      if (bitSizes.has(key)) bitLength = bitSizes.get(key)
-    }
-    return {
-      index: parseNumber(textOf(child(entry, 'Index'))) & 0xffff,
-      subIndex: parseNumber(textOf(child(entry, 'SubIndex'))) & 0xff,
-      bitLength,
-      // ESI names can carry significant trailing spaces ("Actual Torque "),
-      // so they are copied verbatim.
-      name: rawTextOf(child(entry, 'Name')),
-      dataType: resolveDataType(typeName, bitLength, bitSizes, warnings),
-      dataTypeName: typeName,
-    }
-  })
-
-  return {
-    index: parseNumber(textOf(indexElement)) & 0xffff,
-    syncManager: smText === null || smText.trim() === '' ? 0xff : parseNumber(smText) & 0xff,
-    flags: pdoFlags(element, indexElement),
-    name: rawTextOf(child(element, 'Name')),
-    entries,
-    totalBits: entries.reduce((sum, entry) => sum + entry.bitLength, 0),
-  }
-}
-
-function readEsiDc(device) {
-  const opModes = children(child(device, 'Dc'), 'OpMode')
-  return {
-    elements: opModes.map((element, index) => {
-      const cycleTimeSync0 = child(element, 'CycleTimeSync0')
-      const cycleTimeSync1 = child(element, 'CycleTimeSync1')
-      return {
-        index,
-        name: rawTextOf(child(element, 'Name')),
-        description: rawTextOf(child(element, 'Desc')),
-        assignActivate: parseNumber(textOf(child(element, 'AssignActivate'))),
-        sync0CycleTime: parseNumber(textOf(cycleTimeSync0)),
-        sync0ShiftTime: parseNumber(textOf(child(element, 'ShiftTimeSync0'))),
-        sync1ShiftTime: parseNumber(textOf(child(element, 'ShiftTimeSync1'))),
-        sync1CycleFactor: parseNumber(textOf(cycleTimeSync1)),
-        sync0CycleFactor: parseNumber(cycleTimeSync0?.getAttribute('Factor') ?? '1') || 1,
-      }
-    }),
-  }
-}
-
-export function parseEsiXml(xmlText, options = {}) {
-  const doc = typeof xmlText === 'string' ? parseXmlDocument(xmlText) : xmlText
-  const root = doc.documentElement
-  if (!root || elementName(root) !== 'EtherCATInfo') {
-    throw new Error('不是 EtherCATInfo ESI 文件（根元素不是 <EtherCATInfo>）')
-  }
-
-  const warnings = []
-  const vendorElement = child(root, 'Vendor')
-  const vendorId = parseNumber(textOf(child(vendorElement, 'Id')))
-  if (!vendorId) {
-    warnings.push({ level: 'warn', message: 'ESI 缺少有效的 <Vendor><Id>，厂商 ID 为 0。' })
-  }
-
-  const descriptions = child(root, 'Descriptions')
-  const deviceElements = children(child(descriptions, 'Devices'), 'Device')
-  if (deviceElements.length === 0) {
-    throw new Error('ESI 中没有找到 <Descriptions><Devices><Device>')
-  }
-
-  const requested = Math.trunc(Number(options.deviceIndex ?? 0)) || 0
-  const deviceIndex = Math.min(Math.max(requested, 0), deviceElements.length - 1)
-  if (deviceIndex !== requested) {
-    warnings.push({
-      level: 'warn',
-      message: `设备序号 ${options.deviceIndex} 超出 1..${deviceElements.length} 的范围，已改用第 ${deviceIndex + 1} 个设备。`,
-    })
-  }
-  const device = deviceElements[deviceIndex]
-
-  const typeElement = child(device, 'Type')
-  const info = child(device, 'Info')
-  const mailbox = child(device, 'Mailbox')
-  const coe = child(mailbox, 'CoE')
-  const eeprom = child(device, 'Eeprom')
-
-  const physics = (device.getAttribute('Physics') || '').trim()
-  const ports = physicsToPorts(physics)
-
-  const orderName = rawTextOf(typeElement)
-  const deviceName = localizedName(device)
-  let groupName = rawTextOf(child(device, 'GroupType'))
-  if (!groupName) {
-    const firstGroup = child(child(descriptions, 'Groups'), 'Group')
-    groupName = rawTextOf(child(firstGroup, 'Type')) || rawTextOf(child(firstGroup, 'Name'))
-  }
-
-  const byteSize = parseNumber(textOf(child(eeprom, 'ByteSize'))) || 2048
-  const configDataText = textOf(child(eeprom, 'ConfigData'))
-  const bootStrapText = textOf(child(eeprom, 'BootStrap'))
-  const configData = configDataText
-    ? toHexString(parseHexBytes(configDataText, 10).bytes)
-    : ''
-
-  const bitSizes = collectBitSizes(device)
-  const txPdos = children(device, 'TxPdo').map((element) => readEsiPdo(element, bitSizes, warnings))
-  const rxPdos = children(device, 'RxPdo').map((element) => readEsiPdo(element, bitSizes, warnings))
-
-  // Mirror the compiler's fallback chain for the SyncManager length:
-  // DefaultSize, then the bits of the PDOs mapped onto it, then MinSize.
-  const bitsBySm = new Map()
-  for (const pdo of [...txPdos, ...rxPdos]) {
-    if (pdo.syncManager === 0xff) continue
-    bitsBySm.set(pdo.syncManager, (bitsBySm.get(pdo.syncManager) || 0) + pdo.totalBits)
-  }
-
-  const syncManagers = children(device, 'Sm').map((element, index) => {
-    const minSize = element.hasAttribute('MinSize') ? parseNumber(element.getAttribute('MinSize')) : null
-    const maxSize = element.hasAttribute('MaxSize') ? parseNumber(element.getAttribute('MaxSize')) : null
-    const defaultSize = element.hasAttribute('DefaultSize')
-      ? parseNumber(element.getAttribute('DefaultSize'))
-      : null
-    const mappedBits = bitsBySm.get(index)
-    const derivedSize = mappedBits === undefined ? null : Math.ceil(mappedBits / 8)
-    return {
-      index,
-      startAddress: parseNumber(element.getAttribute('StartAddress')) & 0xffff,
-      length: (defaultSize ?? derivedSize ?? minSize ?? 0) & 0xffff,
-      control: parseNumber(element.getAttribute('ControlByte')) & 0xff,
-      enable: element.hasAttribute('Enable') ? (flagAttribute(element, 'Enable') ? 0x01 : 0x00) : 0x01,
-      minSize,
-      maxSize,
-      name: textOf(element),
-    }
-  })
-
-  const syncManagerSizes = {}
-  for (const manager of syncManagers) {
-    if (manager.minSize === null && manager.maxSize === null) continue
-    syncManagerSizes[manager.index] = { minSize: manager.minSize, maxSize: manager.maxSize }
-  }
-
-  // Keep the image reproducible: an ESI without <BootStrap> gets the same
-  // SyncManager-derived value the SII compiler would use.
-  const bootStrap = bootStrapText
-    ? toHexString(parseHexBytes(bootStrapText, 8).bytes)
-    : toHexString(deriveBootStrap(syncManagers))
-
-  const fmmus = children(device, 'Fmmu').map((element) => {
-    const label = textOf(element)
-    return { usage: FMMU_USAGE_BY_NAME[label] ?? 0x00, label }
-  })
-
-  const profileNo = parseNumber(textOf(child(child(device, 'Profile'), 'ProfileNo'))) || null
-
-  // Count only what this device description loses, not the whole file: a
-  // multi-device ESI would otherwise report the other devices' content too.
-  const dropped = {
-    objects: countElements(device, 'Object'),
-    initCommands: countElements(device, 'InitCmd'),
-    images: countElements(device, 'ImageData16x14'),
-    slots: countElements(device, 'Slot'),
-    modules: children(child(descriptions, 'Modules'), 'Module').length,
-    excludes: countElements(device, 'Exclude'),
-  }
-
-  if (dropped.objects) {
-    warnings.push({
-      level: 'info',
-      message: `该设备描述中的 ${dropped.objects} 个对象字典条目（Profile/Dictionary）无法写入 SII，重新生成时会被丢弃。`,
-    })
-  }
-  if (dropped.initCommands) {
-    warnings.push({
-      level: 'info',
-      message: `该设备描述中的 ${dropped.initCommands} 条 InitCmd（启动命令）无法写入 SII，重新生成时会被丢弃。`,
-    })
-  }
-  if (dropped.images) {
-    warnings.push({
-      level: 'info',
-      message: `该设备描述中的 ${dropped.images} 张 ImageData16x14 图像无法写入 SII，重新生成时会被丢弃。`,
-    })
-  }
-  if (dropped.slots || dropped.modules) {
-    const parts = []
-    if (dropped.slots) parts.push(`${dropped.slots} 个 Slot`)
-    if (dropped.modules) parts.push(`${dropped.modules} 个 Module`)
-    warnings.push({
-      level: 'info',
-      message: `该设备描述中的槽位定义（${parts.join(' / ')}）无法写入 SII，重新生成时会被丢弃。`,
-    })
-  }
-  if (dropped.excludes) {
-    warnings.push({
-      level: 'info',
-      message: `该设备描述中的 ${dropped.excludes} 条 PDO Exclude（互斥分配）无法写入 SII，重新生成时会被丢弃。`,
-    })
-  }
-
-  return {
-    source: 'esi',
-    // No SII image behind an imported ESI: the editor compiles one on demand.
-    bytes: new Uint8Array(0),
-    byteLength: 0,
-    info: {
-      vendorId,
-      productCode: parseNumber(typeElement?.getAttribute('ProductCode')),
-      revisionNumber: parseNumber(typeElement?.getAttribute('RevisionNo')),
-      serialNumber: 0,
-      eepromSizeBytes: byteSize,
-      eepromSizeRaw: byteSize / 128 - 1,
-      mailboxProtocols: mailboxProtocolBits(mailbox),
-    },
-    general: {
-      groupStringIndex: 0,
-      imageStringIndex: 0,
-      orderStringIndex: 0,
-      nameStringIndex: 0,
-      coeDetails: coeDetailBits(coe),
-      foeDetails: child(mailbox, 'FoE') ? 0x01 : 0x00,
-      eoeDetails: child(mailbox, 'EoE') ? 0x01 : 0x00,
-      flags: generalFlagBits(device, mailbox),
-      ebusCurrent: parseNumber(textOf(child(device, 'EbusCurrent'))),
-      portsWord: portsToWord(ports),
-      ports,
-      physicalMemoryAddress: 0x0002,
-      groupName,
-      orderName,
-      deviceName,
-    },
-    strings: [],
-    fmmus,
-    syncManagers,
-    txPdos,
-    rxPdos,
-    dc: readEsiDc(device),
-    categories: [],
-    esi: {
-      vendorName: textOf(child(vendorElement, 'Name')),
-      deviceIndex,
-      deviceCount: deviceElements.length,
-      devices: deviceElements.map((element, index) => ({
-        index,
-        orderName: textOf(child(element, 'Type')) || localizedName(element),
-      })),
-      physics,
-      stateMachineTimeouts: readTimeouts(child(child(info, 'StateMachine'), 'Timeout'), STATE_MACHINE_TIMEOUT_FIELDS),
-      mailboxTimeouts: readTimeouts(child(child(info, 'Mailbox'), 'Timeout'), MAILBOX_TIMEOUT_FIELDS),
-      profileNo,
-      coeSegmentedSdo: flagAttribute(coe, 'SegmentedSdo'),
-      syncManagerSizes,
-      configData,
-      bootStrap,
-      dropped,
-    },
-    warnings,
-  }
-}
-
 export function generateSiiFromEsi(xmlText, options = {}) {
   const doc = typeof xmlText === 'string' ? parseXmlDocument(xmlText) : xmlText
   const root = doc.documentElement
@@ -1192,68 +879,30 @@ function optionValue(options, key, fallback) {
   return value === undefined || value === null ? fallback : value
 }
 
-// Like `optionValue`, but an explicit `null` means "leave this out" rather than
-// "keep the source value": the editor page sends null when a field is cleared.
-function nullableOption(options, key, fallback) {
-  const value = options[key]
-  return value === undefined ? fallback : value
-}
-
-function boolOption(options, key, fallback) {
-  const value = options[key]
-  return value === undefined || value === null ? fallback : Boolean(value)
-}
-
-// Builds an EtherCATInfo document from a parsed SII image. Every field can be
-// overridden through `options`, which is what the ESI XML generator page uses
-// to edit a device before exporting it.
+// Builds an EtherCATInfo document from a parsed SII image, honoring the
+// parser page's `vendorName`, `configData`, and `bootStrap` overrides.
 export function generateEsiXml(result, options = {}) {
   if (!result || !result.info) throw new Error('没有可导出的解析结果')
 
   const warnings = []
   const { info, general, fmmus, syncManagers, txPdos, rxPdos, dc } = result
-  // Fields that only live in ESI come from `result.esi` when the source was an
-  // imported ESI document, and stay absent for an SII dump.
-  const esi = result.esi || {}
-  const deviceName = optionValue(options, 'deviceName', general?.deviceName || '')
-  const orderName = optionValue(options, 'orderName', general?.orderName || deviceName || 'Device')
-  const groupName = optionValue(options, 'groupName', general?.groupName || 'Group')
-  const vendorName = optionValue(options, 'vendorName', esi.vendorName || 'Vendor (SII image)')
-  const vendorId = optionValue(options, 'vendorId', info.vendorId ?? 0)
-  const productCode = optionValue(options, 'productCode', info.productCode ?? 0)
-  const revisionNumber = optionValue(options, 'revisionNumber', info.revisionNumber ?? 0)
-  const byteSize = optionValue(
-    options,
-    'byteSize',
-    info.eepromSizeBytes || result.byteLength || 2048,
-  )
-  const mailboxProtocols = optionValue(options, 'mailboxProtocols', info.mailboxProtocols ?? 0)
-  const coeDetails = optionValue(options, 'coeDetails', general?.coeDetails ?? 0)
-  const identificationReg134 = boolOption(
-    options,
-    'identificationReg134',
-    Boolean(general?.flags & 0x08),
-  )
-  const physics = optionValue(options, 'physics', physicsForPorts(general?.ports))
+  const deviceName = general?.deviceName || ''
+  const orderName = general?.orderName || deviceName || 'Device'
+  const groupName = general?.groupName || 'Group'
+  const vendorName = optionValue(options, 'vendorName', 'Vendor (SII image)')
+  const vendorId = info.vendorId ?? 0
+  const productCode = info.productCode ?? 0
+  const revisionNumber = info.revisionNumber ?? 0
+  const byteSize = info.eepromSizeBytes || result.byteLength || 2048
+  const mailboxProtocols = info.mailboxProtocols ?? 0
+  const coeDetails = general?.coeDetails ?? 0
+  const identificationReg134 = Boolean(general?.flags & 0x08)
+  const physics = physicsForPorts(general?.ports)
   // A device with neither mailbox protocols nor the Mailbox-DLL flag has no
   // <Mailbox> element, and emitting an empty one would flip General bit 0x04.
-  const sourceHasMailbox = mailboxProtocols !== 0 || Boolean(general?.flags & 0x04)
-  const includeMailbox = boolOption(options, 'includeMailbox', sourceHasMailbox)
-  const includeFmmu = boolOption(options, 'includeFmmu', true)
-  const includeSyncManagers = boolOption(options, 'includeSyncManagers', true)
-  const includePdos = boolOption(options, 'includePdos', true)
-  const includeDc = boolOption(options, 'includeDc', true)
-  const stateMachineTimeouts = nullableOption(
-    options,
-    'stateMachineTimeouts',
-    esi.stateMachineTimeouts || null,
-  )
-  const mailboxTimeouts = nullableOption(options, 'mailboxTimeouts', esi.mailboxTimeouts || null)
-  const profileNo = nullableOption(options, 'profileNo', esi.profileNo ?? null)
-  const coeSegmentedSdo = boolOption(options, 'coeSegmentedSdo', Boolean(esi.coeSegmentedSdo))
-  const syncManagerSizes = nullableOption(options, 'syncManagerSizes', esi.syncManagerSizes || null)
-  const configData = optionValue(options, 'configData', esi.configData || hexRange(result.bytes, 0, 10))
-  const bootStrap = optionValue(options, 'bootStrap', esi.bootStrap || hexRange(result.bytes, 0x28, 8))
+  const includeMailbox = mailboxProtocols !== 0 || Boolean(general?.flags & 0x04)
+  const configData = optionValue(options, 'configData', hexRange(result.bytes, 0, 10))
+  const bootStrap = optionValue(options, 'bootStrap', hexRange(result.bytes, 0x28, 8))
 
   const lines = []
   const push = (depth, text) => lines.push(`${'\t'.repeat(depth)}${text}`)
@@ -1280,81 +929,49 @@ export function generateEsiXml(result, options = {}) {
   )
   push(4, `<Name LcId="1033">${escapeXml(deviceName || orderName)}</Name>`)
 
-  const writeTimeoutGroup = (tag, timeouts, fields) => {
-    push(5, `<${tag}>`)
-    push(6, '<Timeout>')
-    for (const [key, field] of fields) {
-      push(7, `<${field}>${Number(timeouts[key] ?? 0)}</${field}>`)
-    }
-    push(6, '</Timeout>')
-    push(5, `</${tag}>`)
-  }
-
-  if (identificationReg134 || stateMachineTimeouts || mailboxTimeouts) {
+  if (identificationReg134) {
     push(4, '<Info>')
-    if (stateMachineTimeouts) {
-      writeTimeoutGroup('StateMachine', stateMachineTimeouts, STATE_MACHINE_TIMEOUT_FIELDS)
-    }
-    if (mailboxTimeouts) writeTimeoutGroup('Mailbox', mailboxTimeouts, MAILBOX_TIMEOUT_FIELDS)
-    if (identificationReg134) push(5, '<IdentificationReg134>true</IdentificationReg134>')
+    push(5, '<IdentificationReg134>true</IdentificationReg134>')
     push(4, '</Info>')
   }
   push(4, `<GroupType>${escapeXml(groupName)}</GroupType>`)
-  if (profileNo) {
-    push(4, '<Profile>')
-    push(5, `<ProfileNo>${Number(profileNo)}</ProfileNo>`)
-    push(4, '</Profile>')
-  }
 
   const fmmuUsages = (fmmus || []).map((entry) => entry.usage)
   while (fmmuUsages.length && fmmuUsages[fmmuUsages.length - 1] === 0xff) fmmuUsages.pop()
-  if (includeFmmu) {
-    for (const usage of fmmuUsages) {
-      if (FMMU_NAME_BY_USAGE[usage] === undefined) {
-        warnings.push({
-          level: 'warn',
-          message: `FMMU 用途 0x${usage.toString(16).toUpperCase()} 不是标准值，导出为 Out。`,
-        })
-      }
-      push(4, `<Fmmu>${escapeXml(FMMU_NAME_BY_USAGE[usage] ?? 'Out')}</Fmmu>`)
+  for (const usage of fmmuUsages) {
+    if (FMMU_NAME_BY_USAGE[usage] === undefined) {
+      warnings.push({
+        level: 'warn',
+        message: `FMMU 用途 0x${usage.toString(16).toUpperCase()} 不是标准值，导出为 Out。`,
+      })
     }
-  } else if (fmmuUsages.length) {
-    warnings.push({ level: 'info', message: `已按设置省略 ${fmmuUsages.length} 个 FMMU 条目。` })
+    push(4, `<Fmmu>${escapeXml(FMMU_NAME_BY_USAGE[usage] ?? 'Out')}</Fmmu>`)
   }
 
   const smNames = ['MBoxOut', 'MBoxIn', 'Outputs', 'Inputs']
-  if (includeSyncManagers) {
-    for (const manager of syncManagers || []) {
-      const name = smNames[manager.index] || `SM${manager.index}`
-      const sizes = syncManagerSizes?.[manager.index] || null
-      // TwinCAT writes 34/256 for the two mailbox SyncManagers; an imported ESI
-      // keeps whatever MinSize/MaxSize it declared.
-      const minSize = sizes?.minSize ?? (manager.index < 2 ? 34 : null)
-      const maxSize = sizes?.maxSize ?? (manager.index < 2 ? 256 : null)
-      const attributes = []
-      if (minSize !== null && minSize !== undefined) attributes.push(`MinSize="${minSize}"`)
-      if (maxSize !== null && maxSize !== undefined) attributes.push(`MaxSize="${maxSize}"`)
-      if (manager.enable > 1) {
-        warnings.push({
-          level: 'warn',
-          message: `SyncManager ${manager.index} 的 Enable 字节为 0x${manager.enable
-            .toString(16)
-            .toUpperCase()}，ESI 只能表达启用/禁用，导出为启用。`,
-        })
-      }
-      attributes.push(
-        `DefaultSize="${manager.length}"`,
-        `StartAddress="${hexValue(manager.startAddress)}"`,
-        `ControlByte="${hexValue(manager.control)}"`,
-        `Enable="${manager.enable ? '1' : '0'}"`,
-      )
-      push(4, `<Sm ${attributes.join(' ')}>${name}</Sm>`)
+  for (const manager of syncManagers || []) {
+    const name = smNames[manager.index] || `SM${manager.index}`
+    // TwinCAT writes 34/256 for the two mailbox SyncManagers.
+    const minSize = manager.index < 2 ? 34 : null
+    const maxSize = manager.index < 2 ? 256 : null
+    const attributes = []
+    if (minSize !== null) attributes.push(`MinSize="${minSize}"`)
+    if (maxSize !== null) attributes.push(`MaxSize="${maxSize}"`)
+    if (manager.enable > 1) {
+      warnings.push({
+        level: 'warn',
+        message: `SyncManager ${manager.index} 的 Enable 字节为 0x${manager.enable
+          .toString(16)
+          .toUpperCase()}，ESI 只能表达启用/禁用，导出为启用。`,
+      })
     }
-  } else if ((syncManagers || []).length) {
-    warnings.push({
-      level: 'info',
-      message: `已按设置省略 ${syncManagers.length} 个 SyncManager 条目。`,
-    })
+    attributes.push(
+      `DefaultSize="${manager.length}"`,
+      `StartAddress="${hexValue(manager.startAddress)}"`,
+      `ControlByte="${hexValue(manager.control)}"`,
+      `Enable="${manager.enable ? '1' : '0'}"`,
+    )
+    push(4, `<Sm ${attributes.join(' ')}>${name}</Sm>`)
   }
 
   const writePdo = (tag, pdo) => {
@@ -1401,15 +1018,8 @@ export function generateEsiXml(result, options = {}) {
     push(4, `</${tag}>`)
   }
 
-  if (includePdos) {
-    for (const pdo of rxPdos || []) writePdo('RxPdo', pdo)
-    for (const pdo of txPdos || []) writePdo('TxPdo', pdo)
-  } else if ((rxPdos || []).length + (txPdos || []).length) {
-    warnings.push({
-      level: 'info',
-      message: `已按设置省略 ${(rxPdos || []).length + (txPdos || []).length} 个 PDO。`,
-    })
-  }
+  for (const pdo of rxPdos || []) writePdo('RxPdo', pdo)
+  for (const pdo of txPdos || []) writePdo('TxPdo', pdo)
 
   if (includeMailbox) {
     push(4, '<Mailbox DataLinkLayer="true">')
@@ -1418,7 +1028,6 @@ export function generateEsiXml(result, options = {}) {
     if (mailboxProtocols & 0x02) push(5, '<EoE />')
     if (mailboxProtocols & 0x04) {
       const attributes = [`SdoInfo="${coeDetails & 0x02 ? 'true' : 'false'}"`]
-      if (coeSegmentedSdo) attributes.push('SegmentedSdo="true"')
       attributes.push(
         `PdoAssign="${coeDetails & 0x04 ? 'true' : 'false'}"`,
         `PdoConfig="${coeDetails & 0x08 ? 'true' : 'false'}"`,
@@ -1431,11 +1040,9 @@ export function generateEsiXml(result, options = {}) {
     if (mailboxProtocols & 0x10) push(5, '<SoE />')
     if (mailboxProtocols & 0x20) push(5, '<VoE />')
     push(4, '</Mailbox>')
-  } else if (sourceHasMailbox) {
-    warnings.push({ level: 'info', message: '已按设置省略 Mailbox 元素。' })
   }
 
-  if (includeDc && dc?.elements?.length) {
+  if (dc?.elements?.length) {
     push(4, '<Dc>')
     for (const element of dc.elements) {
       push(5, '<OpMode>')
@@ -1452,11 +1059,6 @@ export function generateEsiXml(result, options = {}) {
       push(5, '</OpMode>')
     }
     push(4, '</Dc>')
-  } else if (!includeDc && dc?.elements?.length) {
-    warnings.push({
-      level: 'info',
-      message: `已按设置省略 ${dc.elements.length} 个 DC 操作模式。`,
-    })
   }
 
   push(4, '<Eeprom>')
@@ -1486,11 +1088,7 @@ export function generateEsiXml(result, options = {}) {
   }
   const portTypes = general?.ports || []
   const firstUnusedPort = portTypes.findIndex((type) => !type)
-  if (
-    options.physics === undefined &&
-    firstUnusedPort !== -1 &&
-    portTypes.slice(firstUnusedPort).some((type) => type)
-  ) {
+  if (firstUnusedPort !== -1 && portTypes.slice(firstUnusedPort).some((type) => type)) {
     warnings.push({
       level: 'info',
       message: 'SII 端口类型在未使用端口之后仍有定义，ESI 的 Physics 属性无法表达这种间隔。',
@@ -1516,10 +1114,7 @@ export function generateEsiXml(result, options = {}) {
   if ((general?.flags ?? 0) & 0x10) {
     warnings.push({ level: 'info', message: 'General 标志位“Physical Memory 识别”无法在 ESI 中表达。' })
   }
-  if (
-    options.byteSize === undefined &&
-    (info.eepromSizeRaw ?? 0) !== Math.floor(byteSize / 128) - 1
-  ) {
+  if ((info.eepromSizeRaw ?? 0) !== Math.floor(byteSize / 128) - 1) {
     warnings.push({ level: 'warn', message: 'EEPROM 大小字段与输入长度不一致，导出值按输入长度计算。' })
   }
 

@@ -158,6 +158,27 @@ test('layer toggles only offer copper layers that carry geometry', async () => {
   }
 })
 
+test('a trace reports the layers its route is drawn on, not the fallback top', () => {
+  // Circuit JSON puts a trace's layers inside `route[]`; the preview used to
+  // fall through to `element.layer`, so every trace claimed top copper and the
+  // layer toggles lied on any board with bottom routing.
+  const circuitJson = [
+    { type: 'pcb_board', pcb_board_id: 'b', center: { x: 0, y: 0 }, width: 10, height: 5 },
+    {
+      type: 'pcb_trace',
+      pcb_trace_id: 't1',
+      route: [
+        { route_type: 'wire', x: 0, y: 0, width: 0.2, layer: 'bottom' },
+        { route_type: 'wire', x: 1, y: 0, width: 0.2, layer: 'bottom' },
+      ],
+    },
+  ]
+  const model = buildPreviewModel(circuitJson)
+  const trace = model.pcb.items.find((item) => item.kind === 'trace')
+  assert.deepEqual(trace.layers, ['bottom'])
+  assert.ok(model.pcb.layers.some((layer) => layer.id === 'bottom' && layer.group === 'copper'))
+})
+
 test('complex STM32 samples keep their four-layer stack and sheet hierarchy', async () => {
   // The F411 sample is a real four-layer board: both inner planes have to reach
   // the preview, not just top/bottom.

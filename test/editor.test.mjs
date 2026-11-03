@@ -11,7 +11,11 @@ import { fileURLToPath } from 'node:url'
 import { parseSii } from 'sii-parser'
 
 import {
+  addEntry,
+  addPdo,
   createEditorModel,
+  removeEntry,
+  removePdo,
   removeString,
   setName,
   setStringText,
@@ -117,3 +121,24 @@ test('removeString clears only the slot that owns the entry and remaps the rest'
     [],
   )
 })
+
+test('adding a PDO or entry after a delete does not reuse an existing id', () => {
+  // Delete a PDO, then add one: its index must not collide with the survivors
+  // (deriving it from list length would produce a duplicate).
+  const model = createEditorModel(parseSii(sample('limx-tron2.bin')))
+  removePdo(model, 'tx', 0)
+  addPdo(model, 'tx')
+  const indices = model.txPdos.map((pdo) => pdo.index)
+  assert.equal(new Set(indices).size, indices.length, `duplicate PDO index in ${indices}`)
+
+  // Entry sub-indices with a real spread (the sample stores them all as 0, so
+  // build one): delete a middle entry and add one back.
+  const pdo = { entries: [0, 1, 2, 3].map((subIndex) => ({ subIndex })) }
+  model.txPdos = [pdo]
+  model.rxPdos = []
+  removeEntry(model, 'tx', 0, 1)
+  addEntry(model, 'tx', 0)
+  const subIndices = pdo.entries.map((entry) => entry.subIndex)
+  assert.equal(new Set(subIndices).size, subIndices.length, `duplicate subIndex in ${subIndices}`)
+})
+

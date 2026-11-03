@@ -348,8 +348,14 @@ function pdoList(model, kind) {
 
 export function addPdo(model, kind) {
   const list = pdoList(model, kind)
+  // Deriving the index from list length collides after a delete, so take the
+  // next free value in this kind's range.
+  const base = kind === 'tx' ? 0x1a00 : 0x1600
+  const used = new Set(list.map((pdo) => pdo.index))
+  let index = base
+  while (used.has(index)) index += 1
   list.push({
-    index: (kind === 'tx' ? 0x1a00 : 0x1600) + list.length,
+    index,
     syncManager: kind === 'tx' ? 3 : 2,
     synchronization: 0,
     nameIndex: 0,
@@ -366,9 +372,11 @@ export function removePdo(model, kind, position) {
 export function addEntry(model, kind, pdoPosition) {
   const pdo = pdoList(model, kind)[pdoPosition]
   if (!pdo) return
+  // Sub-indices must stay unique after a delete, so take max + 1.
+  const subIndex = pdo.entries.reduce((max, entry) => Math.max(max, entry.subIndex), -1) + 1
   pdo.entries.push({
     index: 0x0000,
-    subIndex: pdo.entries.length,
+    subIndex,
     nameIndex: 0,
     name: '',
     dataType: 5,
@@ -412,13 +420,7 @@ export function removeDcOpMode(model, position) {
 // Display helpers
 // ---------------------------------------------------------------------------
 
-export function portsWord(ports) {
-  let word = 0
-  for (let index = 0; index < Math.min(ports?.length || 0, 4); index++) {
-    word |= (Number(ports[index]) & 0x0f) << (index * 4)
-  }
-  return word
-}
+export { portsWord } from './format.js'
 
 export function dcRaw(element) {
   const bytes = new Array(24).fill(0)

@@ -114,6 +114,7 @@ export const pads = {
     if (summary.hasBoard && summary.board.tracks === 0) {
       warnings.push({
         level: 'info',
+        code: 'no-routing',
         message:
           '文件里没有 *ROUTE* 走线段,输出只有元件、焊盘和板框;请在 PADS 里确认已布线并勾选 Routing。',
       })

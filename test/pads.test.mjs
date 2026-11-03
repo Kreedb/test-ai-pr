@@ -102,6 +102,25 @@ test('converts a PADS ASCII board into a KiCad project', async () => {
   assert.ok(pcb.includes('"PADS ASCII DEMO"'), 'board silkscreen text should survive')
 })
 
+test('a board with no routing warns once, not twice', async () => {
+  // The PADS converter and eda.finish() both warn about empty routing; the
+  // converter tags its own warning `no-routing` so finish() does not repeat it.
+  const source = read('res0805.asc').replace(
+    /\*ROUTE\*[\s\S]*?(?=\*LINES\*)/,
+    '*ROUTE*      ROUTING ITEMS\n\n',
+  )
+  assert.ok(!source.includes('*SIGNAL* VCC\n300'), 'the route section should be gone')
+  const result = await convertEda([
+    { name: 'res0805.asc', bytes: new Uint8Array(Buffer.from(source)) },
+  ])
+  assert.equal(result.summary.board.tracks, 0)
+  const routingWarnings = result.warnings.filter(
+    (warning) =>
+      warning.message.includes('没有 *ROUTE* 走线段') || warning.message.includes('输出里没有走线'),
+  )
+  assert.equal(routingWarnings.length, 1, `expected one routing warning, got ${routingWarnings.length}`)
+})
+
 test('mirrored parts put their pads on the back and swap the pad order', async () => {
   const result = await padsProject()
   const pcb = result.files[0].content

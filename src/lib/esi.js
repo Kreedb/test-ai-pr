@@ -24,6 +24,8 @@ import {
   crc8Sii,
 } from 'sii-parser'
 
+import { portsWord as portsToWord } from './format.js'
+
 const GENERAL_CATEGORY_BYTES = 32
 const PDO_ENTRY_FLAGS = 0x1000
 
@@ -585,14 +587,6 @@ function physicsToPorts(physics) {
     ports[index] = PORT_TYPE_BY_PHYSICS[physics.charAt(index).toUpperCase()] || 0
   }
   return ports
-}
-
-function portsToWord(ports) {
-  let word = 0
-  for (let index = 0; index < Math.min(ports.length, 4); index++) {
-    word |= (ports[index] & 0x0f) << (index * 4)
-  }
-  return word
 }
 
 export function generateSiiFromEsi(xmlText, options = {}) {

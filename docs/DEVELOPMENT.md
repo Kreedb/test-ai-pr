@@ -112,7 +112,7 @@ import { padsToCircuitJson } from 'pads-to-circuit-json'
 
 - 新增 EDA 来源：在 `src/lib/formats/` 下新建 `<id>.js`，导出元数据、`losses`、`detect`、`convert`，然后在 `src/lib/formats/index.js` 的显式导入列表里加一行。支持矩阵、有损表、样例按钮和格式标签都从注册表派生，不需要改页面。
 - 新增页面：在 `src/pages/` 下新建 `NamePage.vue`，在普通 `<script>` 块里导出 `route`（`label`、`order`，需要首页卡片时再加 `tool`）。路径由文件名自动生成，导航、路由出口和首页工具列表都从页面自身派生。
-- 新增测试：按来源放到 `test/<id>.test.mjs`，公共的样例读取与转换辅助函数放在 `test/helpers/` 下，避免所有格式共用一个巨型测试文件。
+- 新增测试：按来源放到 `test/<id>.test.mjs`，公共的样例读取与转换辅助函数放在 `test-support/` 下（不要放进 `test/`：`node --test` 会把 `test/` 下的每个 `.js`/`.mjs` 当测试文件执行），避免所有格式共用一个巨型测试文件。
 - 新增可独立发布的解析器：在 `lib/<package-name>/` 下建立独立包（`package.json`、`src/index.js`、`README.md`），用包名在主项目里引用。`lib/` 不允许反向依赖 `src/`，由 `test/lib.test.mjs` 守护。
 
 ## 协作约定

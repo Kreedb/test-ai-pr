@@ -155,6 +155,15 @@ function copperLayersOf(element) {
     const layers = [...new Set(element.layers.map(copperLayer))]
     return layers.filter((layer) => COPPER_RANK.has(layer))
   }
+  // A trace stores its layers inside `route[]`, not on the element, so without
+  // this every trace reports the fallback top copper layer.
+  if (Array.isArray(element.route) && element.route.length) {
+    const layers = element.route
+      .filter((entry) => entry.route_type !== 'via')
+      .map((entry) => copperLayer(entry.layer))
+    const unique = [...new Set(layers)].filter((layer) => COPPER_RANK.has(layer))
+    if (unique.length) return unique
+  }
   return [copperLayer(element.layer)]
 }
 
@@ -666,6 +675,15 @@ function buildSchematic(index) {
     return item
   }
 
+  // Bucket every port by its component once, so attaching pins is O(components
+  // + ports) instead of scanning all ports per component.
+  const portsByComponent = new Map()
+  for (const port of index.list('schematic_port')) {
+    const list = portsByComponent.get(port.schematic_component_id)
+    if (list) list.push(port)
+    else portsByComponent.set(port.schematic_component_id, [port])
+  }
+
   for (const component of index.list('schematic_component')) {
     const item = add({
       kind: 'component',
@@ -679,8 +697,7 @@ function buildSchematic(index) {
         index.valueOf(component.source_component_id),
     })
     const ports = []
-    for (const port of index.list('schematic_port')) {
-      if (port.schematic_component_id !== component.schematic_component_id) continue
+    for (const port of portsByComponent.get(component.schematic_component_id) || []) {
       const net = index.schematicPortNet.get(port.schematic_port_id) || null
       ports.push(
         withNet(

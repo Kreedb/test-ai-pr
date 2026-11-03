@@ -36,3 +36,12 @@ export function parseDecValue(text, fallback = 0) {
   const value = Number.parseInt(String(text ?? '').trim(), 10)
   return Number.isFinite(value) ? value : fallback
 }
+
+// Packs up to four port nibbles into the SII General `portsWord`.
+export function portsWord(ports) {
+  let word = 0
+  for (let index = 0; index < Math.min(ports?.length || 0, 4); index++) {
+    word |= (Number(ports[index]) & 0x0f) << (index * 4)
+  }
+  return word
+}

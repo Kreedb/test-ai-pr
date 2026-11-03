@@ -21,9 +21,9 @@ export const eagle = {
       items: [
         {
           category: '板框',
-          detail: '只导出 Dimension 层直线 wire 组成的主板框，其余闭合轮廓当作开槽；curve 圆弧不参与板框。',
+          detail: '只导出 Dimension 层 wire 组成的主板框，其余闭合轮廓当作开槽；curve 圆弧按直线弦处理。',
           reason:
-            '环只由直线 wire 拼接,EAGLE 的 curve 元素不解析;若板框含曲线,拼环可能失败而回退到元件外接矩形。',
+            'addBoardOutline 只读取 wire 端点,不解析 curve 属性;圆弧会静默变成直弦,不会报错或回退到元件外接矩形。',
         },
         {
           category: '设计规则',
@@ -44,15 +44,15 @@ export const eagle = {
         },
         {
           category: '封装与库',
-          detail: '元件的 attribute 与 3D 数据不导出；封装库/封装名与封装 Value 会保留。',
+          detail: '元件的 attribute 与 3D 数据不导出；封装 Value 由元件值回填，封装库/封装名不保留。',
           reason:
-            'package 的 3D 数据与 element 的 attribute 不解析,但 board 封装库名/封装名已写入 Footprint 属性,Value 由元件值回填。',
+            'package 的 3D 数据与 element 的 attribute 不解析;封装按焊盘几何重建,Footprint 属性由型号或元件值推导,所以源库名/封装名不保留,Value 由元件值回填。',
         },
         {
           category: '文字与丝印',
-          detail: '丝印按直线与文字重建，矢量字体替换为 KiCad 字体，curve 圆弧不导出。',
+          detail: '丝印按直线与文字重建，矢量字体替换为 KiCad 字体，curve 圆弧按直线弦处理。',
           reason:
-            'EAGLE 的矢量字体没有等价字段;丝印只解析 wire/circle,curve 圆弧没有转换成折线或弧。',
+            'EAGLE 的矢量字体没有等价字段;丝印 wire 只按端点画直线,curve 属性不解析,圆弧会变成直弦。',
         },
         {
           category: '其他标注',

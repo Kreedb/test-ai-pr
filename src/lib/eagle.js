@@ -698,28 +698,18 @@ function convertBoard(board, ctx, warnings) {
     const { componentId, localPoints } = packageGeometry(pkg, element, ctx)
     const box = boundingBox(localPoints)
     const placement = createPlacement(element)
-  ctx.elements.push({
-    type: 'pcb_component',
-    pcb_component_id: componentId,
-    source_component_id: ctx.components.get(element.name).sourceComponentId,
-    center: placement.origin,
+    ctx.elements.push({
+      type: 'pcb_component',
+      pcb_component_id: componentId,
+      source_component_id: ctx.components.get(element.name).sourceComponentId,
+      center: placement.origin,
       width: box.width,
       height: box.height,
       layer: placement.mirror ? 'bottom' : 'top',
-    rotation: placement.angle,
-    position_mode: 'none',
-    obstructs_within_bounds: false,
-    // Keep the source package identity as the KiCad footprint link. The
-    // footprint itself is still rebuilt from pad geometry, but the library and
-    // package name are what the EAGLE file actually provides.
-    ...(element.library && element.package
-      ? {
-          metadata: {
-            kicad_footprint: { footprintName: `${element.library}:${element.package}` },
-          },
-        }
-      : {}),
-  })
+      rotation: placement.angle,
+      position_mode: 'none',
+      obstructs_within_bounds: false,
+    })
   }
 
   // Plain-board silk screen and drills outside any package.

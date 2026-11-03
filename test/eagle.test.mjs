@@ -141,9 +141,15 @@ test('EAGLE part values reach the exported schematic and footprint', async () =>
   const pcb = result.files.find((file) => file.name.endsWith('.kicad_pcb')).content
   assert.match(pcb, /\(property "Value" "SOT23-3"/)
   assert.match(pcb, /\(property "MPN" "SOT23-3"/)
-  // The EAGLE library/package pair is the only footprint identity the file
-  // provides, so it becomes the KiCad footprint link.
-  assert.match(pcb, /\(footprint\s+"generic_smd:SOT23-3"/)
+  // The PCB and schematic must name the same footprint. The writer derives both
+  // links from the value, which is all the generic KiCad writer can carry here.
+  assert.match(pcb, /\(footprint\s+"tscircuit:SOT23-3"/)
+  assert.match(sheet.content, /\(property "Footprint" "tscircuit:SOT23-3"/)
+
+  // A passive whose value differs from its package name must still match on
+  // both sides instead of exposing a package-derived PCB link.
+  assert.match(pcb, /\(footprint\s+"tscircuit:PAD"/)
+  assert.match(sheet.content, /\(property "Footprint" "tscircuit:PAD"/)
 })
 
 test('mirrored elements keep their layer, pad positions and nets', async () => {

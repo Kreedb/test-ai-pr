@@ -122,9 +122,9 @@ export const altium = {
         },
         {
           category: '设计规则',
-          detail: '线宽、间距、差分对、规则优先级、网络类、Room、层叠材料不导出。',
+          detail: '只导出全局最小线宽与过孔尺寸；间距、差分对、规则优先级、网络类、Room、层叠材料不导出。',
           reason:
-            'Altium 规则存放在独立的规则表里,altiumts 不解析它,Circuit JSON 也没有规则、网络类或层叠字段;KiCad 侧还要写进 .kicad_pro/.kicad_dru。',
+            'altiumts 会解析规则表,但 altium-to-circuit-json 只把全局 Width 与 RoutingVias 的最小值写进 pcb_board;其余规则、网络类与层叠材料没有进入 Circuit JSON,而且 KiCad 侧还要写进 .kicad_pro/.kicad_dru。',
         },
         {
           category: '敷铜',
@@ -136,7 +136,7 @@ export const altium = {
           category: '封装与库',
           detail: '按焊盘几何重建，不引用封装库；库名、封装名不保留，BOM 字段只保留型号。',
           reason:
-            '中间模型只保留焊盘几何、位号与型号,altiumts 不导出封装库名和其他 BOM 字段,写出器只能按焊盘重建封装。',
+            'altiumts 能读出 footprint 与 footprintLibrary,但 altium-to-circuit-json 没有把它们写进中间模型;写出器只能按焊盘重建封装并保留型号,其他 BOM 字段也没有映射。',
         },
         {
           category: '3D 模型',
@@ -189,7 +189,7 @@ export const altium = {
           category: '封装与库',
           detail: '封装映射只保留名称，符号与封装的绑定需在 KiCad 重新确认。',
           reason:
-            'Altium 的封装名没有进入中间模型,写出器只能按型号或符号名推导 Footprint 属性,无法与源封装库对应。',
+            'altiumts 的 Implementation 记录带有封装名,但 altium-to-circuit-json 没有把它写进 source_component;写出器只能按型号或符号名推导 Footprint 属性,无法与源封装库对应。',
         },
       ],
     },

@@ -24,19 +24,19 @@ export const specctra = {
           category: '设计规则',
           detail: 'rule / clearance 段（默认线宽、间距）不导出，需在 KiCad 重设。',
           reason:
-            'dsnts 不解析 DSN 的 rule 段,Circuit JSON 也没有线宽、间距与差分对字段。',
+            'dsnts 会解析 structure.rule 与 class 规则,但 dsn-to-circuit-json 只映射走线,没有把线宽、间距和差分对写进 Circuit JSON;KiCad 还需要 .kicad_pro/.kicad_dru。',
         },
         {
           category: '层与图形',
           detail: '内层走线与焊盘会落到 top/bottom；没有丝印、阻焊/助焊层图形和铜皮。',
           reason:
-            'dsn-to-circuit-json 的 mapLayer 只产出 top/bottom(内层被折叠),DSN 也没有丝印/阻焊/助焊图形和 copper pour/plane 语义。',
+            'dsn-to-circuit-json 的 mapLayer 只产出 top/bottom(内层被折叠),而且它忽略 wiring 下的 plane 多边形,所以铜皮/平面没有进入中间模型;DSN 也没有丝印/阻焊/助焊图形。',
         },
         {
           category: '焊盘',
-          detail: '只按 DSN 声明的形状与尺寸重建，焊盘叠层与自定义焊盘简化。',
+          detail: '只按 circle/rect 重建；polygon/path 焊盘被简化，焊盘叠层不保留。',
           reason:
-            'dsn-to-circuit-json 只处理 circle/rect,polygon 会压成外接矩形、path 当矩形;逐层焊盘栈与自定义焊盘没有对应字段。',
+            'dsnts 能读 polygon/path 焊盘,但 dsn-to-circuit-json 只处理 circle/rect,把 polygon 压成外接矩形、path 当矩形;Circuit JSON 虽支持 polygon 焊盘,这条转换链没有产出,焊盘叠层也没有映射。',
         },
       ],
     },

@@ -1,0 +1,25 @@
+{
+  "name": "pads-to-circuit-json",
+  "version": "0.1.0",
+  "description": "PADS Layout ASCII to Circuit JSON",
+  "type": "module",
+  "license": "GPL-3.0-only",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "pads",
+    "cad",
+    "pcb",
+    "circuit-json"
+  ],
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  }
+}

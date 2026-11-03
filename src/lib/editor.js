@@ -10,7 +10,7 @@
 // so they can be inspected and edited; the generator warns about the ones ESI
 // cannot carry.
 
-import { DATA_TYPE_NAMES, FMMU_USAGE } from './sii.js'
+import { DATA_TYPE_NAMES, FMMU_USAGE } from 'sii-parser'
 
 const clone = (value) => JSON.parse(JSON.stringify(value))
 

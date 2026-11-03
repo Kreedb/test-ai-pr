@@ -30,6 +30,18 @@ function archive(entries, options) {
   return zipSync(entries, options)
 }
 
+// Both archive tests run the same Altium sample through the converter; keep one
+// conversion for both.
+let sampleArchive
+const sampleArchiveProject = () =>
+  (sampleArchive ??= (async () => {
+    const { files } = await expandArchive('stm32-f411-4layer.zip', sample('public/samples/altium/stm32-f411-4layer.zip'), {
+      maxFileBytes: 40 * 1024 * 1024,
+      maxTotalBytes: 120 * 1024 * 1024,
+    })
+    return { files, outcome: await convertEda(files) }
+  })())
+
 test('zip detection accepts the extension and the header magic', () => {
   const bytes = archive({ 'a.asc': padsAsc })
   assert.equal(isZipArchive('project.zip', bytes), true)
@@ -138,13 +150,8 @@ test('an archive with nothing usable fails with the reason', async () => {
 })
 
 test('a sample archive converts end to end through the archive path', async () => {
-  const bytes = sample('public/samples/altium/stm32-f411-4layer.zip')
-  const { files } = await expandArchive('stm32-f411-4layer.zip', bytes, {
-    maxFileBytes: 40 * 1024 * 1024,
-    maxTotalBytes: 120 * 1024 * 1024,
-  })
+  const { files, outcome } = await sampleArchiveProject()
   assert.deepEqual(namesOf(files), ['STM32F411.PcbDoc', 'STM32F411.SchDoc'])
-  const outcome = await convertEda(files)
   assert.ok(outcome.summary.board, 'expected a board in the conversion summary')
   assert.ok(outcome.summary.schematic, 'expected a schematic in the conversion summary')
   assert.equal(outcome.files[0].name, 'STM32F411.kicad_pcb')
@@ -199,9 +206,7 @@ test('an already-normalised ASCII document is returned unchanged', () => {
 // reaches more than one net, which is exactly what the overshared trace does.
 // The page falls back to converting each side on its own when it sees one.
 test('the overshared project trace is recognised, a healthy project is not', async () => {
-  const bytes = sample('public/samples/altium/stm32-f411-4layer.zip')
-  const { files } = await expandArchive('stm32-f411-4layer.zip', bytes)
-  const outcome = await convertEda(files)
+  const { outcome } = await sampleArchiveProject()
   assert.equal(hasOversharedTrace(outcome.circuitJson), false)
 
   const overshared = [

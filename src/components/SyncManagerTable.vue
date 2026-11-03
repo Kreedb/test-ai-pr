@@ -1,5 +1,5 @@
 <script setup>
-import { SM_ENABLE_BITS, setBits, smTypeName } from '@/lib/sii'
+import { SM_ENABLE_BITS, setBits, smTypeName } from 'sii-parser'
 import { hex, parseDecValue, parseHexValue } from '@/lib/format'
 
 defineProps({

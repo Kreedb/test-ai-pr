@@ -22,7 +22,7 @@ import {
   MAX_INPUT_BYTES,
   categoryName,
   crc8Sii,
-} from './sii.js'
+} from 'sii-parser'
 
 const GENERAL_CATEGORY_BYTES = 32
 const PDO_ENTRY_FLAGS = 0x1000

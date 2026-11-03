@@ -14,7 +14,7 @@ EEPROM 按字寻址、小端存储：
 
 ## ESI XML 导出
 
-- 设备子元素顺序：`Type`、`Name`、`Info`、`GroupType`、`Profile`、`Fmmu`、`Sm`、`RxPdo`、`TxPdo`、`Mailbox`、`Dc`、`Eeprom`。
+- 设备子元素顺序：`Type`、`Name`、`Info`（条件）、`GroupType`、`Fmmu`、`Sm`、`RxPdo`、`TxPdo`、`Mailbox`（条件）、`Dc`（条件）、`Eeprom`。`Profile`/`ProfileNo` 仅在导入时读取。
 - PDO 条目顺序：`Index`、`SubIndex`、`BitLen`、`Name`、`DataType`。
 - DC `OpMode` 顺序：`Name`、`Desc`、`AssignActivate`、`CycleTimeSync0`、`ShiftTimeSync0`、`CycleTimeSync1`、`ShiftTimeSync1`。
 - 邮箱协议顺序：`AoE`、`EoE`、`CoE`、`FoE`、`SoE`、`VoE`，六项都可选。

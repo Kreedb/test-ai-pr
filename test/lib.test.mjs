@@ -4,7 +4,7 @@
 
 import assert from 'node:assert/strict'
 import { readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join, resolve, sep } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
@@ -36,6 +36,7 @@ test('every lib package has a README and a package.json', () => {
 
 test('lib packages do not import the app', () => {
   for (const name of packages) {
+    const packageDir = join(libRoot, name)
     for (const file of sourceFiles(join(libRoot, name, 'src'))) {
       const source = readFileSync(file, 'utf8')
       assert.ok(
@@ -43,8 +44,9 @@ test('lib packages do not import the app', () => {
         `${file} imports the app alias`,
       )
       for (const match of source.matchAll(/from\s+['"](\.[^'"]+)['"]/g)) {
+        const target = resolve(dirname(file), match[1])
         assert.ok(
-          !match[1].startsWith('../../'),
+          target.startsWith(packageDir + sep),
           `${file} imports outside its package: ${match[1]}`,
         )
       }

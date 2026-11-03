@@ -79,8 +79,9 @@ const SUPPORTED_COMPRESSION = new Set([0, 8])
 
 function readEntries(unzipSync, bytes) {
   const entries = []
-  // A filter that always rejects still walks the central directory, so this
-  // call collects every entry's declared sizes without inflating anything.
+  // A filter that always rejects still walks the central directory and throws on
+  // invalid data, so this collects every entry's declared sizes without
+  // inflating anything.
   unzipSync(bytes, {
     filter: (entry) => {
       entries.push(entry)
@@ -95,7 +96,10 @@ function readEntries(unzipSync, bytes) {
  *
  * `maxFileBytes` / `maxTotalBytes` mirror the convert page's upload limits and
  * are applied to the *declared* uncompressed sizes, so an oversized member is
- * skipped before it is inflated. Resolves to `{ files, skipped }`, where each
+ * skipped before it is inflated. Extraction streams one member at a time and
+ * also enforces the same budget on the *actual* inflated bytes; a member whose
+ * header lies about its size fails the whole archive with a clear error instead
+ * of growing the tab unchecked. Resolves to `{ files, skipped }`, where each
  * skipped entry carries one of `SKIP_REASON_LABELS`' keys.
  */
 export async function expandArchive(
@@ -103,7 +107,7 @@ export async function expandArchive(
   bytes,
   { maxFileBytes = Infinity, maxTotalBytes = Infinity, maxEntries = MAX_ARCHIVE_ENTRIES } = {},
 ) {
-  const { unzipSync } = await import('fflate')
+  const { unzipSync, Unzip, UnzipInflate } = await import('fflate')
 
   let entries
   try {
@@ -154,21 +158,74 @@ export async function expandArchive(
     throw new Error(`${name} 里没有可用的文件:${detail}`)
   }
 
-  // fflate keys its output by the raw member name, which Windows-built archives
-  // may spell with backslashes; the filter has to match on that same raw name.
+  // fflate reports members by their raw name, which Windows-built archives may
+  // spell with backslashes; look results up by that same raw name.
   const wanted = new Map(selected.map(({ path, original }) => [pathOf(original), path]))
-  let extracted
-  try {
-    extracted = unzipSync(bytes, { filter: (entry) => wanted.has(pathOf(entry.name)) })
-  } catch (cause) {
-    throw new Error(`${name} 解压失败,压缩包可能已损坏。(${cause.message || cause})`)
-  }
-
   const used = new Set()
   const files = []
-  for (const [rawName, content] of Object.entries(extracted)) {
-    const path = wanted.get(pathOf(rawName))
-    if (!path || !content?.length) continue
+  let inflated = 0
+
+  // Stream one member at a time and abort the whole archive the moment the
+  // actual inflated bytes pass the budget. A member that lies about its
+  // declared size stops here instead of growing the tab unchecked.
+  const extracted = await new Promise((resolve, reject) => {
+    const results = []
+    let current = null
+    let currentSize = 0
+    let blown = false
+    const stream = new Unzip()
+    stream.register(UnzipInflate)
+    stream.onfile = (file) => {
+      const path = wanted.get(pathOf(file.name))
+      if (!path) return
+      current = { path, chunks: [] }
+      currentSize = 0
+      file.ondata = (err, chunk, final) => {
+        if (err) {
+          reject(new Error(`${name} 解压失败,压缩包可能已损坏。(${err.message || err})`))
+          return
+        }
+        if (blown) return
+        currentSize += chunk.length
+        inflated += chunk.length
+        if (currentSize > maxFileBytes || inflated > maxTotalBytes) {
+          blown = true
+          file.terminate()
+          return
+        }
+        current.chunks.push(chunk)
+        if (final) {
+          const content = new Uint8Array(currentSize)
+          let offset = 0
+          for (const piece of current.chunks) {
+            content.set(piece, offset)
+            offset += piece.length
+          }
+          results.push({ path: current.path, content })
+          current = null
+        }
+      }
+      file.start()
+    }
+    try {
+      stream.push(bytes, true)
+    } catch (cause) {
+      reject(new Error(`${name} 解压失败,压缩包可能已损坏。(${cause.message || cause})`))
+      return
+    }
+    if (blown) {
+      reject(
+        new Error(
+          `${name} 解压后超过合计上限,可能是压缩包声明的文件大小与实际不符,请重新打包后再上传。`,
+        ),
+      )
+      return
+    }
+    resolve(results)
+  })
+
+  for (const { path, content } of extracted) {
+    if (!content.length) continue
     const fileName = uniqueName(path, used)
     used.add(fileName)
     files.push({ name: fileName, bytes: content, path })

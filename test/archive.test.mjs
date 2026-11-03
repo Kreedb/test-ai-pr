@@ -113,6 +113,23 @@ test('nested archives and unsupported compression are reported, not inflated', a
   assert.deepEqual(skipped, [{ name: 'inner.zip', reason: 'nested' }])
 })
 
+test('a member that lies about its size is stopped instead of inflating unbounded', async () => {
+  const content = encode('x'.repeat(2000))
+  const bytes = archive({ 'big.asc': content })
+  // Patch both the local header and central directory uncompressed-size fields
+  // (2000 -> 10) so the pre-check believes the member is tiny.
+  for (let index = 0; index + 4 <= bytes.length; index += 1) {
+    if (bytes[index] === 0xd0 && bytes[index + 1] === 0x07 && bytes[index + 2] === 0 && bytes[index + 3] === 0) {
+      bytes[index] = 10
+      bytes[index + 1] = 0
+    }
+  }
+  await assert.rejects(
+    () => expandArchive('lie.zip', bytes, { maxFileBytes: 100000, maxTotalBytes: 100 }),
+    /超过合计上限/,
+  )
+})
+
 test('the entry cap bounds how many documents one archive can add', async () => {
   const entries = {}
   for (let index = 0; index < MAX_ARCHIVE_ENTRIES + 3; index += 1) {
@@ -226,5 +243,13 @@ test('the overshared project trace is recognised, a healthy project is not', asy
       { ...overshared[2], connected_source_net_ids: ['net-a'] },
     ]),
     false,
+  )
+  // Several nets through a single port is still a malformed merge: a real trace
+  // never spans more than one net.
+  assert.equal(
+    hasOversharedTrace([
+      { ...overshared[2], connected_source_port_ids: ['port-1'] },
+    ]),
+    true,
   )
 })

@@ -126,7 +126,7 @@ function orderOf(item) {
 // the silk layer hides them too.
 const refdesLabels = computed(() =>
   props.model.components
-    .filter((item) => visible(item) && item.id !== props.selectedComponentId)
+    .filter((item) => visible(item) && item.componentId !== props.selectedComponentId)
     .map((item) => ({
       id: `ref-${item.id}`,
       text: item.refdes,
@@ -139,7 +139,7 @@ const refdesLabels = computed(() =>
 
 const selectionBounds = computed(() => {
   if (!props.selectedComponentId) return null
-  const item = props.model.components.find((candidate) => candidate.id === props.selectedComponentId)
+  const item = props.model.components.find((candidate) => candidate.componentId === props.selectedComponentId)
   return item?.bounds || null
 })
 

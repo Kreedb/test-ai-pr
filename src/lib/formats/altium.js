@@ -66,16 +66,15 @@ function encodeLatin1(text) {
 // The project-level merge joins the board's net table with the schematic's net
 // graph. On designs whose schematic has the same net under two labels (a local
 // label plus a global one) it ends up emitting a single `source_trace` that
-// claims every net and every port at once. `circuit-json-to-kicad` refuses to
-// pick a net for a pad connected to more than one (`multiple KiCad nets`), so
-// the whole board fails to export. Detection is deliberately narrow: one trace,
-// several nets, several ports.
+// claims every net at once. `circuit-json-to-kicad` refuses to pick a net for a
+// pad connected to more than one (`multiple KiCad nets`), so the whole board
+// fails to export. A healthy trace always belongs to exactly one net, so any
+// trace spanning more than one is the malformed merge regardless of how many
+// ports it carries.
 export function hasOversharedTrace(circuitJson) {
   return circuitJson.some(
     (element) =>
-      element.type === 'source_trace' &&
-      (element.connected_source_net_ids?.length ?? 0) > 1 &&
-      (element.connected_source_port_ids?.length ?? 0) > 1,
+      element.type === 'source_trace' && (element.connected_source_net_ids?.length ?? 0) > 1,
   )
 }
 
@@ -246,17 +245,17 @@ export const altium = {
     } else {
       circuitJson = convertProject()
       if (documents.pcb && documents.schematics.length && hasOversharedTrace(circuitJson)) {
-        // Convert the two sides on their own and stack the results. The
-        // upstream project converter gives each document its own id prefix so
-        // ids across documents stay unique; reproduce those prefixes here or
-        // every schematic would emit the same `schematic_sheet_id`.
+        // Convert the two sides on their own and stack the results. Each
+        // document needs its own id prefix or every schematic would emit the
+        // same `schematic_sheet_id`; our own spelling keeps this fallback
+        // independent of the upstream project converter's private convention.
         circuitJson = [
           ...altiumConverter.convertAltiumPcbDocToCircuitJson(documents.pcb, {
-            idPrefix: 'pcb',
+            idPrefix: 'p1',
           }),
           ...documents.schematics.flatMap(({ document, sheetName }, index) =>
             altiumConverter.convertAltiumSchDocToCircuitJson(document, {
-              idPrefix: `schematic_${index + 1}`,
+              idPrefix: `s${index + 1}`,
               sheetName,
             }),
           ),

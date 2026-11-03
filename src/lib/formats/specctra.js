@@ -83,6 +83,12 @@ export const specctra = {
       const converter = new DsnToCircuitJsonConverter(dsnText)
       converter.runUntilFinished()
       circuitJson = converter.getOutput()
+    }
+
+    const summary = summarize(circuitJson)
+    // A DSN can carry its own `(wiring)` block, so only warn about missing
+    // routing when the conversion actually produced no tracks.
+    if (!ses && summary.hasBoard && summary.board.tracks === 0) {
       warnings.push({
         level: 'warn',
         code: 'no-routing',
@@ -91,6 +97,6 @@ export const specctra = {
       })
     }
 
-    return { circuitJson, summary: summarize(circuitJson) }
+    return { circuitJson, summary }
   },
 }

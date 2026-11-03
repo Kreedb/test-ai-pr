@@ -286,7 +286,7 @@ function selectComponent(refdes) {
     tab.value = destination
     return selectComponent(refdes)
   }
-  selectedComponentId.value = target.id
+  selectedComponentId.value = target.componentId
   selectedPcbId.value = wantsPcb ? component.pcb.id : ''
   activeNetName.value = ''
   const bounds = target.bounds

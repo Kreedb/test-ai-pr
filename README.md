@@ -29,12 +29,10 @@ npm run dev
 
 ## 文档
 
-文档按页面与项目拆分在 [`docs/`](docs/README.md)：
+文档索引见 [`docs/`](docs/README.md)，开发、构建与部署约定见 [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)：
 
-- [应用外壳与部署](docs/app/README.md)
 - [EEPROM 解析器](docs/parser/README.md) · [SII 格式与 ESI 映射](docs/parser/sii-format.md)
 - [EDA 转 KiCad](docs/convert/README.md) · [格式支持](docs/convert/formats.md) · [有损转换](docs/convert/losses.md) · [设计预览](docs/convert/preview.md)
-- [协作约定](docs/development/contributing.md) · [代码结构](docs/development/architecture.md) · [测试](docs/development/testing.md)
 - [第三方组件与数据说明](docs/THIRD-PARTY-NOTICES.md)
 
 ## 独立库

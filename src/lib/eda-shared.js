@@ -9,6 +9,37 @@ export class EdaConversionError extends Error {
   }
 }
 
+// `circuit-json-to-kicad` reads the Value property of a generic chip, diode,
+// LED, switch or connector from `manufacturer_part_number`, not from the
+// component's display value. Altium and EAGLE both keep the schematic's value
+// text in `display_value` and leave that field unset, so without this bridge
+// those parts reach KiCad with an empty Value. Copy the resolved display value
+// into the field the writer reads; the writer also derives the library symbol
+// id, the footprint name and the PCB `MPN` property from it.
+const VALUE_FROM_DISPLAY_TYPES = new Set([
+  'simple_chip',
+  'simple_connector',
+  'simple_diode',
+  'simple_led',
+  'simple_switch',
+])
+
+// An Altium field can contain a formula (`='LED-'+Color`) that the converter
+// cannot evaluate. Exporting the literal expression is worse than leaving the
+// Value empty, so only resolved text is copied.
+const isUnresolvedExpression = (value) => String(value).trim().startsWith('=')
+
+export function fillSchematicValues(circuitJson) {
+  for (const element of circuitJson) {
+    if (element.type !== 'source_component' || element.manufacturer_part_number) continue
+    if (!VALUE_FROM_DISPLAY_TYPES.has(element.ftype)) continue
+    if (element.display_value && !isUnresolvedExpression(element.display_value)) {
+      element.manufacturer_part_number = element.display_value
+    }
+  }
+  return circuitJson
+}
+
 const CFB_MAGIC = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]
 
 export function isCompoundFile(bytes) {

@@ -123,6 +123,10 @@ test('mirrored parts put their pads on the back and swap the pad order', async (
   const firstPad = findBlock(mirrored, 0, '(pad "1"')
   const secondPad = findBlock(mirrored, 0, '(pad "2"')
   assert.ok(firstPad && secondPad)
+  assert.ok(
+    mirrored.startsWith(`(footprint\n    "RES0805"`),
+    'the PADS decal name should become the KiCad footprint link',
+  )
   const xOf = (block) => Number(/\(at ([\d.eE+-]+) /.exec(block)?.[1])
   // Decal pad 1 is at local x = -45 mil, pad 2 at +45 mil; mirroring swaps them.
   assert.ok(xOf(firstPad) > 0, `mirrored pad 1 should sit at positive local x, got ${firstPad}`)

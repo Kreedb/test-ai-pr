@@ -314,11 +314,21 @@ function togglePcbFlip() {
 // Space flips the board like LCEDA's editor. Inputs and buttons keep their own
 // Space behaviour (typing, activation) and are ignored here.
 function onKeydown(event) {
-  if (event.code !== 'Space' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return
+  if (
+    event.code !== 'Space' ||
+    event.repeat ||
+    event.shiftKey ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.altKey
+  ) {
+    return
+  }
   if (tab.value !== 'pcb' || !pcb.value) return
-  if (event.target?.closest?.('input, textarea, select, button, a, [contenteditable]')) return
-  // Leave Space to page scrolling unless the preview is actually on screen.
-  const rect = card.value?.getBoundingClientRect()
+  if (event.target?.closest?.('input, textarea, select, button, a, summary, [contenteditable]')) return
+  // Leave Space to page scrolling unless the PCB canvas itself is on screen; the
+  // card also holds the net table below the canvas.
+  const rect = card.value?.querySelector('.preview-viewport')?.getBoundingClientRect()
   if (!rect || rect.bottom < 0 || rect.top > window.innerHeight) return
   event.preventDefault()
   togglePcbFlip()

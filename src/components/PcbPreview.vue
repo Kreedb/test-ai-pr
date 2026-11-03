@@ -290,6 +290,7 @@ const pinSummary = (item) => {
             x="0"
             y="0"
             :font-size="Math.max(item.element.font_size || 1, 0.4)"
+            :text-anchor="flipped ? 'end' : 'start'"
             fill="#6b7688"
             opacity="0.7"
           >
@@ -341,6 +342,7 @@ const pinSummary = (item) => {
             x="0"
             y="0"
             :font-size="Math.max(item.element.font_size || 1, 0.4)"
+            :text-anchor="flipped ? 'end' : 'start'"
             fill="#e8e8d8"
             :opacity="item.layers[0] === 'silk-bottom' ? 0.55 : 0.95"
           >

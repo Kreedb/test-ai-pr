@@ -69,9 +69,7 @@ test('keeps indented continuation lines that mention clk', () => {
 })
 
 test('reads ROS epoch prefixes and counts orphan lines', () => {
-  const { entries, warnings } = parseLogText(
-    ['lost line before any timestamp', '[INFO] [1700000000.5]: hello'].join('\n'),
-  )
+  const { entries, warnings } = parseLogText(['lost line before any timestamp', '[INFO] [1700000000.5]: hello'].join('\n'))
   assert.equal(entries.length, 1)
   assert.equal(entries[0].wall, 1700000000.5)
   assert.equal(warnings.length, 1)

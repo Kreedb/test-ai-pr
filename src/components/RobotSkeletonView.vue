@@ -165,7 +165,7 @@ function onPointerDown(event) {
 function onPointerMove(event) {
   if (!drag) return
   camera.yaw += (event.clientX - drag.x) * 0.01
-  camera.pitch = Math.max(-1.2, Math.min(1.2, camera.pitch + (event.clientY - drag.y) * 0.01))
+  camera.pitch = Math.max(-1.2, Math.min(1.2, camera.pitch + (drag.y - event.clientY) * 0.01))
   drag = { x: event.clientX, y: event.clientY }
   draw()
 }

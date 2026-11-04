@@ -17,8 +17,7 @@ export const pads = {
         {
           category: '输入范围',
           detail: '只读 ASCII .asc；二进制 .pcb 与 PADS Logic 原理图不支持，导出时需勾选全部内容。',
-          reason:
-            'PADS 二进制 .pcb 未公开且随版本变化，PADS Logic 原理图是另一种数据库；只有 ASCII 导出包含可解析的板级数据。',
+          reason: 'PADS 二进制 .pcb 未公开且随版本变化，PADS Logic 原理图是另一种数据库；只有 ASCII 导出包含可解析的板级数据。',
         },
         {
           category: '敷铜',
@@ -28,8 +27,7 @@ export const pads = {
         {
           category: '焊盘',
           detail: '热焊盘（RT/ST）、反焊盘（RA/SA）、环形焊盘（A）不输出；叠层只取元件面那一层。',
-          reason:
-            'RT/ST/RA/SA/A 是平面间距或环形层，不是焊盘铜箔；PADS 的逐层焊盘栈在 Circuit JSON 里只有元件面一层外径。',
+          reason: 'RT/ST/RA/SA/A 是平面间距或环形层，不是焊盘铜箔；PADS 的逐层焊盘栈在 Circuit JSON 里只有元件面一层外径。',
         },
         {
           category: '内层',
@@ -44,8 +42,7 @@ export const pads = {
         {
           category: '设计数据',
           detail: '设计规则、网络类、层叠材料、盲埋孔、装配/阻焊/助焊层图形与文本不导出。',
-          reason:
-            'PADS ASCII 的规则、层叠与装配/阻焊/助焊图形不在解析范围，Circuit JSON 也没有对应字段。',
+          reason: 'PADS ASCII 的规则、层叠与装配/阻焊/助焊图形不在解析范围，Circuit JSON 也没有对应字段。',
         },
         {
           category: '封装与库',
@@ -69,13 +66,10 @@ export const pads = {
       return null
     // Any ASCII text is a plausible `.asc`, so only accept the ones that carry
     // the PADS-POWERPCB banner as a PADS board.
-    return isPadsAsciiText(leadingText(bytes))
-      ? { id: 'pads', kind: 'pcb' }
-      : { id: 'unknown', kind: 'unknown' }
+    return isPadsAsciiText(leadingText(bytes)) ? { id: 'pads', kind: 'pcb' } : { id: 'unknown', kind: 'unknown' }
   },
   async convert(sources, warnings) {
-    const { looksLikePadsAscii, parsePadsAscii, padsToCircuitJson } =
-      await import('pads-to-circuit-json')
+    const { looksLikePadsAscii, parsePadsAscii, padsToCircuitJson } = await import('pads-to-circuit-json')
     const decoder = new TextDecoder('utf-8', { fatal: false })
     let parsed = null
 
@@ -85,9 +79,7 @@ export const pads = {
       }
       const text = decoder.decode(source.bytes)
       if (!looksLikePadsAscii(text)) {
-        throw new EdaConversionError(
-          `${source.name} 没有 PADS-POWERPCB 版本头。请用 PADS Layout 的 File → Export → ASCII 重新导出，并确认导出时勾选了所有需要的段落。`,
-        )
+        throw new EdaConversionError(`${source.name} 没有 PADS-POWERPCB 版本头。请用 PADS Layout 的 File → Export → ASCII 重新导出，并确认导出时勾选了所有需要的段落。`)
       }
       if (parsed) {
         throw new EdaConversionError('一次只能转换一块板：检测到多个 PADS .asc，请分批转换。')
@@ -115,8 +107,7 @@ export const pads = {
       warnings.push({
         level: 'info',
         code: 'no-routing',
-        message:
-          '文件里没有 *ROUTE* 走线段，输出只有元件、焊盘和板框；请在 PADS 里确认已布线并勾选 Routing。',
+        message: '文件里没有 *ROUTE* 走线段，输出只有元件、焊盘和板框；请在 PADS 里确认已布线并勾选 Routing。',
       })
     }
     return { circuitJson, summary }

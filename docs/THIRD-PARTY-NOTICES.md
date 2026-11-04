@@ -49,7 +49,7 @@ EAGLE XML 与 PADS Layout ASCII 的字段映射是本仓库自己的代码（`li
 | `test/fixtures/pads/*.asc` | [tscircuit/padsts](https://github.com/tscircuit/padsts) 的 `tests/fixtures` PADS ASCII 回归资产 | MIT，Copyright (c) 2025 tscircuit Inc. |
 | `public/samples/akd-eeprom.bin` | [ethercrab-rs/ethercrab](https://github.com/ethercrab-rs/ethercrab) 测试数据 | 见上游仓库 |
 | `public/samples/limx-tron2.bin`、`limx-tron2.xml` | Limx Dynamics Tron2 EEPROM 转储与 TwinCAT ESI | 见上游 |
-| `public/samples/replay/luna-demo.bag` | 由 `test-support/rosbag-fixture.mjs` 生成的合成 Luna 关节与 IMU 数据 | 本仓库原创，随 GPL-3.0 发布 |
+| `public/samples/replay/luna-demo.bag` | 由 `test/replay/rosbag-fixture.mjs` 生成的合成 Luna 关节与 IMU 数据 | 本仓库原创，随 GPL-3.0 发布 |
 
 ## 机器人骨架数据
 

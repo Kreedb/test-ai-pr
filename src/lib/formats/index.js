@@ -23,16 +23,12 @@ export const SOURCE_FORMATS = FORMATS.map(({ id, label, extensions, status, conv
   note,
 }))
 
-export const CONVERTIBLE_FORMATS = FORMATS.filter((format) => format.status === 'supported').map(
-  (format) => format.id,
-)
+export const CONVERTIBLE_FORMATS = FORMATS.filter((format) => format.status === 'supported').map((format) => format.id)
 
 export const SAMPLES = FORMATS.flatMap((format) => format.samples || [])
 
 // One group per supported output kind. The page flattens these into table rows.
-export const LOSS_GROUPS = FORMATS.flatMap((format) =>
-  (format.losses || []).map((group) => ({ ...group, formatId: format.id })),
-)
+export const LOSS_GROUPS = FORMATS.flatMap((format) => (format.losses || []).map((group) => ({ ...group, formatId: format.id })))
 
 export function formatLabel(id) {
   return FORMATS_BY_ID[id]?.label || '未知格式'

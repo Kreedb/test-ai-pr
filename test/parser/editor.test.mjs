@@ -10,19 +10,9 @@ import { fileURLToPath } from 'node:url'
 
 import { parseSii } from 'sii-parser'
 
-import {
-  addEntry,
-  addPdo,
-  createEditorModel,
-  removeEntry,
-  removePdo,
-  removeString,
-  setName,
-  setStringText,
-  unreferencedStrings,
-} from '../src/lib/editor.js'
+import { addEntry, addPdo, createEditorModel, removeEntry, removePdo, removeString, setName, setStringText, unreferencedStrings } from '../../src/lib/editor.js'
 
-const root = fileURLToPath(new URL('..', import.meta.url))
+const root = fileURLToPath(new URL('../..', import.meta.url))
 const sample = (name) => new Uint8Array(readFileSync(join(root, 'public/samples', name)))
 
 test('createEditorModel keeps the string indices the parser read', () => {

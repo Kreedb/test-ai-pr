@@ -5,8 +5,7 @@ export const route = {
   tool: {
     tag: 'SII → 编辑 → ESI XML',
     title: 'EEPROM 解析器',
-    description:
-      '上传 .bin 格式的 SII EEPROM 转储，解析并可编辑固定头、General、字符串、FMMU、SyncManager、PDO 与 DC，导出 ESI XML，并用内置生成器重新编译校验。',
+    description: '上传 .bin 格式的 SII EEPROM 转储，解析并可编辑固定头、General、字符串、FMMU、SyncManager、PDO 与 DC，导出 ESI XML，并用内置生成器重新编译校验。',
     action: '打开解析器',
   },
 }
@@ -25,17 +24,7 @@ import { downloadBlob, fileBaseName } from '@/lib/download'
 import * as editor from '@/lib/editor'
 import { generateEsiXml, verifyEsiXml } from '@/lib/esi'
 import { formatBytes, hex, parseDecValue, parseHexValue } from '@/lib/format'
-import {
-  COE_DETAIL_BITS,
-  DATA_TYPE_NAMES,
-  FMMU_USAGE,
-  GENERAL_FLAG_BITS,
-  MAILBOX_PROTOCOLS,
-  MAX_INPUT_BYTES,
-  PORT_TYPES,
-  parseSii,
-  setBits,
-} from 'sii-parser'
+import { COE_DETAIL_BITS, DATA_TYPE_NAMES, FMMU_USAGE, GENERAL_FLAG_BITS, MAILBOX_PROTOCOLS, MAX_INPUT_BYTES, PORT_TYPES, parseSii, setBits } from 'sii-parser'
 
 const SAMPLES = [
   { file: 'samples/akd-eeprom.bin', label: 'Kollmorgen AKD' },
@@ -87,12 +76,7 @@ const pageWarnings = computed(() => {
 const warnings = computed(() => {
   const seen = new Set()
   const list = []
-  for (const warning of [
-    ...(source.value?.parsed?.warnings || []),
-    ...pageWarnings.value,
-    ...(output.value?.warnings || []),
-    ...(check.value?.warnings || []),
-  ]) {
+  for (const warning of [...(source.value?.parsed?.warnings || []), ...pageWarnings.value, ...(output.value?.warnings || []), ...(check.value?.warnings || [])]) {
     if (seen.has(warning.message)) continue
     seen.add(warning.message)
     list.push(warning)
@@ -131,11 +115,7 @@ const stats = computed(() => {
   ]
 })
 
-const mailboxProtocolLabels = computed(() =>
-  MAILBOX_PROTOCOLS.filter(
-    (protocol) => ((model.info.mailboxProtocols ?? 0) & protocol.bit) !== 0,
-  ).map((protocol) => protocol.label),
-)
+const mailboxProtocolLabels = computed(() => MAILBOX_PROTOCOLS.filter((protocol) => ((model.info.mailboxProtocols ?? 0) & protocol.bit) !== 0).map((protocol) => protocol.label))
 
 const coeLabels = computed(() => setBits(model.general.coeDetails ?? 0, COE_DETAIL_BITS))
 const generalFlagLabels = computed(() => setBits(model.general.flags ?? 0, GENERAL_FLAG_BITS))
@@ -269,10 +249,7 @@ function regenerate() {
   if (!source.value) return
   let generated
   try {
-    generated = generateEsiXml(
-      editor.editorResult(model, source.value.bytes),
-      editor.editorOptions(model, vendorName.value),
-    )
+    generated = generateEsiXml(editor.editorResult(model, source.value.bytes), editor.editorOptions(model, vendorName.value))
   } catch (cause) {
     output.value = null
     check.value = null
@@ -432,29 +409,14 @@ function scrollToSection(id) {
         <span v-if="fileName" class="badge">{{ fileName }}</span>
       </div>
 
-      <label
-        class="drop-zone"
-        :class="{ dragging }"
-        @dragover.prevent="dragging = true"
-        @dragleave.prevent="dragging = false"
-        @drop.prevent="onDrop"
-      >
+      <label class="drop-zone" :class="{ dragging }" @dragover.prevent="dragging = true" @dragleave.prevent="dragging = false" @drop.prevent="onDrop">
         <input type="file" accept=".bin" @change="onFileChange" />
         <span class="drop-title">拖拽 .bin EEPROM 转储到这里，或点击选择文件</span>
         <span class="drop-hint">仅支持 .bin · 最大 {{ formatBytes(MAX_INPUT_BYTES) }}</span>
       </label>
 
       <div class="actions">
-        <button
-          v-for="sample in SAMPLES"
-          :key="sample.file"
-          type="button"
-          class="btn"
-          :disabled="busy || Boolean(source)"
-          @click="loadSample(sample)"
-        >
-          示例：{{ sample.label }}
-        </button>
+        <button v-for="sample in SAMPLES" :key="sample.file" type="button" class="btn" :disabled="busy || Boolean(source)" @click="loadSample(sample)">示例：{{ sample.label }}</button>
         <button type="button" class="btn ghost" :disabled="busy" @click="clearAll">清空</button>
         <span v-if="sampleName" class="muted small">示例：{{ sampleName }}</span>
       </div>
@@ -475,13 +437,7 @@ function scrollToSection(id) {
       </section>
 
       <nav class="section-nav" aria-label="章节导航">
-        <a
-          v-for="item in navItems"
-          :key="item.id"
-          :href="`#${item.id}`"
-          @click.prevent="scrollToSection(item.id)"
-          >{{ item.label }}</a
-        >
+        <a v-for="item in navItems" :key="item.id" :href="`#${item.id}`" @click.prevent="scrollToSection(item.id)">{{ item.label }}</a>
       </nav>
 
       <section v-if="warnings.length" class="card warnings-card">
@@ -521,9 +477,7 @@ function scrollToSection(id) {
               </div>
               <div>
                 <dt>配置站别名</dt>
-                <dd class="mono">
-                  {{ hex(info.stationAlias, 4) }}（{{ info.stationAlias ?? '—' }}）
-                </dd>
+                <dd class="mono">{{ hex(info.stationAlias, 4) }}（{{ info.stationAlias ?? '—' }}）</dd>
               </div>
               <div>
                 <dt>EEPROM 版本</dt>
@@ -572,12 +526,8 @@ function scrollToSection(id) {
               <span v-if="general.foeDetails & 0x01" class="chip">FoE</span>
               <span v-if="general.eoeDetails & 0x01" class="chip">EoE</span>
               <span v-if="general.soeChannels" class="chip">SoE × {{ general.soeChannels }}</span>
-              <span v-if="general.ds402Channels" class="chip"
-                >DS402 × {{ general.ds402Channels }}</span
-              >
-              <span v-if="general.sysmanClass" class="chip"
-                >Sysman class {{ general.sysmanClass }}</span
-              >
+              <span v-if="general.ds402Channels" class="chip">DS402 × {{ general.ds402Channels }}</span>
+              <span v-if="general.sysmanClass" class="chip">Sysman class {{ general.sysmanClass }}</span>
             </div>
             <div class="chip-row">
               <span v-for="label in generalFlagLabels" :key="label" class="chip">{{ label }}</span>
@@ -596,34 +546,24 @@ function scrollToSection(id) {
             <dl class="kv">
               <div>
                 <dt>标准接收</dt>
-                <dd class="mono">
-                  {{ hex(info.standard.rxOffset, 4) }} · {{ info.standard.rxSize }} B
-                </dd>
+                <dd class="mono">{{ hex(info.standard.rxOffset, 4) }} · {{ info.standard.rxSize }} B</dd>
               </div>
               <div>
                 <dt>标准发送</dt>
-                <dd class="mono">
-                  {{ hex(info.standard.txOffset, 4) }} · {{ info.standard.txSize }} B
-                </dd>
+                <dd class="mono">{{ hex(info.standard.txOffset, 4) }} · {{ info.standard.txSize }} B</dd>
               </div>
               <div>
                 <dt>Bootstrap 接收</dt>
-                <dd class="mono">
-                  {{ hex(info.bootstrap.rxOffset, 4) }} · {{ info.bootstrap.rxSize }} B
-                </dd>
+                <dd class="mono">{{ hex(info.bootstrap.rxOffset, 4) }} · {{ info.bootstrap.rxSize }} B</dd>
               </div>
               <div>
                 <dt>Bootstrap 发送</dt>
-                <dd class="mono">
-                  {{ hex(info.bootstrap.txOffset, 4) }} · {{ info.bootstrap.txSize }} B
-                </dd>
+                <dd class="mono">{{ hex(info.bootstrap.txOffset, 4) }} · {{ info.bootstrap.txSize }} B</dd>
               </div>
               <div>
                 <dt>协议</dt>
                 <dd class="chip-row compact">
-                  <span v-for="label in mailboxProtocolLabels" :key="label" class="chip accent">{{
-                    label
-                  }}</span>
+                  <span v-for="label in mailboxProtocolLabels" :key="label" class="chip accent">{{ label }}</span>
                   <span v-if="!mailboxProtocolLabels.length" class="muted">无</span>
                 </dd>
               </div>
@@ -634,47 +574,24 @@ function scrollToSection(id) {
 
       <section id="header" class="card">
         <h2>身份与固定头</h2>
-        <p class="muted small">
-          多字节字段均为小端。带 <span class="sii-only">*</span> 的字段只存在于 SII 镜像中，导出 ESI
-          XML 时无法保留。
-        </p>
+        <p class="muted small">多字节字段均为小端。带 <span class="sii-only">*</span> 的字段只存在于 SII 镜像中，导出 ESI XML 时无法保留。</p>
 
         <div class="form-grid">
           <label class="field">
             <span>厂商 ID（十六进制）</span>
-            <input
-              class="mono"
-              :value="hex(info.vendorId, 8)"
-              spellcheck="false"
-              @change="setHex(info, 'vendorId', $event, 32)"
-            />
+            <input class="mono" :value="hex(info.vendorId, 8)" spellcheck="false" @change="setHex(info, 'vendorId', $event, 32)" />
           </label>
           <label class="field">
             <span>产品码（十六进制）</span>
-            <input
-              class="mono"
-              :value="hex(info.productCode, 8)"
-              spellcheck="false"
-              @change="setHex(info, 'productCode', $event, 32)"
-            />
+            <input class="mono" :value="hex(info.productCode, 8)" spellcheck="false" @change="setHex(info, 'productCode', $event, 32)" />
           </label>
           <label class="field">
             <span>修订号（十六进制）</span>
-            <input
-              class="mono"
-              :value="hex(info.revisionNumber, 8)"
-              spellcheck="false"
-              @change="setHex(info, 'revisionNumber', $event, 32)"
-            />
+            <input class="mono" :value="hex(info.revisionNumber, 8)" spellcheck="false" @change="setHex(info, 'revisionNumber', $event, 32)" />
           </label>
           <label class="field">
             <span>序列号（十六进制）<span class="sii-only">*</span></span>
-            <input
-              class="mono"
-              :value="hex(info.serialNumber, 8)"
-              spellcheck="false"
-              @change="setHex(info, 'serialNumber', $event, 32)"
-            />
+            <input class="mono" :value="hex(info.serialNumber, 8)" spellcheck="false" @change="setHex(info, 'serialNumber', $event, 32)" />
           </label>
         </div>
 
@@ -683,48 +600,23 @@ function scrollToSection(id) {
           <div class="form-grid">
             <label class="field">
               <span>PDI Control（0x00）</span>
-              <input
-                class="mono"
-                :value="hex(info.pdiControl, 4)"
-                spellcheck="false"
-                @change="setHex(info, 'pdiControl', $event)"
-              />
+              <input class="mono" :value="hex(info.pdiControl, 4)" spellcheck="false" @change="setHex(info, 'pdiControl', $event)" />
             </label>
             <label class="field">
               <span>ESC Configuration（0x01）</span>
-              <input
-                class="mono"
-                :value="hex(info.pdiConfiguration, 4)"
-                spellcheck="false"
-                @change="setHex(info, 'pdiConfiguration', $event)"
-              />
+              <input class="mono" :value="hex(info.pdiConfiguration, 4)" spellcheck="false" @change="setHex(info, 'pdiConfiguration', $event)" />
             </label>
             <label class="field">
               <span>Sync Impulse Length（0x02）</span>
-              <input
-                class="mono"
-                :value="hex(info.syncImpulseLength, 4)"
-                spellcheck="false"
-                @change="setHex(info, 'syncImpulseLength', $event)"
-              />
+              <input class="mono" :value="hex(info.syncImpulseLength, 4)" spellcheck="false" @change="setHex(info, 'syncImpulseLength', $event)" />
             </label>
             <label class="field">
               <span>PDI Configuration 2（0x03）</span>
-              <input
-                class="mono"
-                :value="hex(info.pdiConfiguration2, 4)"
-                spellcheck="false"
-                @change="setHex(info, 'pdiConfiguration2', $event)"
-              />
+              <input class="mono" :value="hex(info.pdiConfiguration2, 4)" spellcheck="false" @change="setHex(info, 'pdiConfiguration2', $event)" />
             </label>
             <label class="field">
               <span>Configured Station Alias（0x04）</span>
-              <input
-                class="mono"
-                :value="hex(info.stationAlias, 4)"
-                spellcheck="false"
-                @change="setHex(info, 'stationAlias', $event)"
-              />
+              <input class="mono" :value="hex(info.stationAlias, 4)" spellcheck="false" @change="setHex(info, 'stationAlias', $event)" />
             </label>
           </div>
           <p class="muted small mono break-all">ConfigData = {{ configDataPreview }}</p>
@@ -735,48 +627,23 @@ function scrollToSection(id) {
           <div class="form-grid">
             <label class="field">
               <span>Reserved（0x05）</span>
-              <input
-                class="mono"
-                :value="hex(info.reserved1, 4)"
-                spellcheck="false"
-                @change="setHex(info, 'reserved1', $event)"
-              />
+              <input class="mono" :value="hex(info.reserved1, 4)" spellcheck="false" @change="setHex(info, 'reserved1', $event)" />
             </label>
             <label class="field">
               <span>Reserved（0x06）</span>
-              <input
-                class="mono"
-                :value="hex(info.reserved2, 4)"
-                spellcheck="false"
-                @change="setHex(info, 'reserved2', $event)"
-              />
+              <input class="mono" :value="hex(info.reserved2, 4)" spellcheck="false" @change="setHex(info, 'reserved2', $event)" />
             </label>
             <label class="field">
               <span>Execution Delay（0x10）</span>
-              <input
-                class="mono"
-                :value="hex(info.executionDelay, 4)"
-                spellcheck="false"
-                @change="setHex(info, 'executionDelay', $event)"
-              />
+              <input class="mono" :value="hex(info.executionDelay, 4)" spellcheck="false" @change="setHex(info, 'executionDelay', $event)" />
             </label>
             <label class="field">
               <span>Port 0 Delay（0x11）</span>
-              <input
-                class="mono"
-                :value="hex(info.port0Delay, 4)"
-                spellcheck="false"
-                @change="setHex(info, 'port0Delay', $event)"
-              />
+              <input class="mono" :value="hex(info.port0Delay, 4)" spellcheck="false" @change="setHex(info, 'port0Delay', $event)" />
             </label>
             <label class="field">
               <span>Port 1 Delay（0x12）</span>
-              <input
-                class="mono"
-                :value="hex(info.port1Delay, 4)"
-                spellcheck="false"
-                @change="setHex(info, 'port1Delay', $event)"
-              />
+              <input class="mono" :value="hex(info.port1Delay, 4)" spellcheck="false" @change="setHex(info, 'port1Delay', $event)" />
             </label>
           </div>
         </div>
@@ -794,12 +661,7 @@ function scrollToSection(id) {
             </label>
             <label class="field">
               <span>版本（0x3F）<span class="sii-only">*</span></span>
-              <input
-                class="mono"
-                :value="hex(info.eepromVersion, 4)"
-                spellcheck="false"
-                @change="setHex(info, 'eepromVersion', $event)"
-              />
+              <input class="mono" :value="hex(info.eepromVersion, 4)" spellcheck="false" @change="setHex(info, 'eepromVersion', $event)" />
             </label>
           </div>
         </div>
@@ -813,37 +675,19 @@ function scrollToSection(id) {
           <div class="form-grid">
             <label class="field">
               <span>接收偏移（0x14）</span>
-              <input
-                class="mono"
-                :value="hex(info.bootstrap.rxOffset, 4)"
-                spellcheck="false"
-                @change="setHex(info.bootstrap, 'rxOffset', $event)"
-              />
+              <input class="mono" :value="hex(info.bootstrap.rxOffset, 4)" spellcheck="false" @change="setHex(info.bootstrap, 'rxOffset', $event)" />
             </label>
             <label class="field">
               <span>接收大小（0x15）</span>
-              <input
-                class="mono"
-                :value="info.bootstrap.rxSize"
-                @change="setDec(info.bootstrap, 'rxSize', $event)"
-              />
+              <input class="mono" :value="info.bootstrap.rxSize" @change="setDec(info.bootstrap, 'rxSize', $event)" />
             </label>
             <label class="field">
               <span>发送偏移（0x16）</span>
-              <input
-                class="mono"
-                :value="hex(info.bootstrap.txOffset, 4)"
-                spellcheck="false"
-                @change="setHex(info.bootstrap, 'txOffset', $event)"
-              />
+              <input class="mono" :value="hex(info.bootstrap.txOffset, 4)" spellcheck="false" @change="setHex(info.bootstrap, 'txOffset', $event)" />
             </label>
             <label class="field">
               <span>发送大小（0x17）</span>
-              <input
-                class="mono"
-                :value="info.bootstrap.txSize"
-                @change="setDec(info.bootstrap, 'txSize', $event)"
-              />
+              <input class="mono" :value="info.bootstrap.txSize" @change="setDec(info.bootstrap, 'txSize', $event)" />
             </label>
           </div>
           <p class="muted small mono break-all">BootStrap = {{ bootStrapPreview }}</p>
@@ -854,37 +698,19 @@ function scrollToSection(id) {
           <div class="form-grid">
             <label class="field">
               <span>接收偏移</span>
-              <input
-                class="mono"
-                :value="hex(info.standard.rxOffset, 4)"
-                spellcheck="false"
-                @change="setHex(info.standard, 'rxOffset', $event)"
-              />
+              <input class="mono" :value="hex(info.standard.rxOffset, 4)" spellcheck="false" @change="setHex(info.standard, 'rxOffset', $event)" />
             </label>
             <label class="field">
               <span>接收大小</span>
-              <input
-                class="mono"
-                :value="info.standard.rxSize"
-                @change="setDec(info.standard, 'rxSize', $event)"
-              />
+              <input class="mono" :value="info.standard.rxSize" @change="setDec(info.standard, 'rxSize', $event)" />
             </label>
             <label class="field">
               <span>发送偏移</span>
-              <input
-                class="mono"
-                :value="hex(info.standard.txOffset, 4)"
-                spellcheck="false"
-                @change="setHex(info.standard, 'txOffset', $event)"
-              />
+              <input class="mono" :value="hex(info.standard.txOffset, 4)" spellcheck="false" @change="setHex(info.standard, 'txOffset', $event)" />
             </label>
             <label class="field">
               <span>发送大小</span>
-              <input
-                class="mono"
-                :value="info.standard.txSize"
-                @change="setDec(info.standard, 'txSize', $event)"
-              />
+              <input class="mono" :value="info.standard.txSize" @change="setDec(info.standard, 'txSize', $event)" />
             </label>
           </div>
           <p class="muted small">重新编译时标准邮箱由 SyncManager 0/1 生成。</p>
@@ -894,11 +720,7 @@ function scrollToSection(id) {
           <h3>邮箱协议（0x1C）</h3>
           <div class="check-grid">
             <label v-for="protocol in MAILBOX_PROTOCOLS" :key="protocol.bit" class="check">
-              <input
-                type="checkbox"
-                :checked="(info.mailboxProtocols & protocol.bit) !== 0"
-                @change="toggleProtocol(protocol.bit, $event)"
-              />
+              <input type="checkbox" :checked="(info.mailboxProtocols & protocol.bit) !== 0" @change="toggleProtocol(protocol.bit, $event)" />
               {{ protocol.label }}
             </label>
           </div>
@@ -912,31 +734,19 @@ function scrollToSection(id) {
         <div class="form-grid">
           <label class="field">
             <span>设备名称</span>
-            <input
-              :value="general.deviceName"
-              @input="setName(general, 'deviceName', 'nameStringIndex', $event)"
-            />
+            <input :value="general.deviceName" @input="setName(general, 'deviceName', 'nameStringIndex', $event)" />
           </label>
           <label class="field">
             <span>订货号 / Type</span>
-            <input
-              :value="general.orderName"
-              @input="setName(general, 'orderName', 'orderStringIndex', $event)"
-            />
+            <input :value="general.orderName" @input="setName(general, 'orderName', 'orderStringIndex', $event)" />
           </label>
           <label class="field">
             <span>组（GroupType）</span>
-            <input
-              :value="general.groupName"
-              @input="setName(general, 'groupName', 'groupStringIndex', $event)"
-            />
+            <input :value="general.groupName" @input="setName(general, 'groupName', 'groupStringIndex', $event)" />
           </label>
           <label class="field">
             <span>图像名称 <span class="sii-only">*</span></span>
-            <input
-              :value="general.imageName"
-              @input="setName(general, 'imageName', 'imageStringIndex', $event)"
-            />
+            <input :value="general.imageName" @input="setName(general, 'imageName', 'imageStringIndex', $event)" />
           </label>
         </div>
 
@@ -944,11 +754,7 @@ function scrollToSection(id) {
           <h3>CoE 服务（SDO 始终启用）</h3>
           <div class="check-grid">
             <label v-for="service in COE_SERVICES" :key="service.bit" class="check">
-              <input
-                type="checkbox"
-                :checked="(general.coeDetails & service.bit) !== 0"
-                @change="toggleCoe(service.bit, $event)"
-              />
+              <input type="checkbox" :checked="(general.coeDetails & service.bit) !== 0" @change="toggleCoe(service.bit, $event)" />
               {{ service.label }}
             </label>
           </div>
@@ -958,70 +764,36 @@ function scrollToSection(id) {
           <h3>协议明细与通道</h3>
           <div class="form-grid">
             <label class="check">
-              <input
-                type="checkbox"
-                :checked="(general.foeDetails & 0x01) !== 0"
-                @change="toggleBit(general, 'foeDetails', 0x01, $event)"
-              />
+              <input type="checkbox" :checked="(general.foeDetails & 0x01) !== 0" @change="toggleBit(general, 'foeDetails', 0x01, $event)" />
               FoE 明细 <span class="sii-only">*</span>
             </label>
             <label class="check">
-              <input
-                type="checkbox"
-                :checked="(general.eoeDetails & 0x01) !== 0"
-                @change="toggleBit(general, 'eoeDetails', 0x01, $event)"
-              />
+              <input type="checkbox" :checked="(general.eoeDetails & 0x01) !== 0" @change="toggleBit(general, 'eoeDetails', 0x01, $event)" />
               EoE 明细 <span class="sii-only">*</span>
             </label>
             <label class="field">
               <span>SoE 通道 <span class="sii-only">*</span></span>
-              <input
-                class="mono"
-                :value="general.soeChannels"
-                @change="setDec(general, 'soeChannels', $event, 0xff)"
-              />
+              <input class="mono" :value="general.soeChannels" @change="setDec(general, 'soeChannels', $event, 0xff)" />
             </label>
             <label class="field">
               <span>DS402 通道 <span class="sii-only">*</span></span>
-              <input
-                class="mono"
-                :value="general.ds402Channels"
-                @change="setDec(general, 'ds402Channels', $event, 0xff)"
-              />
+              <input class="mono" :value="general.ds402Channels" @change="setDec(general, 'ds402Channels', $event, 0xff)" />
             </label>
             <label class="field">
               <span>Sysman Class <span class="sii-only">*</span></span>
-              <input
-                class="mono"
-                :value="general.sysmanClass"
-                @change="setDec(general, 'sysmanClass', $event, 0xff)"
-              />
+              <input class="mono" :value="general.sysmanClass" @change="setDec(general, 'sysmanClass', $event, 0xff)" />
             </label>
             <label class="field">
               <span>保留字节（offset 4）<span class="sii-only">*</span></span>
-              <input
-                class="mono"
-                :value="hex(general.reserved, 2)"
-                spellcheck="false"
-                @change="setHex(general, 'reserved', $event, 8)"
-              />
+              <input class="mono" :value="hex(general.reserved, 2)" spellcheck="false" @change="setHex(general, 'reserved', $event, 8)" />
             </label>
             <label class="field">
               <span>EBus 电流（mA）<span class="sii-only">*</span></span>
-              <input
-                class="mono"
-                :value="general.ebusCurrent"
-                @change="setSigned(general, 'ebusCurrent', $event)"
-              />
+              <input class="mono" :value="general.ebusCurrent" @change="setSigned(general, 'ebusCurrent', $event)" />
             </label>
             <label class="field">
               <span>物理内存地址 <span class="sii-only">*</span></span>
-              <input
-                class="mono"
-                :value="hex(general.physicalMemoryAddress, 4)"
-                spellcheck="false"
-                @change="setHex(general, 'physicalMemoryAddress', $event)"
-              />
+              <input class="mono" :value="hex(general.physicalMemoryAddress, 4)" spellcheck="false" @change="setHex(general, 'physicalMemoryAddress', $event)" />
             </label>
           </div>
         </div>
@@ -1030,17 +802,11 @@ function scrollToSection(id) {
           <h3>General 标志位</h3>
           <div class="check-grid">
             <label v-for="flag in GENERAL_FLAG_BITS" :key="flag.bit" class="check">
-              <input
-                type="checkbox"
-                :checked="(general.flags & flag.bit) !== 0"
-                @change="toggleGeneralFlag(flag.bit, $event)"
-              />
+              <input type="checkbox" :checked="(general.flags & flag.bit) !== 0" @change="toggleGeneralFlag(flag.bit, $event)" />
               {{ flag.label }}
             </label>
           </div>
-          <p class="muted small">
-            Mailbox DLL 与 Identification via AL Status 会写入 ESI；其余标志位只存在于 SII 镜像中。
-          </p>
+          <p class="muted small">Mailbox DLL 与 Identification via AL Status 会写入 ESI；其余标志位只存在于 SII 镜像中。</p>
         </div>
 
         <div class="form-section">
@@ -1061,14 +827,8 @@ function scrollToSection(id) {
 
       <section id="strings" class="card">
         <h2>字符串（Strings）</h2>
-        <p class="muted small">
-          索引从 1 开始。在名称字段中输入新名称会自动创建字符串；修改字符串会同步所有引用它的名称。
-        </p>
-        <StringsTable
-          :strings="model.strings"
-          @update-text="setStringText"
-          @remove="editor.removeString(model, $event)"
-        />
+        <p class="muted small">索引从 1 开始。在名称字段中输入新名称会自动创建字符串；修改字符串会同步所有引用它的名称。</p>
+        <StringsTable :strings="model.strings" @update-text="setStringText" @remove="editor.removeString(model, $event)" />
       </section>
 
       <section id="fmmu" class="card">
@@ -1081,13 +841,9 @@ function scrollToSection(id) {
                 {{ choice.label }}
               </option>
             </select>
-            <span v-if="fmmu.usage === 0xff" class="muted small"
-              >填充字节（位于末尾时导出会忽略）</span
-            >
+            <span v-if="fmmu.usage === 0xff" class="muted small">填充字节（位于末尾时导出会忽略）</span>
             <span class="spacer"></span>
-            <button type="button" class="btn small ghost" @click="editor.removeFmmu(model, index)">
-              删除
-            </button>
+            <button type="button" class="btn small ghost" @click="editor.removeFmmu(model, index)">删除</button>
           </div>
         </div>
         <p v-else class="muted small">没有 FMMU 条目。</p>
@@ -1098,24 +854,13 @@ function scrollToSection(id) {
 
       <section id="sm" class="card">
         <h2>同步管理器（SyncManager）</h2>
-        <p class="muted small">
-          带 <span class="sii-only">*</span> 的字段（状态、类型）只存在于 SII
-          镜像中；重新编译时类型取 SM 序号 + 1。
-        </p>
-        <SyncManagerTable
-          :sync-managers="model.syncManagers"
-          @update="updateSyncManager"
-          @add="editor.addSyncManager(model)"
-          @remove="editor.removeSyncManager(model, $event)"
-        />
+        <p class="muted small">带 <span class="sii-only">*</span> 的字段（状态、类型）只存在于 SII 镜像中；重新编译时类型取 SM 序号 + 1。</p>
+        <SyncManagerTable :sync-managers="model.syncManagers" @update="updateSyncManager" @add="editor.addSyncManager(model)" @remove="editor.removeSyncManager(model, $event)" />
       </section>
 
       <section id="pdo" class="card">
         <h2>PDO 映射</h2>
-        <p class="muted small">
-          带 <span class="sii-only">*</span> 的字段（同步方式、条目标志）不会写入 ESI；PDO 标志只有
-          Mandatory、Fixed、Depend on Slot 会保留。
-        </p>
+        <p class="muted small">带 <span class="sii-only">*</span> 的字段（同步方式、条目标志）不会写入 ESI；PDO 标志只有 Mandatory、Fixed、Depend on Slot 会保留。</p>
         <div class="pdo-group">
           <h3>TxPDO（从站发送 / 主站接收）</h3>
           <PdoTable
@@ -1124,13 +869,8 @@ function scrollToSection(id) {
             @remove-pdo="editor.removePdo(model, 'tx', $event)"
             @add-pdo="editor.addPdo(model, 'tx')"
             @add-entry="editor.addEntry(model, 'tx', $event)"
-            @update-entry="
-              (pdoIndex, entryIndex, key, value) =>
-                updatePdoEntry('tx', pdoIndex, entryIndex, key, value)
-            "
-            @remove-entry="
-              (pdoIndex, entryIndex) => editor.removeEntry(model, 'tx', pdoIndex, entryIndex)
-            "
+            @update-entry="(pdoIndex, entryIndex, key, value) => updatePdoEntry('tx', pdoIndex, entryIndex, key, value)"
+            @remove-entry="(pdoIndex, entryIndex) => editor.removeEntry(model, 'tx', pdoIndex, entryIndex)"
           />
         </div>
         <div class="pdo-group">
@@ -1141,29 +881,16 @@ function scrollToSection(id) {
             @remove-pdo="editor.removePdo(model, 'rx', $event)"
             @add-pdo="editor.addPdo(model, 'rx')"
             @add-entry="editor.addEntry(model, 'rx', $event)"
-            @update-entry="
-              (pdoIndex, entryIndex, key, value) =>
-                updatePdoEntry('rx', pdoIndex, entryIndex, key, value)
-            "
-            @remove-entry="
-              (pdoIndex, entryIndex) => editor.removeEntry(model, 'rx', pdoIndex, entryIndex)
-            "
+            @update-entry="(pdoIndex, entryIndex, key, value) => updatePdoEntry('rx', pdoIndex, entryIndex, key, value)"
+            @remove-entry="(pdoIndex, entryIndex) => editor.removeEntry(model, 'rx', pdoIndex, entryIndex)"
           />
         </div>
       </section>
 
       <section id="dc" class="card">
         <h2>分布式时钟（DC）</h2>
-        <p class="muted small">
-          每个操作模式对应一个 24 字节元素。描述会写入 ESI XML，但 SII
-          镜像不保存描述字符串，重新编译时会丢失。
-        </p>
-        <DcTable
-          :dc="model.dc"
-          @update="updateDc"
-          @add="editor.addDcOpMode(model)"
-          @remove="editor.removeDcOpMode(model, $event)"
-        />
+        <p class="muted small">每个操作模式对应一个 24 字节元素。描述会写入 ESI XML，但 SII 镜像不保存描述字符串，重新编译时会丢失。</p>
+        <DcTable :dc="model.dc" @update="updateDc" @add="editor.addDcOpMode(model)" @remove="editor.removeDcOpMode(model, $event)" />
       </section>
 
       <section id="categories" class="card">
@@ -1179,14 +906,7 @@ function scrollToSection(id) {
             <button type="button" class="btn small" :disabled="!output" @click="copyXml">
               {{ copied ? '已复制' : '复制 XML' }}
             </button>
-            <button
-              type="button"
-              class="btn small primary"
-              :disabled="!output"
-              @click="downloadXml"
-            >
-              下载 .xml
-            </button>
+            <button type="button" class="btn small primary" :disabled="!output" @click="downloadXml">下载 .xml</button>
           </div>
         </div>
 
@@ -1198,9 +918,7 @@ function scrollToSection(id) {
         </div>
 
         <p v-if="exportError" class="warn-inline">{{ exportError }}</p>
-        <p v-else class="muted small">
-          编辑后的字段会实时反映到 XML；导出前已用内置 EEPROM 生成器重新编译并和原始转储比对。
-        </p>
+        <p v-else class="muted small">编辑后的字段会实时反映到 XML；导出前已用内置 EEPROM 生成器重新编译并和原始转储比对。</p>
 
         <div class="form-section">
           <h3>生成器重新编译校验</h3>
@@ -1209,16 +927,10 @@ function scrollToSection(id) {
             <p class="muted">无法从生成的 XML 重新生成镜像：{{ check.error }}</p>
           </template>
           <template v-else-if="check">
-            <p v-if="check.identical === true" class="roundtrip-ok">
-              生成的 XML 重新编译后与原始转储逐字节一致（{{ formatBytes(check.actualLength) }}）。
-            </p>
+            <p v-if="check.identical === true" class="roundtrip-ok">生成的 XML 重新编译后与原始转储逐字节一致（{{ formatBytes(check.actualLength) }}）。</p>
             <template v-else-if="check.identical === false">
               <p class="roundtrip-diff">
-                与原始转储有 {{ check.diffCount }} 个字节不同（原
-                {{ formatBytes(check.expectedLength) }} / 新
-                {{
-                  formatBytes(check.actualLength)
-                }}）。修改身份字段、端口或输出内容后出现差异属预期。
+                与原始转储有 {{ check.diffCount }} 个字节不同（原 {{ formatBytes(check.expectedLength) }} / 新 {{ formatBytes(check.actualLength) }}）。修改身份字段、端口或输出内容后出现差异属预期。
               </p>
               <div v-if="check.firstDiffs.length" class="table-wrap">
                 <table class="data-table">
@@ -1241,31 +953,16 @@ function scrollToSection(id) {
                 </table>
               </div>
             </template>
-            <p v-else class="muted small">
-              已从生成的 XML 重新编译出 {{ formatBytes(check.actualLength) }} 的镜像。
-            </p>
+            <p v-else class="muted small">已从生成的 XML 重新编译出 {{ formatBytes(check.actualLength) }} 的镜像。</p>
             <div class="actions">
-              <button
-                type="button"
-                class="btn small"
-                :disabled="!check.bytes"
-                @click="downloadCompiled"
-              >
-                下载重新编译的 .bin
-              </button>
+              <button type="button" class="btn small" :disabled="!check.bytes" @click="downloadCompiled">下载重新编译的 .bin</button>
             </div>
           </template>
         </div>
 
         <div class="form-section">
           <h3>EtherCATInfo XML</h3>
-          <textarea
-            class="hex-input xml-input xml-preview"
-            readonly
-            wrap="off"
-            spellcheck="false"
-            :value="output?.xml || ''"
-          ></textarea>
+          <textarea class="hex-input xml-input xml-preview" readonly wrap="off" spellcheck="false" :value="output?.xml || ''"></textarea>
         </div>
       </section>
 
@@ -1282,11 +979,7 @@ function scrollToSection(id) {
 
     <section v-else-if="!error" class="empty-state">
       <h2>等待输入</h2>
-      <p>
-        上传 .bin 格式的 SII EEPROM
-        转储后，可在此编辑固定头、General、字符串、FMMU、SyncManager、PDO 与 DC， 并导出 ESI
-        XML。数据类别与列表条目支持新增、修改和删除，固定头字段可直接编辑。
-      </p>
+      <p>上传 .bin 格式的 SII EEPROM 转储后，可在此编辑固定头、General、字符串、FMMU、SyncManager、PDO 与 DC， 并导出 ESI XML。数据类别与列表条目支持新增、修改和删除，固定头字段可直接编辑。</p>
     </section>
   </main>
 </template>

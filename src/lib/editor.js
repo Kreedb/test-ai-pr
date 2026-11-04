@@ -99,9 +99,7 @@ export function createEditorModel(parsed) {
   }
   if (parsed.general) {
     model.general = { ...defaultGeneral(), ...clone(parsed.general) }
-    model.general.ports = Array.isArray(model.general.ports)
-      ? [...model.general.ports]
-      : [0, 0, 0, 0]
+    model.general.ports = Array.isArray(model.general.ports) ? [...model.general.ports] : [0, 0, 0, 0]
   }
 
   model.strings = (parsed.strings || []).map((entry) => clone(entry))
@@ -154,19 +152,8 @@ export function editorOptions(model, vendorName = '') {
   const { info } = model
   return {
     vendorName: vendorName || 'Vendor (SII image)',
-    configData: wordsToHex([
-      info.pdiControl,
-      info.pdiConfiguration,
-      info.syncImpulseLength,
-      info.pdiConfiguration2,
-      info.stationAlias,
-    ]),
-    bootStrap: wordsToHex([
-      info.bootstrap.rxOffset,
-      info.bootstrap.rxSize,
-      info.bootstrap.txOffset,
-      info.bootstrap.txSize,
-    ]),
+    configData: wordsToHex([info.pdiControl, info.pdiConfiguration, info.syncImpulseLength, info.pdiConfiguration2, info.stationAlias]),
+    bootStrap: wordsToHex([info.bootstrap.rxOffset, info.bootstrap.rxSize, info.bootstrap.txOffset, info.bootstrap.txSize]),
   }
 }
 

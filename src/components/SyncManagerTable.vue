@@ -56,65 +56,31 @@ function normalizedDec(event, max = 0xffff) {
         <tr v-for="(sm, index) in syncManagers" :key="index">
           <td class="mono">{{ sm.index }}</td>
           <td>
-            <input
-              class="table-input mono narrow"
-              :value="hex(sm.startAddress, 4)"
-              spellcheck="false"
-              @change="emit('update', index, 'startAddress', normalizedHex($event))"
-            />
+            <input class="table-input mono narrow" :value="hex(sm.startAddress, 4)" spellcheck="false" @change="emit('update', index, 'startAddress', normalizedHex($event))" />
           </td>
           <td>
-            <input
-              class="table-input mono narrow"
-              :value="sm.length"
-              @change="emit('update', index, 'length', normalizedDec($event))"
-            />
+            <input class="table-input mono narrow" :value="sm.length" @change="emit('update', index, 'length', normalizedDec($event))" />
           </td>
           <td>
-            <input
-              class="table-input mono narrow"
-              :value="hex(sm.control, 2)"
-              spellcheck="false"
-              @change="emit('update', index, 'control', normalizedHex($event, 8))"
-            />
+            <input class="table-input mono narrow" :value="hex(sm.control, 2)" spellcheck="false" @change="emit('update', index, 'control', normalizedHex($event, 8))" />
             <span v-if="sm.control & 0x40" class="badge">WD</span>
           </td>
-          <td class="small nowrap">
-            {{ modeLabel(sm.control) }} / {{ directionLabel(sm.control) }}
+          <td class="small nowrap">{{ modeLabel(sm.control) }} / {{ directionLabel(sm.control) }}</td>
+          <td>
+            <input class="table-input mono narrow" :value="hex(sm.status, 2)" spellcheck="false" @change="emit('update', index, 'status', normalizedHex($event, 8))" />
           </td>
           <td>
-            <input
-              class="table-input mono narrow"
-              :value="hex(sm.status, 2)"
-              spellcheck="false"
-              @change="emit('update', index, 'status', normalizedHex($event, 8))"
-            />
-          </td>
-          <td>
-            <input
-              class="table-input mono narrow"
-              :value="hex(sm.enable, 2)"
-              spellcheck="false"
-              @change="emit('update', index, 'enable', normalizedHex($event, 8))"
-            />
+            <input class="table-input mono narrow" :value="hex(sm.enable, 2)" spellcheck="false" @change="emit('update', index, 'enable', normalizedHex($event, 8))" />
             <div v-if="setBits(sm.enable, SM_ENABLE_BITS).length" class="chip-row compact">
-              <span v-for="label in setBits(sm.enable, SM_ENABLE_BITS)" :key="label" class="chip">{{
-                label
-              }}</span>
+              <span v-for="label in setBits(sm.enable, SM_ENABLE_BITS)" :key="label" class="chip">{{ label }}</span>
             </div>
           </td>
           <td>
-            <input
-              class="table-input mono narrow"
-              :value="sm.type"
-              @change="emit('update', index, 'type', normalizedDec($event, 0xff))"
-            />
+            <input class="table-input mono narrow" :value="sm.type" @change="emit('update', index, 'type', normalizedDec($event, 0xff))" />
             <span class="muted small nowrap">{{ smTypeName(sm.type, sm.control) }}</span>
           </td>
           <td class="row-actions">
-            <button type="button" class="btn small ghost" @click="emit('remove', index)">
-              删除
-            </button>
+            <button type="button" class="btn small ghost" @click="emit('remove', index)">删除</button>
           </td>
         </tr>
       </tbody>

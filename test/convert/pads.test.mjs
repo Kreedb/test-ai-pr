@@ -7,10 +7,10 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
-import { convertEda, detectSource } from '../src/lib/eda.js'
+import { convertEda, detectSource } from '../../src/lib/eda.js'
 import { looksLikePadsAscii, padsToCircuitJson, parsePadsAscii } from 'pads-to-circuit-json'
 
-const root = fileURLToPath(new URL('..', import.meta.url))
+const root = fileURLToPath(new URL('../..', import.meta.url))
 const read = (name) => readFileSync(join(root, 'public/samples/pads', name), 'utf8')
 const sample = (name) => new Uint8Array(readFileSync(join(root, 'public/samples/pads', name)))
 
@@ -22,8 +22,7 @@ const kicad = await import('kicadts')
 
 // Three tests read the same converted board; convert it once.
 let project
-const padsProject = () =>
-  (project ??= convertEda([{ name: 'res0805.asc', bytes: sample('res0805.asc') }]))
+const padsProject = () => (project ??= convertEda([{ name: 'res0805.asc', bytes: sample('res0805.asc') }]))
 
 function findBlock(source, start, keyword) {
   const index = source.indexOf(keyword, start)
@@ -105,24 +104,12 @@ test('converts a PADS ASCII board into a KiCad project', async () => {
 test('a board with no routing warns once, not twice', async () => {
   // The PADS converter and eda.finish() both warn about empty routing; the
   // converter tags its own warning `no-routing` so finish() does not repeat it.
-  const source = read('res0805.asc').replace(
-    /\*ROUTE\*[\s\S]*?(?=\*LINES\*)/,
-    '*ROUTE*      ROUTING ITEMS\n\n',
-  )
+  const source = read('res0805.asc').replace(/\*ROUTE\*[\s\S]*?(?=\*LINES\*)/, '*ROUTE*      ROUTING ITEMS\n\n')
   assert.ok(!source.includes('*SIGNAL* VCC\n300'), 'the route section should be gone')
-  const result = await convertEda([
-    { name: 'res0805.asc', bytes: new Uint8Array(Buffer.from(source)) },
-  ])
+  const result = await convertEda([{ name: 'res0805.asc', bytes: new Uint8Array(Buffer.from(source)) }])
   assert.equal(result.summary.board.tracks, 0)
-  const routingWarnings = result.warnings.filter(
-    (warning) =>
-      warning.message.includes('没有 *ROUTE* 走线段') || warning.message.includes('输出里没有走线'),
-  )
-  assert.equal(
-    routingWarnings.length,
-    1,
-    `expected one routing warning, got ${routingWarnings.length}`,
-  )
+  const routingWarnings = result.warnings.filter((warning) => warning.message.includes('没有 *ROUTE* 走线段') || warning.message.includes('输出里没有走线'))
+  assert.equal(routingWarnings.length, 1, `expected one routing warning, got ${routingWarnings.length}`)
 })
 
 test('mirrored parts put their pads on the back and swap the pad order', async () => {
@@ -151,10 +138,7 @@ test('mirrored parts put their pads on the back and swap the pad order', async (
   const firstPad = findBlock(mirrored, 0, '(pad "1"')
   const secondPad = findBlock(mirrored, 0, '(pad "2"')
   assert.ok(firstPad && secondPad)
-  assert.ok(
-    mirrored.startsWith(`(footprint\n    "RES0805"`),
-    'the PADS decal name should become the KiCad footprint link',
-  )
+  assert.ok(mirrored.startsWith(`(footprint\n    "RES0805"`), 'the PADS decal name should become the KiCad footprint link')
   const xOf = (block) => Number(/\(at ([\d.eE+-]+) /.exec(block)?.[1])
   // Decal pad 1 is at local x = -45 mil, pad 2 at +45 mil; mirroring swaps them.
   assert.ok(xOf(firstPad) > 0, `mirrored pad 1 should sit at positive local x, got ${firstPad}`)
@@ -204,25 +188,14 @@ test('upstream fixtures convert without throwing', () => {
 
   // Copper cutouts and thermal vias must not throw even though the pour and
   // relief geometry is simplified.
-  for (const name of [
-    'copper-cutouts.asc',
-    'thermal-vias.asc',
-    'decal-graphics.asc',
-    'decal-text.asc',
-    'text-layers.asc',
-  ]) {
-    assert.doesNotThrow(
-      () => padsToCircuitJson(parsePadsAscii(upstream(name))),
-      `${name} should convert`,
-    )
+  for (const name of ['copper-cutouts.asc', 'thermal-vias.asc', 'decal-graphics.asc', 'decal-text.asc', 'text-layers.asc']) {
+    assert.doesNotThrow(() => padsToCircuitJson(parsePadsAscii(upstream(name))), `${name} should convert`)
   }
 
   // Thermal (RT/ST), antipad (RA/SA) and annular (A) rows are clearance
   // geometry, so the finished via keeps its barrel size (40/44 mil), not the
   // relief outline.
-  const thermal = padsToCircuitJson(parsePadsAscii(upstream('thermal-vias.asc'))).filter(
-    (element) => element.type === 'pcb_via',
-  )
+  const thermal = padsToCircuitJson(parsePadsAscii(upstream('thermal-vias.asc'))).filter((element) => element.type === 'pcb_via')
   assert.deepEqual(
     thermal.map((via) => Number(via.outer_diameter.toFixed(4))),
     [1.016, 1.1176],
@@ -256,9 +229,7 @@ CLOSED 5 0 0
 -50 -50
 *END*
 `
-  const traces = padsToCircuitJson(parsePadsAscii(source)).filter(
-    (element) => element.type === 'pcb_trace',
-  )
+  const traces = padsToCircuitJson(parsePadsAscii(source)).filter((element) => element.type === 'pcb_trace')
   assert.equal(traces.length, 2)
   const ys = traces.map((trace) => trace.route.map((point) => point.y).join(','))
   assert.deepEqual(ys, ['0,0', '2.54,2.54'])

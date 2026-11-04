@@ -51,5 +51,5 @@ bag 不上传，解析与渲染都在本机完成。
 
 ## 示例与测试
 
-- 示例：`public/samples/replay/luna-demo.bag`，由 `test-support/rosbag-fixture.mjs` 生成的合成 Luna 动作，含 27 关节与 IMU。
-- 回归测试：`test/replay.test.mjs`，覆盖 bag 解析、lz4 / 未压缩数据块、重复与倒退时间戳、机型识别、正运动学与示例文件。
+- 示例：`public/samples/replay/luna-demo.bag`，由 `test/replay/rosbag-fixture.mjs` 生成的合成 Luna 动作，含 27 关节与 IMU。
+- 回归测试：`test/replay/replay.test.mjs`，覆盖 bag 解析、lz4 / 未压缩数据块、重复与倒退时间戳、机型识别、正运动学与示例文件。

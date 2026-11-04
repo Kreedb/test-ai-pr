@@ -38,66 +38,35 @@ function normalizedDec(event, max = 0xffff) {
       <div class="form-grid compact-grid">
         <label class="field">
           <span>名称</span>
-          <input
-            :value="element.name"
-            @input="emit('update', index, 'name', $event.target.value)"
-          />
+          <input :value="element.name" @input="emit('update', index, 'name', $event.target.value)" />
         </label>
         <label class="field">
           <span>描述</span>
-          <input
-            :value="element.description"
-            @input="emit('update', index, 'description', $event.target.value)"
-          />
+          <input :value="element.description" @input="emit('update', index, 'description', $event.target.value)" />
         </label>
         <label class="field">
           <span>AssignActivate（十六进制）</span>
-          <input
-            class="mono"
-            :value="hex(element.assignActivate, 4)"
-            spellcheck="false"
-            @change="emit('update', index, 'assignActivate', normalizedHex($event))"
-          />
+          <input class="mono" :value="hex(element.assignActivate, 4)" spellcheck="false" @change="emit('update', index, 'assignActivate', normalizedHex($event))" />
         </label>
         <label class="field">
           <span>Sync0 周期时间（ns）</span>
-          <input
-            class="mono"
-            :value="element.sync0CycleTime"
-            @change="emit('update', index, 'sync0CycleTime', normalizedDec($event, 0xffffffff))"
-          />
+          <input class="mono" :value="element.sync0CycleTime" @change="emit('update', index, 'sync0CycleTime', normalizedDec($event, 0xffffffff))" />
         </label>
         <label class="field">
           <span>Sync0 偏移时间（ns）</span>
-          <input
-            class="mono"
-            :value="element.sync0ShiftTime"
-            @change="emit('update', index, 'sync0ShiftTime', normalizedDec($event, 0xffffffff))"
-          />
+          <input class="mono" :value="element.sync0ShiftTime" @change="emit('update', index, 'sync0ShiftTime', normalizedDec($event, 0xffffffff))" />
         </label>
         <label class="field">
           <span>Sync0 周期因子</span>
-          <input
-            class="mono"
-            :value="element.sync0CycleFactor"
-            @change="emit('update', index, 'sync0CycleFactor', normalizedDec($event))"
-          />
+          <input class="mono" :value="element.sync0CycleFactor" @change="emit('update', index, 'sync0CycleFactor', normalizedDec($event))" />
         </label>
         <label class="field">
           <span>Sync1 周期因子</span>
-          <input
-            class="mono"
-            :value="element.sync1CycleFactor"
-            @change="emit('update', index, 'sync1CycleFactor', normalizedDec($event))"
-          />
+          <input class="mono" :value="element.sync1CycleFactor" @change="emit('update', index, 'sync1CycleFactor', normalizedDec($event))" />
         </label>
         <label class="field">
           <span>Sync1 偏移时间（ns）</span>
-          <input
-            class="mono"
-            :value="element.sync1ShiftTime"
-            @change="emit('update', index, 'sync1ShiftTime', normalizedDec($event, 0xffffffff))"
-          />
+          <input class="mono" :value="element.sync1ShiftTime" @change="emit('update', index, 'sync1ShiftTime', normalizedDec($event, 0xffffffff))" />
         </label>
       </div>
 

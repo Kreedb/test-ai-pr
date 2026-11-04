@@ -4,17 +4,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import PcbPreview from '@/components/PcbPreview.vue'
 import PreviewViewport from '@/components/PreviewViewport.vue'
 import SchematicPreview from '@/components/SchematicPreview.vue'
-import {
-  SCHEMATIC_MM_PER_UNIT,
-  buildPreviewModel,
-  buildSearchIndex,
-  indexComponents,
-  indexNets,
-  padBounds,
-  pcbFlipBounds,
-  searchPreview,
-  unionBounds,
-} from '@/lib/preview'
+import { SCHEMATIC_MM_PER_UNIT, buildPreviewModel, buildSearchIndex, indexComponents, indexNets, padBounds, pcbFlipBounds, searchPreview, unionBounds } from '@/lib/preview'
 
 // Read-only preview of a converted project: board and schematic side by side,
 // with search, layer visibility and net cross-probing. Nothing here writes back
@@ -64,9 +54,7 @@ const activeNet = computed(() => (activeNetName.value ? netByName(activeNetName.
 
 const netNeedle = computed(() => activeNet.value?.name || '')
 
-const selectedPcbItem = computed(
-  () => pcb.value?.items.find((item) => item.id === selectedPcbId.value) || null,
-)
+const selectedPcbItem = computed(() => pcb.value?.items.find((item) => item.id === selectedPcbId.value) || null)
 
 const searchIndex = computed(() => buildSearchIndex(model.value, nets.value))
 const results = computed(() => searchPreview(searchIndex.value, query.value.trim()))
@@ -98,9 +86,7 @@ const visibleLayers = computed(() => {
   return visible
 })
 
-const allLayersVisible = computed(() =>
-  (pcb.value?.layers || []).every((layer) => !hiddenLayers.value.has(layer.id)),
-)
+const allLayersVisible = computed(() => (pcb.value?.layers || []).every((layer) => !hiddenLayers.value.has(layer.id)))
 
 function toggleLayer(id) {
   const next = new Set(hiddenLayers.value)
@@ -110,9 +96,7 @@ function toggleLayer(id) {
 }
 
 function setAllLayers(visible) {
-  hiddenLayers.value = visible
-    ? new Set()
-    : new Set((pcb.value?.layers || []).map((layer) => layer.id))
+  hiddenLayers.value = visible ? new Set() : new Set((pcb.value?.layers || []).map((layer) => layer.id))
 }
 
 // "Only this layer" is what a layer toggle is really used for: flip back to
@@ -123,19 +107,14 @@ function isolateLayer(id) {
     setAllLayers(true)
     return
   }
-  hiddenLayers.value = new Set(
-    (pcb.value?.layers || []).map((layer) => layer.id).filter((layerId) => layerId !== id),
-  )
+  hiddenLayers.value = new Set((pcb.value?.layers || []).map((layer) => layer.id).filter((layerId) => layerId !== id))
 }
 
 // ---- cross-probing --------------------------------------------------------
 
 function focusBounds(bounds) {
   if (!bounds) return
-  const shown =
-    tab.value === 'pcb' && pcbFlipped.value
-      ? pcbFlipBounds(bounds, pcb.value?.boardBounds || pcb.value?.bounds)
-      : bounds
+  const shown = tab.value === 'pcb' && pcbFlipped.value ? pcbFlipBounds(bounds, pcb.value?.boardBounds || pcb.value?.bounds) : bounds
   viewport.value?.focus(shown)
 }
 
@@ -148,9 +127,7 @@ function netBoundsOnPcb(net) {
 function netBoundsOnSchematic(net) {
   if (!net) return null
   const sheetId = activeSheet.value?.id
-  const points = [...net.schematicPins, ...net.labels].filter(
-    (point) => !sheetId || point.sheet === sheetId,
-  )
+  const points = [...net.schematicPins, ...net.labels].filter((point) => !sheetId || point.sheet === sheetId)
   if (!points.length) return null
   return padBounds(unionBounds(points.map((point) => point.bounds)), 1.5)
 }
@@ -160,13 +137,7 @@ function selectNet(name, { jumpTo = '', sheet = '' } = {}) {
   selectedPcbId.value = ''
   selectedComponentId.value = ''
   const net = name ? netByName(name) : null
-  const destination =
-    jumpTo ||
-    (net?.pcbPads.length && tab.value !== 'pcb'
-      ? 'pcb'
-      : net?.schematicPins.length && tab.value !== 'schematic'
-        ? 'schematic'
-        : '')
+  const destination = jumpTo || (net?.pcbPads.length && tab.value !== 'pcb' ? 'pcb' : net?.schematicPins.length && tab.value !== 'schematic' ? 'schematic' : '')
   if (destination && tabs.value.some((entry) => entry.id === destination)) {
     tab.value = destination
     if (destination === 'schematic') {
@@ -188,9 +159,7 @@ function jumpToOtherView() {
   selectNet(activeNet.value.name, { jumpTo: destination })
 }
 
-const canJumpToOtherView = computed(() =>
-  tab.value === 'pcb' ? netHasSchematic(activeNet.value?.name) : netHasPcb(activeNet.value?.name),
-)
+const canJumpToOtherView = computed(() => (tab.value === 'pcb' ? netHasSchematic(activeNet.value?.name) : netHasPcb(activeNet.value?.name)))
 
 /** Whether the named net has anything to frame in the PCB view. */
 function netHasPcb(name) {
@@ -325,19 +294,11 @@ function togglePcbFlip() {
 // Space flips the board like LCEDA's editor. Inputs and buttons keep their own
 // Space behaviour (typing, activation) and are ignored here.
 function onKeydown(event) {
-  if (
-    event.code !== 'Space' ||
-    event.repeat ||
-    event.shiftKey ||
-    event.ctrlKey ||
-    event.metaKey ||
-    event.altKey
-  ) {
+  if (event.code !== 'Space' || event.repeat || event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) {
     return
   }
   if (tab.value !== 'pcb' || !pcb.value) return
-  if (event.target?.closest?.('input, textarea, select, button, a, summary, [contenteditable]'))
-    return
+  if (event.target?.closest?.('input, textarea, select, button, a, summary, [contenteditable]')) return
   // Leave Space to page scrolling unless the PCB canvas itself is on screen; the
   // card also holds the net table below the canvas.
   const rect = card.value?.querySelector('.preview-viewport')?.getBoundingClientRect()
@@ -426,28 +387,13 @@ const selectedLabel = computed(() => {
 
     <div class="preview-toolbar">
       <div class="tabs" role="tablist">
-        <button
-          v-for="entry in tabs"
-          :key="entry.id"
-          type="button"
-          role="tab"
-          class="tab"
-          :class="{ active: tab === entry.id }"
-          :aria-selected="tab === entry.id"
-          @click="setTab(entry.id)"
-        >
+        <button v-for="entry in tabs" :key="entry.id" type="button" role="tab" class="tab" :class="{ active: tab === entry.id }" :aria-selected="tab === entry.id" @click="setTab(entry.id)">
           {{ entry.label }}
         </button>
       </div>
 
       <div class="preview-search">
-        <input
-          v-model="query"
-          type="search"
-          class="table-input"
-          placeholder="搜索网络、位号或引脚，例如 GND、R1、U1.3"
-          aria-label="搜索网络、位号或引脚"
-        />
+        <input v-model="query" type="search" class="table-input" placeholder="搜索网络、位号或引脚，例如 GND、R1、U1.3" aria-label="搜索网络、位号或引脚" />
         <ul v-if="results.length" class="search-results">
           <li v-for="entry in results" :key="entry.id">
             <button type="button" class="search-hit" @click="onSearchSelect(entry)">
@@ -472,26 +418,13 @@ const selectedLabel = computed(() => {
         <div v-for="group in layerGroups" :key="group.id" class="layer-group">
           <span class="layer-group-title">{{ group.label }}</span>
           <label v-for="layer in group.layers" :key="layer.id" class="check layer-row">
-            <input
-              type="checkbox"
-              :checked="!hiddenLayers.has(layer.id)"
-              @change="toggleLayer(layer.id)"
-            />
+            <input type="checkbox" :checked="!hiddenLayers.has(layer.id)" @change="toggleLayer(layer.id)" />
             <span class="layer-swatch" :class="`swatch-${layer.group}`" />
             <span class="layer-name">{{ layer.label }}</span>
-            <button
-              type="button"
-              class="btn small ghost isolate"
-              title="只显示这一层"
-              @click.prevent.stop="isolateLayer(layer.id)"
-            >
-              仅
-            </button>
+            <button type="button" class="btn small ghost isolate" title="只显示这一层" @click.prevent.stop="isolateLayer(layer.id)">仅</button>
           </label>
         </div>
-        <p v-if="!allLayersVisible" class="muted small">
-          已隐藏 {{ hiddenLayers.size }} 层，点击“全开”恢复。
-        </p>
+        <p v-if="!allLayersVisible" class="muted small">已隐藏 {{ hiddenLayers.size }} 层，点击“全开”恢复。</p>
       </aside>
 
       <aside v-else-if="tab === 'schematic' && schematic" class="preview-side">
@@ -499,21 +432,11 @@ const selectedLabel = computed(() => {
           <h3>图纸</h3>
         </div>
         <label v-for="(sheet, index) in schematic.sheets" :key="sheet.id" class="check layer-row">
-          <input
-            v-model="activeSheetIndex"
-            type="radio"
-            name="sheet"
-            :value="index"
-            @change="fitKey += 1"
-          />
+          <input v-model="activeSheetIndex" type="radio" name="sheet" :value="index" @change="fitKey += 1" />
           <span class="layer-name">{{ sheet.name }}</span>
-          <span class="muted small"
-            >{{ sheet.items.filter((item) => item.kind === 'component').length }} 符号</span
-          >
+          <span class="muted small">{{ sheet.items.filter((item) => item.kind === 'component').length }} 符号</span>
         </label>
-        <p class="muted small">
-          原理图按层次化输出，跨图同名网络在 KiCad 中按全局标签连接，这里也会作为同一个网络高亮。
-        </p>
+        <p class="muted small">原理图按层次化输出，跨图同名网络在 KiCad 中按全局标签连接，这里也会作为同一个网络高亮。</p>
       </aside>
 
       <div class="preview-canvas">
@@ -533,13 +456,7 @@ const selectedLabel = computed(() => {
             :flipped="pcbFlipped"
             @select="onPcbSelect"
           />
-          <SchematicPreview
-            v-else-if="tab === 'schematic' && activeSheet"
-            :sheet="activeSheet"
-            :active-net="netNeedle"
-            :selected-component-id="selectedComponentId"
-            @select="onSchematicSelect"
-          />
+          <SchematicPreview v-else-if="tab === 'schematic' && activeSheet" :sheet="activeSheet" :active-net="netNeedle" :selected-component-id="selectedComponentId" @select="onSchematicSelect" />
         </PreviewViewport>
         <div v-else class="empty-state">
           <h2>没有可预览的内容</h2>
@@ -552,55 +469,28 @@ const selectedLabel = computed(() => {
       <div class="card-head">
         <h3>网络</h3>
         <div class="side-actions">
-          <button
-            v-if="activeNet"
-            type="button"
-            class="btn small"
-            :disabled="!canJumpToOtherView"
-            :title="canJumpToOtherView ? '' : '这个网络在另一个视图里没有连接点'"
-            @click="jumpToOtherView"
-          >
+          <button v-if="activeNet" type="button" class="btn small" :disabled="!canJumpToOtherView" :title="canJumpToOtherView ? '' : '这个网络在另一个视图里没有连接点'" @click="jumpToOtherView">
             跳到{{ tab === 'pcb' ? '原理图' : 'PCB' }}
           </button>
-          <button v-if="activeNet" type="button" class="btn small ghost" @click="clearSelection">
-            清除高亮
-          </button>
+          <button v-if="activeNet" type="button" class="btn small ghost" @click="clearSelection">清除高亮</button>
         </div>
       </div>
 
       <p v-if="activeNet" class="net-summary">
         <span class="mono net-name">{{ activeNet.name }}</span>
-        <span class="muted small">
-          PCB {{ activeNetPcbPads.length }} 个焊盘 · 原理图
-          {{ activeNetSchematicPins.length }} 个引脚
-        </span>
+        <span class="muted small"> PCB {{ activeNetPcbPads.length }} 个焊盘 · 原理图 {{ activeNetSchematicPins.length }} 个引脚 </span>
       </p>
-      <p v-else class="muted small">
-        在画布上点击焊盘/引脚，或在下方列表里选择网络，两个视图会同时高亮这个网络。
-      </p>
+      <p v-else class="muted small">在画布上点击焊盘/引脚，或在下方列表里选择网络，两个视图会同时高亮这个网络。</p>
 
-      <ul
-        v-if="activeNet && (activeNetPcbPads.length || activeNetSchematicPins.length)"
-        class="net-endpoints"
-      >
+      <ul v-if="activeNet && (activeNetPcbPads.length || activeNetSchematicPins.length)" class="net-endpoints">
         <li v-for="pad in activeNetPcbPads" :key="`pad-${pad.id}`">
-          <button
-            type="button"
-            class="linkish mono"
-            title="Ctrl/⌘+点击跳到原理图"
-            @click="onEndpointClick(activeNet.name, 'pcb', $event)"
-          >
+          <button type="button" class="linkish mono" title="Ctrl/⌘+点击跳到原理图" @click="onEndpointClick(activeNet.name, 'pcb', $event)">
             {{ pad.refdes || '?' }}{{ pad.pin !== '' ? `.${pad.pin}` : '' }}
           </button>
           <span class="muted small">PCB 焊盘</span>
         </li>
         <li v-for="pin in activeNetSchematicPins" :key="`pin-${pin.id}`">
-          <button
-            type="button"
-            class="linkish mono"
-            title="Ctrl/⌘+点击跳到 PCB"
-            @click="onEndpointClick(activeNet.name, 'schematic', $event)"
-          >
+          <button type="button" class="linkish mono" title="Ctrl/⌘+点击跳到 PCB" @click="onEndpointClick(activeNet.name, 'schematic', $event)">
             {{ pin.refdes || '?' }}{{ pin.pin !== '' ? `.${pin.pin}` : '' }}
           </button>
           <span class="muted small">原理图引脚</span>
@@ -617,18 +507,9 @@ const selectedLabel = computed(() => {
             </tr>
           </thead>
           <tbody>
-            <tr
-              v-for="net in nets.slice(0, 300)"
-              :key="net.id"
-              :class="{ 'row-active': net.name === activeNetName }"
-            >
+            <tr v-for="net in nets.slice(0, 300)" :key="net.id" :class="{ 'row-active': net.name === activeNetName }">
               <td class="mono">
-                <button
-                  type="button"
-                  class="linkish mono"
-                  title="Ctrl/⌘+点击跳到另一视图的同名网络"
-                  @click="onNetNameClick(net.name, $event)"
-                >
+                <button type="button" class="linkish mono" title="Ctrl/⌘+点击跳到另一视图的同名网络" @click="onNetNameClick(net.name, $event)">
                   {{ net.name }}
                 </button>
               </td>
@@ -641,14 +522,11 @@ const selectedLabel = computed(() => {
           </tbody>
         </table>
       </div>
-      <p v-if="nets.length > 300" class="muted small">
-        仅列出前 300 个网络，共 {{ nets.length }} 个；用上方搜索框可以直接定位其余网络。
-      </p>
+      <p v-if="nets.length > 300" class="muted small">仅列出前 300 个网络，共 {{ nets.length }} 个；用上方搜索框可以直接定位其余网络。</p>
     </div>
 
     <p v-if="selectedLabel" class="muted small">
-      已选中 {{ selectedLabel
-      }}<template v-if="selectedPcbItem?.net"> · 网络 {{ selectedPcbItem.net }}</template>
+      已选中 {{ selectedLabel }}<template v-if="selectedPcbItem?.net"> · 网络 {{ selectedPcbItem.net }}</template>
     </p>
   </section>
 </template>

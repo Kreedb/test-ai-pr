@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 
 import { crc8Sii, parseSii } from 'sii-parser'
 
-const root = fileURLToPath(new URL('..', import.meta.url))
+const root = fileURLToPath(new URL('../..', import.meta.url))
 const sample = (name) => new Uint8Array(readFileSync(join(root, 'public/samples', name)))
 
 test('parses the Limx EEPROM image', () => {

@@ -7,10 +7,10 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
-import { convertEda, detectSource } from '../src/lib/eda.js'
+import { convertEda, detectSource } from '../../src/lib/eda.js'
 import { eagleToCircuitJson, looksLikeEagleXml, parseEagleXml } from 'eagle-to-circuit-json'
 
-const root = fileURLToPath(new URL('..', import.meta.url))
+const root = fileURLToPath(new URL('../..', import.meta.url))
 const sample = (name) => new Uint8Array(readFileSync(join(root, 'public/samples/eagle', name)))
 
 const kicad = await import('kicadts')
@@ -111,10 +111,7 @@ test('schematic pin positions match the EAGLE wire endpoints', () => {
       for (const segment of toArray(net.segment)) {
         for (const wire of toArray(segment.wire)) {
           // Schematic Circuit JSON is in 1/15 mm, EAGLE writes millimetres.
-          wireEnds.push(
-            { x: Number(wire.x1) / 15, y: Number(wire.y1) / 15 },
-            { x: Number(wire.x2) / 15, y: Number(wire.y2) / 15 },
-          )
+          wireEnds.push({ x: Number(wire.x1) / 15, y: Number(wire.y1) / 15 }, { x: Number(wire.x2) / 15, y: Number(wire.y2) / 15 })
         }
       }
     }
@@ -124,9 +121,7 @@ test('schematic pin positions match the EAGLE wire endpoints', () => {
   for (const port of ports) {
     // Compare against the raw source coordinates rather than the snapped trace
     // edges, so a wrong pin transform cannot hide behind snapToPort().
-    const attached = wireEnds.some(
-      (point) => Math.hypot(point.x - port.center.x, point.y - port.center.y) < 0.02,
-    )
+    const attached = wireEnds.some((point) => Math.hypot(point.x - port.center.x, point.y - port.center.y) < 0.02)
     assert.ok(attached, `pin ${port.pin_number} does not line up with an EAGLE wire endpoint`)
   }
 })
@@ -208,9 +203,7 @@ test('mirrored elements keep their layer, pad positions and nets', async () => {
   // Rebuild the absolute offset the way KiCad renders footprint-local pads.
   const tht = findBlock(mirrored, mirrored.indexOf('(pad "2"'), '(pad "2"')
   assert.ok(tht?.includes('"GND"'), 'through-hole pad should keep the GND net')
-  const footprintAt = /^\(footprint[\s\S]*?\(at ([\d.eE+-]+) ([\d.eE+-]+) ([\d.eE+-]+)\)/.exec(
-    mirrored,
-  )
+  const footprintAt = /^\(footprint[\s\S]*?\(at ([\d.eE+-]+) ([\d.eE+-]+) ([\d.eE+-]+)\)/.exec(mirrored)
   const padAt = /\(at ([\d.eE+-]+) ([\d.eE+-]+) ([\d.eE+-]+)\)/.exec(tht)
   assert.ok(footprintAt && padAt, 'footprint and pad should have a position')
   const angle = (Number(footprintAt[3]) * Math.PI) / 180
@@ -222,9 +215,5 @@ test('mirrored elements keep their layer, pad positions and nets', async () => {
   assert.ok(Math.abs(offsetY - 2) < 0.01, 'pad 2 should sit 2 mm above the mirrored part')
   // KiCad stores pad angles as absolute board angles, so the mirrored part's
   // footprint rotation is part of the pad angle.
-  assert.equal(
-    ((Number(padAt[3]) % 360) + 360) % 360,
-    90,
-    'pad angle should include the component rotation',
-  )
+  assert.equal(((Number(padAt[3]) % 360) + 360) % 360, 90, 'pad angle should include the component rotation')
 })

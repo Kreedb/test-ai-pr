@@ -32,9 +32,7 @@ const layerColors = computed(() => {
 
 const colorOf = (layer) => layerColors.value.get(layer) || '#e05a5a'
 
-const flipTransform = computed(() =>
-  pcbFlipTransform(props.model.boardBounds || props.model.bounds, props.flipped),
-)
+const flipTransform = computed(() => pcbFlipTransform(props.model.boardBounds || props.model.bounds, props.flipped))
 
 // Keep label text readable after the board itself is mirrored.
 const textTransform = (x, y) => `translate(${x} ${y}) scale(${props.flipped ? -1 : 1} -1)`
@@ -48,8 +46,7 @@ function classesOf(item) {
   return {
     'preview-dim': Boolean(props.activeNet) && item.net !== props.activeNet,
     'preview-hit': Boolean(props.activeNet) && item.net === props.activeNet,
-    'preview-selected':
-      Boolean(props.selectedComponentId) && item.componentId === props.selectedComponentId,
+    'preview-selected': Boolean(props.selectedComponentId) && item.componentId === props.selectedComponentId,
   }
 }
 
@@ -145,9 +142,7 @@ const refdesLabels = computed(() =>
 
 const selectionBounds = computed(() => {
   if (!props.selectedComponentId) return null
-  const item = props.model.components.find(
-    (candidate) => candidate.componentId === props.selectedComponentId,
-  )
+  const item = props.model.components.find((candidate) => candidate.componentId === props.selectedComponentId)
   return item?.bounds || null
 })
 
@@ -163,24 +158,12 @@ const pinSummary = (item) => {
 
 <template>
   <g class="pcb" :transform="flipTransform">
-    <g
-      v-for="item in rendered"
-      :key="item.id"
-      :class="classesOf(item)"
-      @click.stop="emit('select', item, $event)"
-    >
+    <g v-for="item in rendered" :key="item.id" :class="classesOf(item)" @click.stop="emit('select', item, $event)">
       <title>
         {{ item.kind === 'pad' ? pinSummary(item) : item.net ? `网络 ${item.net}` : item.kind }}
       </title>
 
-      <path
-        v-if="item.kind === 'board'"
-        :d="polygonPath(item.element.outline)"
-        fill="#0f2a1c"
-        stroke="#f5d76e"
-        stroke-width="0.15"
-        vector-effect="non-scaling-stroke"
-      />
+      <path v-if="item.kind === 'board'" :d="polygonPath(item.element.outline)" fill="#0f2a1c" stroke="#f5d76e" stroke-width="0.15" vector-effect="non-scaling-stroke" />
       <path
         v-else-if="item.kind === 'cutout'"
         :d="polygonPath(item.element.outline || item.element.route || item.element.points)"
@@ -189,14 +172,7 @@ const pinSummary = (item) => {
         stroke-width="0.12"
         vector-effect="non-scaling-stroke"
       />
-      <path
-        v-else-if="item.kind === 'pour'"
-        :d="pourPath(item.element)"
-        :fill="colorOf(item.layers[0])"
-        fill-rule="evenodd"
-        fill-opacity="0.35"
-        stroke="none"
-      />
+      <path v-else-if="item.kind === 'pour'" :d="pourPath(item.element)" :fill="colorOf(item.layers[0])" fill-rule="evenodd" fill-opacity="0.35" stroke="none" />
 
       <template v-else-if="item.kind === 'trace'">
         <polyline
@@ -234,53 +210,20 @@ const pinSummary = (item) => {
             stroke-width="0.06"
           />
         </g>
-        <circle
-          v-if="item.element.hole_diameter"
-          :cx="item.element.x"
-          :cy="item.element.y"
-          :r="item.element.hole_diameter / 2"
-          fill="#0b0d12"
-        />
+        <circle v-if="item.element.hole_diameter" :cx="item.element.x" :cy="item.element.y" :r="item.element.hole_diameter / 2" fill="#0b0d12" />
       </template>
 
       <template v-else-if="item.kind === 'via'">
-        <circle
-          :cx="item.element.x"
-          :cy="item.element.y"
-          :r="(item.element.outer_diameter || 0.6) / 2"
-          fill="#c9b458"
-          stroke="#0b0d12"
-          stroke-width="0.06"
-        />
-        <circle
-          :cx="item.element.x"
-          :cy="item.element.y"
-          :r="(item.element.hole_diameter || 0.3) / 2"
-          fill="#0b0d12"
-        />
+        <circle :cx="item.element.x" :cy="item.element.y" :r="(item.element.outer_diameter || 0.6) / 2" fill="#c9b458" stroke="#0b0d12" stroke-width="0.06" />
+        <circle :cx="item.element.x" :cy="item.element.y" :r="(item.element.hole_diameter || 0.3) / 2" fill="#0b0d12" />
       </template>
 
       <template v-else-if="item.kind === 'hole'">
-        <circle
-          :cx="item.element.x"
-          :cy="item.element.y"
-          :r="(item.element.hole_diameter || item.element.hole_width || 0.5) / 2"
-          fill="#0b0d12"
-          stroke="#4b5563"
-          stroke-width="0.06"
-        />
+        <circle :cx="item.element.x" :cy="item.element.y" :r="(item.element.hole_diameter || item.element.hole_width || 0.5) / 2" fill="#0b0d12" stroke="#4b5563" stroke-width="0.06" />
       </template>
 
       <template v-else-if="item.kind === 'courtyard'">
-        <path
-          v-if="item.element.outline"
-          :d="polygonPath(item.element.outline)"
-          fill="none"
-          stroke="#7d8aa3"
-          stroke-width="0.08"
-          stroke-dasharray="0.5 0.4"
-          vector-effect="non-scaling-stroke"
-        />
+        <path v-if="item.element.outline" :d="polygonPath(item.element.outline)" fill="none" stroke="#7d8aa3" stroke-width="0.08" stroke-dasharray="0.5 0.4" vector-effect="non-scaling-stroke" />
       </template>
 
       <template v-else-if="item.kind === 'fab'">
@@ -292,23 +235,8 @@ const pinSummary = (item) => {
           :stroke-width="Math.max(item.element.stroke_width || 0.1, 0.05)"
           stroke-linecap="round"
         />
-        <g
-          v-else-if="item.element.text"
-          :transform="
-            textTransform(
-              item.element.anchor_position?.x ?? 0,
-              item.element.anchor_position?.y ?? 0,
-            )
-          "
-        >
-          <text
-            x="0"
-            y="0"
-            :font-size="Math.max(item.element.font_size || 1, 0.4)"
-            :text-anchor="flipped ? 'end' : 'start'"
-            fill="#6b7688"
-            opacity="0.7"
-          >
+        <g v-else-if="item.element.text" :transform="textTransform(item.element.anchor_position?.x ?? 0, item.element.anchor_position?.y ?? 0)">
+          <text x="0" y="0" :font-size="Math.max(item.element.font_size || 1, 0.4)" :text-anchor="flipped ? 'end' : 'start'" fill="#6b7688" opacity="0.7">
             {{ item.element.text }}
           </text>
         </g>
@@ -342,32 +270,12 @@ const pinSummary = (item) => {
           stroke="#e8e8d8"
           :stroke-width="Math.max(item.element.stroke_width || 0.12, 0.05)"
         />
-        <path
-          v-else-if="item.element.brep_shape || item.element.points"
-          :d="pourPath(item.element)"
-          fill="none"
-          stroke="#e8e8d8"
-          :stroke-width="Math.max(item.element.stroke_width || 0.12, 0.05)"
-        />
+        <path v-else-if="item.element.brep_shape || item.element.points" :d="pourPath(item.element)" fill="none" stroke="#e8e8d8" :stroke-width="Math.max(item.element.stroke_width || 0.12, 0.05)" />
       </template>
 
       <template v-else-if="item.kind === 'text'">
-        <g
-          :transform="
-            textTransform(
-              item.element.anchor_position?.x ?? 0,
-              item.element.anchor_position?.y ?? 0,
-            )
-          "
-        >
-          <text
-            x="0"
-            y="0"
-            :font-size="Math.max(item.element.font_size || 1, 0.4)"
-            :text-anchor="flipped ? 'end' : 'start'"
-            fill="#e8e8d8"
-            :opacity="item.layers[0] === 'silk-bottom' ? 0.55 : 0.95"
-          >
+        <g :transform="textTransform(item.element.anchor_position?.x ?? 0, item.element.anchor_position?.y ?? 0)">
+          <text x="0" y="0" :font-size="Math.max(item.element.font_size || 1, 0.4)" :text-anchor="flipped ? 'end' : 'start'" fill="#e8e8d8" :opacity="item.layers[0] === 'silk-bottom' ? 0.55 : 0.95">
             {{ item.element.text }}
           </text>
         </g>

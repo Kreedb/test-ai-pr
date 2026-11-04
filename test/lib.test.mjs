@@ -42,10 +42,7 @@ test('lib packages do not import the app', () => {
       assert.ok(!/from\s+['"]@\//.test(source), `${file} imports the app alias`)
       for (const match of source.matchAll(/from\s+['"](\.[^'"]+)['"]/g)) {
         const target = resolve(dirname(file), match[1])
-        assert.ok(
-          target.startsWith(packageDir + sep),
-          `${file} imports outside its package: ${match[1]}`,
-        )
+        assert.ok(target.startsWith(packageDir + sep), `${file} imports outside its package: ${match[1]}`)
       }
     }
   }

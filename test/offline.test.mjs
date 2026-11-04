@@ -11,17 +11,9 @@ import test from 'node:test'
 import { offlinePlugin, serviceWorkerSource } from '../build/offline.js'
 
 test('the service worker precaches every build asset under the base', () => {
-  const source = serviceWorkerSource(
-    ['index.html', 'assets/index-abc.js', 'assets/index-abc.css'],
-    '/test-ai-pr/',
-  )
+  const source = serviceWorkerSource(['index.html', 'assets/index-abc.js', 'assets/index-abc.css'], '/test-ai-pr/')
 
-  for (const url of [
-    '"/test-ai-pr/"',
-    '"/test-ai-pr/index.html"',
-    '"/test-ai-pr/assets/index-abc.js"',
-    '"/test-ai-pr/assets/index-abc.css"',
-  ]) {
+  for (const url of ['"/test-ai-pr/"', '"/test-ai-pr/index.html"', '"/test-ai-pr/assets/index-abc.js"', '"/test-ai-pr/assets/index-abc.css"']) {
     assert.ok(source.includes(url), url)
   }
 })
@@ -78,8 +70,5 @@ test('a missing public file fails the build instead of silently disabling offlin
   plugin.configResolved({ publicDir: 'public' })
   const bundle = { 'index.html': { type: 'asset', source: '<html></html>' } }
 
-  assert.throws(
-    () => plugin.generateBundle.handler.call({ emitFile() {} }, {}, bundle),
-    /missing\.bin/,
-  )
+  assert.throws(() => plugin.generateBundle.handler.call({ emitFile() {} }, {}, bundle), /missing\.bin/)
 })

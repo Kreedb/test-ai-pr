@@ -10,15 +10,10 @@ import { fileURLToPath } from 'node:url'
 
 import { zipSync } from 'fflate'
 
-import {
-  MAX_ARCHIVE_ENTRIES,
-  expandArchive,
-  isZipArchive,
-  looksLikeZip,
-} from '../src/lib/archive.js'
-import { convertEda, hasOversharedTrace, normalizeAltiumAscii } from '../src/lib/eda.js'
+import { MAX_ARCHIVE_ENTRIES, expandArchive, isZipArchive, looksLikeZip } from '../../src/lib/archive.js'
+import { convertEda, hasOversharedTrace, normalizeAltiumAscii } from '../../src/lib/eda.js'
 
-const root = fileURLToPath(new URL('..', import.meta.url))
+const root = fileURLToPath(new URL('../..', import.meta.url))
 const sample = (path) => new Uint8Array(readFileSync(join(root, path)))
 const encode = (text) => new TextEncoder().encode(text)
 const decode = (bytes) => new TextDecoder().decode(bytes)
@@ -35,14 +30,10 @@ function archive(entries, options) {
 let sampleArchive
 const sampleArchiveProject = () =>
   (sampleArchive ??= (async () => {
-    const { files } = await expandArchive(
-      'stm32-f411-4layer.zip',
-      sample('public/samples/altium/stm32-f411-4layer.zip'),
-      {
-        maxFileBytes: 40 * 1024 * 1024,
-        maxTotalBytes: 120 * 1024 * 1024,
-      },
-    )
+    const { files } = await expandArchive('stm32-f411-4layer.zip', sample('public/samples/altium/stm32-f411-4layer.zip'), {
+      maxFileBytes: 40 * 1024 * 1024,
+      maxTotalBytes: 120 * 1024 * 1024,
+    })
     return { files, outcome: await convertEda(files) }
   })())
 
@@ -120,20 +111,12 @@ test('a member that lies about its size is stopped instead of inflating unbounde
   // Patch both the local header and central directory uncompressed-size fields
   // (2000 -> 10) so the pre-check believes the member is tiny.
   for (let index = 0; index + 4 <= bytes.length; index += 1) {
-    if (
-      bytes[index] === 0xd0 &&
-      bytes[index + 1] === 0x07 &&
-      bytes[index + 2] === 0 &&
-      bytes[index + 3] === 0
-    ) {
+    if (bytes[index] === 0xd0 && bytes[index + 1] === 0x07 && bytes[index + 2] === 0 && bytes[index + 3] === 0) {
       bytes[index] = 10
       bytes[index + 1] = 0
     }
   }
-  await assert.rejects(
-    () => expandArchive('lie.zip', bytes, { maxFileBytes: 100000, maxTotalBytes: 100 }),
-    /超过合计上限/,
-  )
+  await assert.rejects(() => expandArchive('lie.zip', bytes, { maxFileBytes: 100000, maxTotalBytes: 100 }), /超过合计上限/)
 })
 
 test('the entry cap bounds how many documents one archive can add', async () => {
@@ -162,14 +145,8 @@ test('members spelled with backslashes are still extracted', async () => {
 })
 
 test('an archive with nothing usable fails with the reason', async () => {
-  await assert.rejects(
-    () => expandArchive('empty.zip', archive({ 'inner.zip': archive({ 'a.asc': padsAsc }) })),
-    /没有可用的文件.*嵌套压缩包/,
-  )
-  await assert.rejects(
-    () => expandArchive('blank.zip', new Uint8Array([0x50, 0x4b, 0x03, 0x04])),
-    /不是有效的 zip 压缩包/,
-  )
+  await assert.rejects(() => expandArchive('empty.zip', archive({ 'inner.zip': archive({ 'a.asc': padsAsc }) })), /没有可用的文件.*嵌套压缩包/)
+  await assert.rejects(() => expandArchive('blank.zip', new Uint8Array([0x50, 0x4b, 0x03, 0x04])), /不是有效的 zip 压缩包/)
 })
 
 test('a sample archive converts end to end through the archive path', async () => {
@@ -205,10 +182,7 @@ test('wrapped ASCII Board records are re-joined, real records are not', () => {
   const joined = decode(normalizeAltiumAscii(encode(ASCII_PCB)))
   // The join leaves exactly one separator between the last field of one
   // fragment and the first field of the next.
-  assert.equal(
-    joined.split('\r\n')[0],
-    '|RECORD=Board|UNIQUEID=1|LAYER1NAME=Top Layer|LAYER1NEXT=2|LAYER2NAME=Mid-Layer 1|LAYER2NEXT=32|LAYER32NAME=Bottom Layer|LAYER32NEXT=0|',
-  )
+  assert.equal(joined.split('\r\n')[0], '|RECORD=Board|UNIQUEID=1|LAYER1NAME=Top Layer|LAYER1NEXT=2|LAYER2NAME=Mid-Layer 1|LAYER2NEXT=32|LAYER32NAME=Bottom Layer|LAYER32NEXT=0|')
   const lines = joined.split('\r\n')
   assert.equal(lines.length, 3)
   assert.equal(lines[1], '|RECORD=Net|ID=0|NAME=GND|')
@@ -217,8 +191,7 @@ test('wrapped ASCII Board records are re-joined, real records are not', () => {
 })
 
 test('an already-normalised ASCII document is returned unchanged', () => {
-  const flat =
-    '|RECORD=Board|UNIQUEID=1|LAYER1NAME=Top Layer|LAYER1NEXT=32|\r\n|RECORD=Net|ID=0|\r\n'
+  const flat = '|RECORD=Board|UNIQUEID=1|LAYER1NAME=Top Layer|LAYER1NEXT=32|\r\n|RECORD=Net|ID=0|\r\n'
   const bytes = encode(flat)
   assert.equal(decode(normalizeAltiumAscii(bytes)), flat)
   // Text that is not an Altium board at all is not rewritten either.
@@ -245,14 +218,8 @@ test('the overshared project trace is recognised, a healthy project is not', asy
   ]
   assert.equal(hasOversharedTrace(overshared), true)
   // A trace with one net and many ports is normal fan-out, not the bug.
-  assert.equal(
-    hasOversharedTrace([{ ...overshared[2], connected_source_net_ids: ['net-a'] }]),
-    false,
-  )
+  assert.equal(hasOversharedTrace([{ ...overshared[2], connected_source_net_ids: ['net-a'] }]), false)
   // Several nets through a single port is still a malformed merge: a real trace
   // never spans more than one net.
-  assert.equal(
-    hasOversharedTrace([{ ...overshared[2], connected_source_port_ids: ['port-1'] }]),
-    true,
-  )
+  assert.equal(hasOversharedTrace([{ ...overshared[2], connected_source_port_ids: ['port-1'] }]), true)
 })

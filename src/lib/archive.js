@@ -46,9 +46,7 @@ function baseName(path) {
 
 function isJunk(path) {
   const lower = path.toLowerCase()
-  return (
-    JUNK_PREFIXES.some((prefix) => lower.startsWith(prefix)) || JUNK_BASENAMES.has(baseName(lower))
-  )
+  return JUNK_PREFIXES.some((prefix) => lower.startsWith(prefix)) || JUNK_BASENAMES.has(baseName(lower))
 }
 
 // Two documents can share a file name in different folders. The page keys
@@ -104,20 +102,14 @@ function readEntries(unzipSync, bytes) {
  * of growing the tab unchecked. Resolves to `{ files, skipped }`, where each
  * skipped entry carries one of `SKIP_REASON_LABELS`' keys.
  */
-export async function expandArchive(
-  name,
-  bytes,
-  { maxFileBytes = Infinity, maxTotalBytes = Infinity, maxEntries = MAX_ARCHIVE_ENTRIES } = {},
-) {
+export async function expandArchive(name, bytes, { maxFileBytes = Infinity, maxTotalBytes = Infinity, maxEntries = MAX_ARCHIVE_ENTRIES } = {}) {
   const { unzipSync, Unzip, UnzipInflate } = await import('fflate')
 
   let entries
   try {
     entries = readEntries(unzipSync, bytes)
   } catch (cause) {
-    throw new Error(
-      `${name} 不是有效的 zip 压缩包，请重新打包后再上传。(${cause.message || cause})`,
-    )
+    throw new Error(`${name} 不是有效的 zip 压缩包，请重新打包后再上传。(${cause.message || cause})`)
   }
 
   const skipped = []
@@ -156,9 +148,7 @@ export async function expandArchive(
   }
 
   if (!selected.length) {
-    const detail = skipped.length
-      ? `压缩包里的 ${skipped.length} 个文件都被跳过了（${skipped.map((item) => SKIP_REASON_LABELS[item.reason]).join('、')}）。`
-      : '压缩包里没有文件。'
+    const detail = skipped.length ? `压缩包里的 ${skipped.length} 个文件都被跳过了（${skipped.map((item) => SKIP_REASON_LABELS[item.reason]).join('、')}）。` : '压缩包里没有文件。'
     throw new Error(`${name} 里没有可用的文件：${detail}`)
   }
 
@@ -218,11 +208,7 @@ export async function expandArchive(
       return
     }
     if (blown) {
-      reject(
-        new Error(
-          `${name} 解压后超过合计上限，可能是压缩包声明的文件大小与实际不符，请重新打包后再上传。`,
-        ),
-      )
+      reject(new Error(`${name} 解压后超过合计上限，可能是压缩包声明的文件大小与实际不符，请重新打包后再上传。`))
       return
     }
     resolve(results)

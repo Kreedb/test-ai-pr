@@ -5,8 +5,7 @@ export const route = {
   tool: {
     tag: 'Altium / Specctra / EAGLE / PADS → KiCad',
     title: 'EDA 转 KiCad',
-    description:
-      '把 Altium .PcbDoc/.SchDoc、Specctra .dsn/.ses、EAGLE XML .brd/.sch 或 PADS Layout ASCII .asc 转成 .kicad_pcb、.kicad_sch 与 .kicad_pro，页面会逐项说明哪些信息可能无法无损转换。',
+    description: '把 Altium .PcbDoc/.SchDoc、Specctra .dsn/.ses、EAGLE XML .brd/.sch 或 PADS Layout ASCII .asc 转成 .kicad_pcb、.kicad_sch 与 .kicad_pro，页面会逐项说明哪些信息可能无法无损转换。',
     action: '打开转换器',
   },
 }
@@ -42,9 +41,7 @@ const entryNames = (list) => list.map((entry) => entry.name).join('、')
 
 // Project side files (`.PrjPcb`, `.PcbLib`, `.OutJob`) carry nothing the
 // converters can read. Keep them visible but never count them as a source.
-const ignoredEntries = computed(() =>
-  entries.value.filter((entry) => formatOf(entry).id === 'unknown'),
-)
+const ignoredEntries = computed(() => entries.value.filter((entry) => formatOf(entry).id === 'unknown'))
 
 const unsupportedEntries = computed(() =>
   entries.value.filter((entry) => {
@@ -53,20 +50,11 @@ const unsupportedEntries = computed(() =>
   }),
 )
 
-const sourceFormats = computed(
-  () =>
-    new Set(
-      entries.value
-        .map((entry) => formatOf(entry).id)
-        .filter((id) => CONVERTIBLE_FORMATS.includes(id)),
-    ),
-)
+const sourceFormats = computed(() => new Set(entries.value.map((entry) => formatOf(entry).id).filter((id) => CONVERTIBLE_FORMATS.includes(id))))
 
 const mixedFormats = computed(() => sourceFormats.value.size > 1)
 
-const canConvert = computed(
-  () => sourceFormats.value.size > 0 && !mixedFormats.value && !unsupportedEntries.value.length,
-)
+const canConvert = computed(() => sourceFormats.value.size > 0 && !mixedFormats.value && !unsupportedEntries.value.length)
 
 const stats = computed(() => {
   const outcome = result.value
@@ -85,18 +73,13 @@ const stats = computed(() => {
   }
   const schematic = outcome.summary.schematic
   if (schematic) {
-    list.push(
-      { label: '原理图页', value: schematic.sheets, note: '层次化输出' },
-      { label: '符号', value: schematic.components, note: 'Schematic symbol' },
-    )
+    list.push({ label: '原理图页', value: schematic.sheets, note: '层次化输出' }, { label: '符号', value: schematic.components, note: 'Schematic symbol' })
   }
   list.push({ label: '耗时', value: `${outcome.elapsedMs} ms`, note: '全部在本地完成' })
   return list
 })
 
-const outputTotal = computed(() =>
-  result.value ? result.value.files.reduce((sum, file) => sum + file.size, 0) : 0,
-)
+const outputTotal = computed(() => (result.value ? result.value.files.reduce((sum, file) => sum + file.size, 0) : 0))
 
 // Which archive a document came from, keyed by the (possibly de-duplicated)
 // name the entry list uses.
@@ -154,18 +137,14 @@ async function collectEntries(documents, { useAfter, taken }) {
     if (landed.length) opened.push({ name, files: landed })
     if (skipped.length) {
       const shown = skipped.slice(0, 4)
-      const summary = shown
-        .map((item) => `${item.name}（${SKIP_REASON_LABELS[item.reason]}）`)
-        .join('、')
+      const summary = shown.map((item) => `${item.name}（${SKIP_REASON_LABELS[item.reason]}）`).join('、')
       const rest = skipped.length > shown.length ? ` 等 ${skipped.length} 个文件` : ''
       notes.push(`${name}：${summary}${rest} 已跳过。`)
     }
   }
   if (duplicates.size) notes.push(`${[...duplicates].join('、')} 与已有文件重名，已跳过。`)
   if (used > MAX_TOTAL_BYTES) {
-    throw new Error(
-      `解压后合计 ${formatBytes(used)}，超过 ${formatBytes(MAX_TOTAL_BYTES)} 上限，请分批转换。`,
-    )
+    throw new Error(`解压后合计 ${formatBytes(used)}，超过 ${formatBytes(MAX_TOTAL_BYTES)} 上限，请分批转换。`)
   }
 
   return { added, opened, notes }
@@ -263,9 +242,7 @@ async function runConversion() {
   errorDetail.value = ''
   result.value = null
   try {
-    const inputs = entries.value
-      .filter((entry) => CONVERTIBLE_FORMATS.includes(formatOf(entry).id))
-      .map(({ name, bytes }) => ({ name, bytes }))
+    const inputs = entries.value.filter((entry) => CONVERTIBLE_FORMATS.includes(formatOf(entry).id)).map(({ name, bytes }) => ({ name, bytes }))
     result.value = await convertEda(inputs)
   } catch (cause) {
     error.value = cause.message || '转换失败'
@@ -307,20 +284,13 @@ function clearAll() {
         <span v-if="entries.length" class="badge">{{ entries.length }} 个文件</span>
       </div>
 
-      <ConvertDropZone
-        v-model:dragging="dragging"
-        :max-input-bytes="MAX_INPUT_BYTES"
-        :max-total-bytes="MAX_TOTAL_BYTES"
-        @files="addFiles"
-      />
+      <ConvertDropZone v-model:dragging="dragging" :max-input-bytes="MAX_INPUT_BYTES" :max-total-bytes="MAX_TOTAL_BYTES" @files="addFiles" />
 
       <ul v-if="entries.length" class="file-list">
         <li v-for="(entry, index) in entries" :key="entry.name" class="file-row">
           <div class="file-main">
             <span class="file-name mono">{{ entry.name }}</span>
-            <span v-if="archiveByEntry.get(entry.name)" class="muted small">
-              来自 {{ archiveByEntry.get(entry.name) }}
-            </span>
+            <span v-if="archiveByEntry.get(entry.name)" class="muted small"> 来自 {{ archiveByEntry.get(entry.name) }} </span>
           </div>
           <span class="chip">{{ formatLabel(formatOf(entry).id) }}</span>
           <span class="muted small nowrap">{{ formatBytes(entry.bytes.length) }}</span>
@@ -342,44 +312,16 @@ function clearAll() {
         </ul>
       </details>
 
-      <p v-if="mixedFormats" class="warn-inline">
-        当前混选了不同来源的文件，请只保留同一类（Altium、Specctra、EAGLE 或 PADS）。
-      </p>
-      <p v-else-if="unsupportedEntries.length" class="warn-inline">
-        {{ entryNames(unsupportedEntries) }} 的格式尚未接入，见下方支持列表。
-      </p>
-      <p v-else-if="ignoredEntries.length" class="muted small">
-        {{ entryNames(ignoredEntries) }} 不是可转换的输入（工程侧文件如 .PrjPcb，或缺少
-        PADS-POWERPCB 版本头的 .asc），已忽略。
-      </p>
+      <p v-if="mixedFormats" class="warn-inline">当前混选了不同来源的文件，请只保留同一类（Altium、Specctra、EAGLE 或 PADS）。</p>
+      <p v-else-if="unsupportedEntries.length" class="warn-inline">{{ entryNames(unsupportedEntries) }} 的格式尚未接入，见下方支持列表。</p>
+      <p v-else-if="ignoredEntries.length" class="muted small">{{ entryNames(ignoredEntries) }} 不是可转换的输入（工程侧文件如 .PrjPcb，或缺少 PADS-POWERPCB 版本头的 .asc），已忽略。</p>
 
       <div class="actions">
-        <button
-          type="button"
-          class="btn primary"
-          :disabled="busy || !canConvert"
-          @click="runConversion"
-        >
+        <button type="button" class="btn primary" :disabled="busy || !canConvert" @click="runConversion">
           {{ busy ? '转换中…' : '转换为 KiCad' }}
         </button>
-        <button
-          v-for="sample in SAMPLES"
-          :key="sample.label"
-          type="button"
-          class="btn"
-          :disabled="busy || entries.length > 0"
-          @click="loadSample(sample)"
-        >
-          示例：{{ sample.label }}
-        </button>
-        <button
-          type="button"
-          class="btn ghost"
-          :disabled="busy || !entries.length"
-          @click="clearAll"
-        >
-          清空
-        </button>
+        <button v-for="sample in SAMPLES" :key="sample.label" type="button" class="btn" :disabled="busy || entries.length > 0" @click="loadSample(sample)">示例：{{ sample.label }}</button>
+        <button type="button" class="btn ghost" :disabled="busy || !entries.length" @click="clearAll">清空</button>
         <span v-if="sampleLabel" class="muted small">示例：{{ sampleLabel }}</span>
       </div>
     </section>
@@ -402,11 +344,7 @@ function clearAll() {
       <section v-if="result.warnings.length" class="card warnings-card">
         <h2>提示（{{ result.warnings.length }}）</h2>
         <ul class="warning-list">
-          <li
-            v-for="(warning, index) in result.warnings"
-            :key="index"
-            :class="`warn-${warning.level}`"
-          >
+          <li v-for="(warning, index) in result.warnings" :key="index" :class="`warn-${warning.level}`">
             {{ warning.message }}
           </li>
         </ul>
@@ -417,9 +355,7 @@ function clearAll() {
       <section class="card">
         <div class="card-head">
           <h2>输出文件</h2>
-          <span class="muted small"
-            >{{ result.files.length }} 个 · {{ formatBytes(outputTotal) }}</span
-          >
+          <span class="muted small">{{ result.files.length }} 个 · {{ formatBytes(outputTotal) }}</span>
         </div>
         <ul class="file-list">
           <li v-for="file in result.files" :key="file.name" class="file-row">
@@ -429,17 +365,8 @@ function clearAll() {
           </li>
         </ul>
         <div class="actions">
-          <button
-            v-if="result.files.length > 1"
-            type="button"
-            class="btn primary"
-            @click="downloadArchive"
-          >
-            打包下载 {{ projectName }}.zip
-          </button>
-          <span class="muted small">
-            层次化原理图（根图 + 子图）必须放在同一目录下，KiCad 才能解析图纸引用。
-          </span>
+          <button v-if="result.files.length > 1" type="button" class="btn primary" @click="downloadArchive">打包下载 {{ projectName }}.zip</button>
+          <span class="muted small"> 层次化原理图（根图 + 子图）必须放在同一目录下，KiCad 才能解析图纸引用。 </span>
         </div>
       </section>
     </template>
@@ -450,8 +377,7 @@ function clearAll() {
         <span class="badge">有损转换</span>
       </div>
       <p class="muted small">
-        所有来源先解析为统一的 Circuit JSON，再写出 KiCad（.kicad_pcb / .kicad_sch / .kicad_pro）。
-        下表按“来源 × 信息类别”列出会被简化或丢失的内容；导入 KiCad 后请逐项核对，并重新设置敷铜、3D
+        所有来源先解析为统一的 Circuit JSON，再写出 KiCad（.kicad_pcb / .kicad_sch / .kicad_pro）。 下表按“来源 × 信息类别”列出会被简化或丢失的内容；导入 KiCad 后请逐项核对，并重新设置敷铜、3D
         模型与设计规则。
       </p>
       <LossTable />
@@ -461,11 +387,8 @@ function clearAll() {
       <h2>支持的格式</h2>
       <SupportMatrix />
       <p class="export-note">
-        转换器来自 tscircuit
-        的开源项目：altium-to-circuit-json、dsn-to-circuit-json、circuit-json-to-kicad（均为 MIT）。
-        EAGLE XML 与 PADS Layout ASCII 由本仓库的
-        lib/eagle-to-circuit-json、lib/pads-to-circuit-json 解析（fast-xml-parser，MIT）， zip
-        压缩包由 src/lib/archive.js 用 fflate（MIT）在本地解开。 文件不会上传到任何服务器。
+        转换器来自 tscircuit 的开源项目：altium-to-circuit-json、dsn-to-circuit-json、circuit-json-to-kicad（均为 MIT）。 EAGLE XML 与 PADS Layout ASCII 由本仓库的
+        lib/eagle-to-circuit-json、lib/pads-to-circuit-json 解析（fast-xml-parser，MIT）， zip 压缩包由 src/lib/archive.js 用 fflate（MIT）在本地解开。 文件不会上传到任何服务器。
       </p>
     </section>
   </main>

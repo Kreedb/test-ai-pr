@@ -71,16 +71,10 @@ function fitTo(bounds, { padding = 1.12 } = {}) {
     // A single point (an unconnected pin) has nothing to frame: centre on it at
     // a readable zoom instead of leaving the scale at whatever it was.
     center.value = { x: bounds?.minX ?? 0, y: bounds?.minY ?? 0 }
-    scale.value = Math.min(
-      Math.max(1 / (8 * props.mmPerUnit), scaleLimits.value.zoomIn),
-      scaleLimits.value.zoomOut,
-    )
+    scale.value = Math.min(Math.max(1 / (8 * props.mmPerUnit), scaleLimits.value.zoomIn), scaleLimits.value.zoomOut)
     return
   }
-  const fitScale = Math.max(
-    (width * padding) / size.value.width,
-    (height * padding) / size.value.height,
-  )
+  const fitScale = Math.max((width * padding) / size.value.width, (height * padding) / size.value.height)
   scale.value = Math.min(Math.max(fitScale, scaleLimits.value.zoomIn), scaleLimits.value.zoomOut)
   center.value = {
     x: (bounds.minX + bounds.maxX) / 2,
@@ -100,10 +94,7 @@ function zoomBy(factor) {
 
 // Zoom around a point given in CSS pixels inside the canvas.
 function zoomAt(factor, pixel) {
-  const next = Math.min(
-    Math.max(scale.value / factor, scaleLimits.value.zoomIn),
-    scaleLimits.value.zoomOut,
-  )
+  const next = Math.min(Math.max(scale.value / factor, scaleLimits.value.zoomIn), scaleLimits.value.zoomOut)
   const worldX = center.value.x + (pixel.x - size.value.width / 2) * scale.value
   const worldY = center.value.y - (pixel.y - size.value.height / 2) * scale.value
   scale.value = next

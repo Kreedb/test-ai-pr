@@ -12,7 +12,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
-import { convertEda } from '../src/lib/eda.js'
+import { convertEda } from '../../src/lib/eda.js'
 import {
   MAX_PX_PER_MM,
   SCHEMATIC_MM_PER_UNIT,
@@ -27,9 +27,9 @@ import {
   schematicTextSize,
   searchPreview,
   zoomScaleLimits,
-} from '../src/lib/preview.js'
+} from '../../src/lib/preview.js'
 
-const root = fileURLToPath(new URL('..', import.meta.url))
+const root = fileURLToPath(new URL('../..', import.meta.url))
 const read = (...parts) => new Uint8Array(readFileSync(join(root, ...parts)))
 
 // Conversions are the slow part of this suite, and every test below reads the
@@ -46,9 +46,7 @@ const eagleProject = once(() =>
   ]),
 )
 
-const padsProject = once(() =>
-  convertEda([{ name: 'res0805.asc', bytes: read('public/samples/pads/res0805.asc') }]),
-)
+const padsProject = once(() => convertEda([{ name: 'res0805.asc', bytes: read('public/samples/pads/res0805.asc') }]))
 
 const altiumProject = once(() =>
   convertEda([
@@ -65,12 +63,7 @@ const altiumProject = once(() =>
 
 const coreBoardProject = once(() =>
   convertEda(
-    [
-      'STM32F405RGT6.PcbDoc',
-      '00_connectors_power.SchDoc',
-      '01_stm32f4_min_system.SchDoc',
-      '02_other.SchDoc',
-    ].map((name) => ({
+    ['STM32F405RGT6.PcbDoc', '00_connectors_power.SchDoc', '01_stm32f4_min_system.SchDoc', '02_other.SchDoc'].map((name) => ({
       name,
       bytes: read('public/samples/altium/stm32f405-core', name),
     })),
@@ -88,9 +81,7 @@ test('preview model covers both sides of an EAGLE project', async () => {
 
   // Every board pad the converter emitted has to be drawn somewhere, on a
   // copper layer that the layer panel offers.
-  const copperIds = new Set(
-    model.pcb.layers.filter((layer) => layer.group === 'copper').map((layer) => layer.id),
-  )
+  const copperIds = new Set(model.pcb.layers.filter((layer) => layer.group === 'copper').map((layer) => layer.id))
   assert.equal(model.pcb.pads.length, result.summary.board.pads)
   for (const pad of model.pcb.pads) {
     assert.ok(
@@ -146,9 +137,7 @@ test('nets join the board and the schematic through the shared port ids', async 
 test('layer toggles only offer copper layers that carry geometry', async () => {
   const result = await eagleProject()
   const model = buildPreviewModel(result.circuitJson)
-  const copper = model.pcb.layers
-    .filter((layer) => layer.group === 'copper')
-    .map((layer) => layer.id)
+  const copper = model.pcb.layers.filter((layer) => layer.group === 'copper').map((layer) => layer.id)
 
   // EAGLE writes through-hole vias with the full 1-16 extent, but the sample is
   // a two-layer board: offering inner1..16 would be sixteen empty checkboxes.
@@ -189,9 +178,7 @@ test('complex STM32 samples keep their four-layer stack and sheet hierarchy', as
   // the preview, not just top/bottom.
   const f411 = await altiumProject()
   const f411Model = buildPreviewModel(f411.circuitJson)
-  const f411Copper = f411Model.pcb.layers
-    .filter((layer) => layer.group === 'copper')
-    .map((layer) => layer.id)
+  const f411Copper = f411Model.pcb.layers.filter((layer) => layer.group === 'copper').map((layer) => layer.id)
   assert.deepEqual(f411Copper, ['top', 'inner1', 'inner2', 'bottom'])
   // Both inner layers carry real copper (the ground/power pours), so the
   // four-layer claim is not just a stack setting on the board.
@@ -209,11 +196,7 @@ test('complex STM32 samples keep their four-layer stack and sheet hierarchy', as
   assert.equal(core.files.filter((file) => file.name.endsWith('.kicad_sch')).length, 4)
   const coreModel = buildPreviewModel(core.circuitJson)
   assert.equal(coreModel.schematic.sheets.length, 3)
-  assert.deepEqual(coreModel.schematic.sheets.map((sheet) => sheet.name).sort(), [
-    '00_connectors_power',
-    '01_stm32f4_min_system',
-    '02_other',
-  ])
+  assert.deepEqual(coreModel.schematic.sheets.map((sheet) => sheet.name).sort(), ['00_connectors_power', '01_stm32f4_min_system', '02_other'])
   assert.equal(coreModel.pcb.components.length, core.summary.board.components)
 })
 
@@ -282,10 +265,7 @@ test('schematic text uses the size the KiCad writer draws', () => {
   // a symbol property and trace text an inline label; KiCad writes both at the
   // fixed 1.27 mm default even when standalone graphics are preserved.
   const sized = { font_size: 1.778 / 15 }
-  assert.equal(
-    schematicTextSize({ ...sized, schematic_component_id: 'c1' }, true),
-    SCHEMATIC_TEXT_SIZE,
-  )
+  assert.equal(schematicTextSize({ ...sized, schematic_component_id: 'c1' }, true), SCHEMATIC_TEXT_SIZE)
   assert.equal(schematicTextSize({ ...sized, source_trace_id: 't1' }, true), SCHEMATIC_TEXT_SIZE)
 })
 
@@ -412,10 +392,7 @@ test('preview survives a hand-built model with missing optional fields', () => {
   assert.equal(model.schematic.sheets.length, 1)
   assert.equal(model.schematic.sheets[0].id, 'sheet_0')
   assert.ok(model.schematic.items.every((item) => item.sheet === 'sheet_0'))
-  assert.equal(
-    model.schematic.sheets[0].items.filter((item) => item.kind === 'component').length,
-    1,
-  )
+  assert.equal(model.schematic.sheets[0].items.filter((item) => item.kind === 'component').length, 1)
   assert.equal(model.pcb.items.find((item) => item.kind === 'pad').refdes, 'R1')
   assert.ok(model.schematic.items.some((item) => item.kind === 'label' && item.text === 'ORPHAN'))
   assert.deepEqual(indexNets(model), [])
@@ -431,19 +408,13 @@ test('component-owned text is always written at the KiCad property size', async 
   assert.ok(texts.length > 0)
   for (const text of texts) {
     if (text.element.schematic_component_id || text.element.source_trace_id) {
-      assert.equal(
-        text.fontSize,
-        SCHEMATIC_TEXT_SIZE,
-        `Altium text ${text.id} should use the KiCad property size`,
-      )
+      assert.equal(text.fontSize, SCHEMATIC_TEXT_SIZE, `Altium text ${text.id} should use the KiCad property size`)
     }
   }
 
   const sch = (await altiumProject()).files.find((file) => file.name === 'stm32f411_2.kicad_sch')
   assert.ok(sch, 'expected the child schematic sheet')
-  const sizes = new Set(
-    [...sch.content.matchAll(/\(size ([\d.]+) ([\d.]+)\)/g)].map((match) => match[1]),
-  )
+  const sizes = new Set([...sch.content.matchAll(/\(size ([\d.]+) ([\d.]+)\)/g)].map((match) => match[1]))
   assert.deepEqual([...sizes], ['1.27'])
 })
 
@@ -455,13 +426,9 @@ test('schematic preview draws the value of parts without value texts', async () 
   const model = buildPreviewModel((await altiumProject()).circuitJson)
   const sheet = model.schematic.sheets[0]
   const componentTexts = (refdes) => {
-    const component = sheet.items.find(
-      (item) => item.kind === 'component' && item.refdes === refdes,
-    )
+    const component = sheet.items.find((item) => item.kind === 'component' && item.refdes === refdes)
     assert.ok(component, `expected ${refdes} on the sheet`)
-    return sheet.items
-      .filter((item) => item.kind === 'text' && item.componentId === component.id)
-      .map((item) => item.element.text)
+    return sheet.items.filter((item) => item.kind === 'text' && item.componentId === component.id).map((item) => item.element.text)
   }
 
   assert.ok(componentTexts('R1').includes('1k'), 'resistor value is missing')
@@ -472,17 +439,10 @@ test('schematic preview draws the value of parts without value texts', async () 
   // carries the part number: the preview must still show it.
   const f405 = buildPreviewModel((await coreBoardProject()).circuitJson)
   const connectors = f405.schematic.sheets.find((entry) => entry.name === '00_connectors_power')
-  const inductor = connectors.items.find(
-    (item) => item.kind === 'component' && item.refdes === 'L1',
-  )
+  const inductor = connectors.items.find((item) => item.kind === 'component' && item.refdes === 'L1')
   assert.ok(inductor, 'expected L1 on the first sheet')
   assert.ok(
-    connectors.items.some(
-      (item) =>
-        item.kind === 'text' &&
-        item.componentId === inductor.id &&
-        item.element.text === 'UPZ2012E221',
-    ),
+    connectors.items.some((item) => item.kind === 'text' && item.componentId === inductor.id && item.element.text === 'UPZ2012E221'),
     'inductor value is missing',
   )
 
@@ -491,13 +451,7 @@ test('schematic preview draws the value of parts without value texts', async () 
   const led = connectors.items.find((item) => item.kind === 'component' && item.refdes === 'D1')
   assert.ok(led, 'expected D1 on the first sheet')
   assert.equal(led.value, '')
-  assert.ok(
-    !connectors.items.some(
-      (item) =>
-        item.kind === 'text' && item.componentId === led.id && item.element.text.includes('='),
-    ),
-    'unresolved formula was drawn',
-  )
+  assert.ok(!connectors.items.some((item) => item.kind === 'text' && item.componentId === led.id && item.element.text.includes('=')), 'unresolved formula was drawn')
 })
 
 test('synthesized value text uses the writer height fallback', () => {
@@ -518,9 +472,7 @@ test('synthesized value text uses the writer height fallback', () => {
       center: { x: 0, y: 0 },
     },
   ])
-  const value = model.schematic.sheets[0].items.find(
-    (item) => item.kind === 'text' && item.element.text === 'ABC',
-  )
+  const value = model.schematic.sheets[0].items.find((item) => item.kind === 'text' && item.element.text === 'ABC')
   assert.ok(value, 'value text is missing')
   assert.ok(Math.abs(value.element.position.y + 0.7) < 1e-9)
 })
@@ -536,28 +488,17 @@ test('Altium parts without value texts still export a filled KiCad Value', async
     ['D1', 'GREEN'],
     ['U1', 'ams1117'],
   ]) {
-    assert.match(
-      f411.content,
-      new RegExp(`\\(property "Reference" "${refdes}"[\\s\\S]*?\\(property "Value" "${value}"`),
-      `${refdes} lost its value`,
-    )
+    assert.match(f411.content, new RegExp(`\\(property "Reference" "${refdes}"[\\s\\S]*?\\(property "Value" "${value}"`), `${refdes} lost its value`)
   }
 
-  const f405 = (await coreBoardProject()).files.find(
-    (file) => file.name === '00_connectors_power.kicad_sch',
-  )
+  const f405 = (await coreBoardProject()).files.find((file) => file.name === '00_connectors_power.kicad_sch')
   assert.ok(f405, 'expected the F405 connector sheet')
   assert.match(f405.content, /\(property "Value" "UPZ2012E221"/)
   assert.match(f405.content, /\(property "Value" "SMAJ5.0A"/)
   // Formula-valued fields cannot be evaluated and must stay empty instead of
   // leaking the expression into the exported schematic.
-  for (const file of (await coreBoardProject()).files.filter((entry) =>
-    entry.name.endsWith('.kicad_sch'),
-  )) {
-    assert.ok(
-      !file.content.includes('(property "Value" "='),
-      `${file.name} exported an unresolved Value expression`,
-    )
+  for (const file of (await coreBoardProject()).files.filter((entry) => entry.name.endsWith('.kicad_sch'))) {
+    assert.ok(!file.content.includes('(property "Value" "='), `${file.name} exported an unresolved Value expression`)
   }
 })
 
@@ -571,9 +512,6 @@ test('KiCad power symbols are rewritten to a token KiCad 9 accepts', async () =>
     assert.ok(!file.content.includes('(power global)'), `${file.name} still has (power global)`)
   }
   // The F405 project has 17 power symbols; each one must still be emitted.
-  const powerSymbols = schematics.reduce(
-    (total, file) => total + [...file.content.matchAll(/\(power\)/g)].length,
-    0,
-  )
+  const powerSymbols = schematics.reduce((total, file) => total + [...file.content.matchAll(/\(power\)/g)].length, 0)
   assert.equal(powerSymbols, 17)
 })

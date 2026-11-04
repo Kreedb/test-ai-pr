@@ -15,14 +15,7 @@
 // Warnings are collected instead of throwing so the UI can show a partial
 // result.
 
-import {
-  CATEGORY_TYPE,
-  DATA_TYPE_NAMES,
-  HEADER_BYTES,
-  MAX_INPUT_BYTES,
-  categoryName,
-  crc8Sii,
-} from 'sii-parser'
+import { CATEGORY_TYPE, DATA_TYPE_NAMES, HEADER_BYTES, MAX_INPUT_BYTES, categoryName, crc8Sii } from 'sii-parser'
 
 import { latin1Bytes, portsWord as portsToWord } from './format.js'
 
@@ -357,9 +350,7 @@ function resolveDataType(name, bitLength, bitSizes, warnings) {
 
   warnings.push({
     level: 'warn',
-    message: `无法确定 PDO 条目数据类型${name ? ` ${name}` : ''}（位长 ${
-      bits || '未知'
-    }），SII 类型码写入 0。`,
+    message: `无法确定 PDO 条目数据类型${name ? ` ${name}` : ''}（位长 ${bits || '未知'}），SII 类型码写入 0。`,
   })
   return 0
 }
@@ -380,11 +371,7 @@ function deriveBootStrap(syncManagers) {
 // ESI PDO attributes map onto the SII PDO flag word, using the bits named in
 // PDO_FLAG_BITS: 0x0001 Mandatory, 0x0010 Fixed content, 0x0200 Depend on slot.
 function pdoFlags(pdoElement, indexElement) {
-  return (
-    (flagAttribute(pdoElement, 'Mandatory') ? 0x0001 : 0x0000) |
-    (flagAttribute(pdoElement, 'Fixed') ? 0x0010 : 0x0000) |
-    (flagAttribute(indexElement, 'DependOnSlot') ? 0x0200 : 0x0000)
-  )
+  return (flagAttribute(pdoElement, 'Mandatory') ? 0x0001 : 0x0000) | (flagAttribute(pdoElement, 'Fixed') ? 0x0010 : 0x0000) | (flagAttribute(indexElement, 'DependOnSlot') ? 0x0200 : 0x0000)
 }
 
 function buildPdoCategory(elements, strings, bitSizes, warnings) {
@@ -394,9 +381,7 @@ function buildPdoCategory(elements, strings, bitSizes, warnings) {
   for (const element of elements) {
     const entries = children(element, 'Entry')
     if (entries.length > 255) {
-      throw new Error(
-        `PDO ${textOf(child(element, 'Index'))} 有 ${entries.length} 个条目，超过 SII 的 255 个上限`,
-      )
+      throw new Error(`PDO ${textOf(child(element, 'Index'))} 有 ${entries.length} 个条目，超过 SII 的 255 个上限`)
     }
 
     const indexElement = child(element, 'Index')
@@ -444,9 +429,7 @@ function buildSyncManagerCategory(smElements, bitsBySm, warnings) {
   const entries = []
 
   smElements.forEach((element, index) => {
-    let length = element.hasAttribute('DefaultSize')
-      ? parseNumber(element.getAttribute('DefaultSize'))
-      : null
+    let length = element.hasAttribute('DefaultSize') ? parseNumber(element.getAttribute('DefaultSize')) : null
     if (length === null) {
       const bits = bitsBySm.get(index)
       if (bits !== undefined) {
@@ -472,11 +455,7 @@ function buildSyncManagerCategory(smElements, bitsBySm, warnings) {
       length: length & 0xffff,
       control: parseNumber(element.getAttribute('ControlByte')) & 0xff,
       status: 0,
-      enable: element.hasAttribute('Enable')
-        ? flagAttribute(element, 'Enable')
-          ? 0x01
-          : 0x00
-        : 0x01,
+      enable: element.hasAttribute('Enable') ? (flagAttribute(element, 'Enable') ? 0x01 : 0x00) : 0x01,
       type: (index + 1) & 0xff,
       name: textOf(element),
     }
@@ -517,14 +496,7 @@ function buildDcCategory(opModes) {
     // is disabled, and a real 1×SYNC0 factor when SYNC1 is enabled.
     const sync1FactorAttr = parseNumber(cycleTimeSync1?.getAttribute('Factor'))
     const sync1FactorText = parseNumber(textOf(cycleTimeSync1))
-    const sync1Factor =
-      sync1FactorAttr > 1
-        ? sync1FactorAttr
-        : sync1FactorText > 0
-          ? sync1FactorText
-          : assignActivate & 0x400
-            ? 1
-            : 0
+    const sync1Factor = sync1FactorAttr > 1 ? sync1FactorAttr : sync1FactorText > 0 ? sync1FactorText : assignActivate & 0x400 ? 1 : 0
 
     writer.u32(parseNumber(textOf(cycleTimeSync0)) >>> 0)
     writer.u32(parseNumber(textOf(child(opMode.element, 'ShiftTimeSync0'))) >>> 0)
@@ -669,8 +641,7 @@ export function generateSiiFromEsi(xmlText, options = {}) {
   if (flagAttribute(coe, 'SegmentedSdo')) {
     warnings.push({
       level: 'info',
-      message:
-        'CoE 的 SegmentedSdo 属性只存在于 ESI 中，SII 的 CoE Details 字节没有对应位，已忽略。',
+      message: 'CoE 的 SegmentedSdo 属性只存在于 ESI 中，SII 的 CoE Details 字节没有对应位，已忽略。',
     })
   }
 
@@ -775,26 +746,17 @@ export function generateSiiFromEsi(xmlText, options = {}) {
   if (txPdos.length > 0) addCategory(CATEGORY_TYPE.TX_PDO, tx.data)
   if (rxPdos.length > 0) addCategory(CATEGORY_TYPE.RX_PDO, rx.data)
   if (opModes.length > 0) addCategory(CATEGORY_TYPE.DC, buildDcCategory(opModes))
-  if (child(device, 'Fmmu'))
-    addCategory(CATEGORY_TYPE.FMMU, buildFmmuCategory(children(device, 'Fmmu')), 0xff)
+  if (child(device, 'Fmmu')) addCategory(CATEGORY_TYPE.FMMU, buildFmmuCategory(children(device, 'Fmmu')), 0xff)
 
   // TwinCAT emits FMMU before SyncManager; keep the canonical order.
-  const orderedCategories = [
-    CATEGORY_TYPE.STRINGS,
-    CATEGORY_TYPE.GENERAL,
-    CATEGORY_TYPE.FMMU,
-    CATEGORY_TYPE.SYNC_MANAGER,
-    CATEGORY_TYPE.TX_PDO,
-    CATEGORY_TYPE.RX_PDO,
-    CATEGORY_TYPE.DC,
-  ].map((type) => categories.find((category) => category.type === type))
+  const orderedCategories = [CATEGORY_TYPE.STRINGS, CATEGORY_TYPE.GENERAL, CATEGORY_TYPE.FMMU, CATEGORY_TYPE.SYNC_MANAGER, CATEGORY_TYPE.TX_PDO, CATEGORY_TYPE.RX_PDO, CATEGORY_TYPE.DC].map((type) =>
+    categories.find((category) => category.type === type),
+  )
 
   const used = orderedCategories.filter(Boolean)
   const required = HEADER_BYTES + used.reduce((sum, category) => sum + category.bytes.length, 0) + 4
   if (required > byteSize) {
-    throw new Error(
-      `生成的类别数据需要 ${required} 字节，超过 ESI 声明的 EEPROM 大小 ${byteSize} 字节`,
-    )
+    throw new Error(`生成的类别数据需要 ${required} 字节，超过 ESI 声明的 EEPROM 大小 ${byteSize} 字节`)
   }
 
   const bytes = new Uint8Array(byteSize).fill(0xff)
@@ -930,10 +892,7 @@ export function generateEsiXml(result, options = {}) {
   push(2, '<Devices>')
 
   push(3, `<Device Physics="${escapeXml(physics)}">`)
-  push(
-    4,
-    `<Type ProductCode="${productCode}" RevisionNo="${revisionNumber}">${escapeXml(orderName)}</Type>`,
-  )
+  push(4, `<Type ProductCode="${productCode}" RevisionNo="${revisionNumber}">${escapeXml(orderName)}</Type>`)
   push(4, `<Name LcId="1033">${escapeXml(deviceName || orderName)}</Name>`)
 
   if (identificationReg134) {
@@ -967,17 +926,10 @@ export function generateEsiXml(result, options = {}) {
     if (manager.enable > 1) {
       warnings.push({
         level: 'warn',
-        message: `SyncManager ${manager.index} 的 Enable 字节为 0x${manager.enable
-          .toString(16)
-          .toUpperCase()}，ESI 只能表达启用/禁用，导出为启用。`,
+        message: `SyncManager ${manager.index} 的 Enable 字节为 0x${manager.enable.toString(16).toUpperCase()}，ESI 只能表达启用/禁用，导出为启用。`,
       })
     }
-    attributes.push(
-      `DefaultSize="${manager.length}"`,
-      `StartAddress="${hexValue(manager.startAddress)}"`,
-      `ControlByte="${hexValue(manager.control)}"`,
-      `Enable="${manager.enable ? '1' : '0'}"`,
-    )
+    attributes.push(`DefaultSize="${manager.length}"`, `StartAddress="${hexValue(manager.startAddress)}"`, `ControlByte="${hexValue(manager.control)}"`, `Enable="${manager.enable ? '1' : '0'}"`)
     push(4, `<Sm ${attributes.join(' ')}>${name}</Sm>`)
   }
 
@@ -986,17 +938,12 @@ export function generateEsiXml(result, options = {}) {
     if (pdo.flags & 0x0001) attributes.push('Mandatory="true"')
     if (pdo.syncManager !== 0xff) attributes.push(`Sm="${pdo.syncManager}"`)
     push(4, `<${tag} ${attributes.join(' ')}>`)
-    push(
-      5,
-      `<Index${pdo.flags & 0x0200 ? ' DependOnSlot="true"' : ''}>${hexValue(pdo.index)}</Index>`,
-    )
+    push(5, `<Index${pdo.flags & 0x0200 ? ' DependOnSlot="true"' : ''}>${hexValue(pdo.index)}</Index>`)
     const pdoName = pdo.name || `PDO 0x${pdo.index.toString(16).toUpperCase()}`
     if (!pdo.name) {
       warnings.push({
         level: 'warn',
-        message: `PDO 0x${pdo.index
-          .toString(16)
-          .toUpperCase()} 没有名称，ESI 要求 <Name>，已写入占位名称 ${pdoName}。`,
+        message: `PDO 0x${pdo.index.toString(16).toUpperCase()} 没有名称，ESI 要求 <Name>，已写入占位名称 ${pdoName}。`,
       })
     }
     push(5, `<Name>${escapeXml(pdoName)}</Name>`)
@@ -1055,10 +1002,7 @@ export function generateEsiXml(result, options = {}) {
       push(6, `<Name>${escapeXml(element.name || `OpMode ${element.index}`)}</Name>`)
       if (element.description) push(6, `<Desc>${escapeXml(element.description)}</Desc>`)
       push(6, `<AssignActivate>${hexValue(element.assignActivate)}</AssignActivate>`)
-      push(
-        6,
-        `<CycleTimeSync0 Factor="${element.sync0CycleFactor ?? 1}">${element.sync0CycleTime ?? 0}</CycleTimeSync0>`,
-      )
+      push(6, `<CycleTimeSync0 Factor="${element.sync0CycleFactor ?? 1}">${element.sync0CycleTime ?? 0}</CycleTimeSync0>`)
       push(6, `<ShiftTimeSync0>${element.sync0ShiftTime ?? 0}</ShiftTimeSync0>`)
       push(6, `<CycleTimeSync1 Factor="${sync1Factor === 0 ? 1 : sync1Factor}">0</CycleTimeSync1>`)
       push(6, `<ShiftTimeSync1>${element.sync1ShiftTime ?? 0}</ShiftTimeSync1>`)
@@ -1106,11 +1050,7 @@ export function generateEsiXml(result, options = {}) {
       message: `General 类别的 Ebus 电流 ${general.ebusCurrent} mA 未写入 ESI，重新生成时为 0。`,
     })
   }
-  if (
-    general &&
-    general.physicalMemoryAddress !== null &&
-    general.physicalMemoryAddress !== 0x0002
-  ) {
+  if (general && general.physicalMemoryAddress !== null && general.physicalMemoryAddress !== 0x0002) {
     warnings.push({
       level: 'info',
       message: `General 类别的物理内存地址 0x${Number(general.physicalMemoryAddress ?? 0)

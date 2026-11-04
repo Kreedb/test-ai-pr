@@ -17,20 +17,17 @@ export const specctra = {
         {
           category: '走线',
           detail: 'DSN 的 wiring 段若为空则只有布局与网表；自动布线结果需另传同一工程的 .ses。',
-          reason:
-            'DSN 的 wiring 段可以带已有布线，但不是必需内容，没有时转换器只能输出空走线，补 .ses 才能还原自动布线结果。',
+          reason: 'DSN 的 wiring 段可以带已有布线，但不是必需内容，没有时转换器只能输出空走线，补 .ses 才能还原自动布线结果。',
         },
         {
           category: '设计规则',
           detail: 'rule / clearance 段（默认线宽、间距）不导出，需在 KiCad 重设。',
-          reason:
-            'dsnts 会解析 structure.rule 与 class 规则，但 dsn-to-circuit-json 只映射走线，没有把线宽、间距和差分对写进 Circuit JSON；KiCad 还需要 .kicad_pro/.kicad_dru。',
+          reason: 'dsnts 会解析 structure.rule 与 class 规则，但 dsn-to-circuit-json 只映射走线，没有把线宽、间距和差分对写进 Circuit JSON；KiCad 还需要 .kicad_pro/.kicad_dru。',
         },
         {
           category: '层与图形',
           detail: '内层走线与焊盘会落到 top/bottom；没有丝印、阻焊/助焊层图形和铜皮。',
-          reason:
-            'dsn-to-circuit-json 的 mapLayer 只产出 top/bottom（内层被折叠），而且它忽略 wiring 下的 plane 多边形，所以铜皮/平面没有进入中间模型；DSN 也没有丝印/阻焊/助焊图形。',
+          reason: 'dsn-to-circuit-json 的 mapLayer 只产出 top/bottom（内层被折叠），而且它忽略 wiring 下的 plane 多边形，所以铜皮/平面没有进入中间模型；DSN 也没有丝印/阻焊/助焊图形。',
         },
         {
           category: '焊盘',
@@ -53,8 +50,7 @@ export const specctra = {
     return null
   },
   async convert(sources, warnings) {
-    const { DsnToCircuitJsonConverter, SesToCircuitJsonConverter } =
-      await import('dsn-to-circuit-json')
+    const { DsnToCircuitJsonConverter, SesToCircuitJsonConverter } = await import('dsn-to-circuit-json')
 
     const dsnSources = sources.filter((source) => source.format.kind === 'dsn')
     const dsn = dsnSources[0]
@@ -89,8 +85,7 @@ export const specctra = {
       warnings.push({
         level: 'warn',
         code: 'no-routing',
-        message:
-          '只提供了 DSN：只有元件位置、焊盘与网表，走线为空。补上同工程的 .ses 可一并转换布线。',
+        message: '只提供了 DSN：只有元件位置、焊盘与网表，走线为空。补上同工程的 .ses 可一并转换布线。',
       })
     }
 

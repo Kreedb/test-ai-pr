@@ -7,39 +7,16 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
-import { LUNA, OLI } from '../src/lib/replay/models.js'
-import {
-  buildJointValues,
-  computePose,
-  normalizeQuat,
-  quatToEuler,
-} from '../src/lib/replay/pose.js'
-import { detectProfile, mapJoints } from '../src/lib/replay/profiles.js'
-import { inspectRosbag, readRosbag } from '../src/lib/replay/rosbag.js'
-import {
-  buildRosbag,
-  encodeImu,
-  encodeJointState,
-  encodeSensorImu,
-  encodeSensorJointState,
-  record,
-} from '../test-support/rosbag-fixture.mjs'
+import { LUNA, OLI } from '../../src/lib/replay/models.js'
+import { buildJointValues, computePose, normalizeQuat, quatToEuler } from '../../src/lib/replay/pose.js'
+import { detectProfile, mapJoints } from '../../src/lib/replay/profiles.js'
+import { inspectRosbag, readRosbag } from '../../src/lib/replay/rosbag.js'
+import { buildRosbag, encodeImu, encodeJointState, encodeSensorImu, encodeSensorJointState, record } from './rosbag-fixture.mjs'
 
-const root = fileURLToPath(new URL('..', import.meta.url))
+const root = fileURLToPath(new URL('../..', import.meta.url))
 const lunaNames = LUNA.filter((node) => node.joint && node.axis).map((node) => node.joint)
 const oliNames = OLI.filter((node) => node.joint && node.axis).map((node) => node.joint)
-const tronNames = [
-  'proximal_pitch_L',
-  'proximal_roll_L',
-  'proximal_yaw_L',
-  'knee_L',
-  'wheel_L',
-  'proximal_pitch_R',
-  'proximal_roll_R',
-  'proximal_yaw_R',
-  'knee_R',
-  'wheel_R',
-]
+const tronNames = ['proximal_pitch_L', 'proximal_roll_L', 'proximal_yaw_L', 'knee_L', 'wheel_L', 'proximal_pitch_R', 'proximal_roll_R', 'proximal_yaw_R', 'knee_R', 'wheel_R']
 
 function bag(messages, connections, compression = 'lz4') {
   return buildRosbag({ connections, messages, compression })
@@ -49,10 +26,7 @@ const JOINT_CONNECTION = { id: 0, topic: '/joint/state', type: 'controller_msgs/
 const IMU_CONNECTION = { id: 1, topic: '/ImuData', type: 'controller_msgs/IMUData' }
 
 test('inspects connections without decoding chunks', () => {
-  const bytes = bag(
-    [{ conn: 0, time: 10, data: encodeJointState({ names: ['a'], position: [0], time: 10 }) }],
-    [JOINT_CONNECTION],
-  )
+  const bytes = bag([{ conn: 0, time: 10, data: encodeJointState({ names: ['a'], position: [0], time: 10 }) }], [JOINT_CONNECTION])
   const info = inspectRosbag(bytes)
   assert.deepEqual(
     info.topics.map((topic) => [topic.name, topic.type, topic.kind]),
@@ -87,9 +61,7 @@ test('finds connection metadata stored inside chunks (active recording)', () => 
 test('keeps complete records when an active recording has a truncated tail', () => {
   const full = buildRosbag({
     connections: [JOINT_CONNECTION],
-    messages: [
-      { conn: 0, time: 10, data: encodeJointState({ names: ['a'], position: [0.5], time: 10 }) },
-    ],
+    messages: [{ conn: 0, time: 10, data: encodeJointState({ names: ['a'], position: [0.5], time: 10 }) }],
     compression: 'lz4',
     topLevelConnections: false,
   })
@@ -118,10 +90,7 @@ test('keeps complete records when an active recording has a truncated tail', () 
 })
 
 test('skips an unfinished zero-length lz4 chunk', () => {
-  const full = bag(
-    [{ conn: 0, time: 10, data: encodeJointState({ names: ['a'], position: [0.5], time: 10 }) }],
-    [JOINT_CONNECTION],
-  )
+  const full = bag([{ conn: 0, time: 10, data: encodeJointState({ names: ['a'], position: [0.5], time: 10 }) }], [JOINT_CONNECTION])
   // rosbag writers leave the open chunk header at size 0 until it is closed.
   const empty = record(
     {
@@ -141,10 +110,7 @@ test('skips an unfinished zero-length lz4 chunk', () => {
 })
 
 test('does not offer unsupported JointState-like types', () => {
-  const bytes = bag(
-    [{ conn: 0, time: 10, data: encodeJointState({ names: ['a'], position: [0], time: 10 }) }],
-    [{ id: 0, topic: '/joint/state', type: 'my_robot/JointState' }],
-  )
+  const bytes = bag([{ conn: 0, time: 10, data: encodeJointState({ names: ['a'], position: [0], time: 10 }) }], [{ id: 0, topic: '/joint/state', type: 'my_robot/JointState' }])
   const info = inspectRosbag(bytes)
   assert.deepEqual(
     info.topics.map((topic) => topic.kind),
@@ -274,11 +240,7 @@ test('rejects backwards timestamps and unsupported compression', () => {
   )
   assert.throws(() => readRosbag(backwards, { topics: ['/joint/state'] }), /时间戳倒退/)
 
-  const bz2 = bag(
-    [{ conn: 0, time: 1, data: encodeJointState({ names: ['a'], position: [1], time: 1 }) }],
-    [JOINT_CONNECTION],
-    'bz2',
-  )
+  const bz2 = bag([{ conn: 0, time: 1, data: encodeJointState({ names: ['a'], position: [1], time: 1 }) }], [JOINT_CONNECTION], 'bz2')
   assert.throws(() => readRosbag(bz2, { topics: ['/joint/state'] }), /暂不支持 bz2 压缩/)
 })
 

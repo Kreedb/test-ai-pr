@@ -31,9 +31,7 @@ export function offlinePlugin(base, staticFiles = []) {
         // Runtime fetches are cached under this version, and samples are not
         // content-hashed, so hash every public file: same name, new content must
         // still produce a new cache.
-        const revision = createHash('sha256').update(
-          String(index?.type === 'asset' ? index.source : ''),
-        )
+        const revision = createHash('sha256').update(String(index?.type === 'asset' ? index.source : ''))
         for (const file of publicFiles) revision.update(file).update(readFileSync(file))
 
         // A listed precache source that is missing must fail the build rather

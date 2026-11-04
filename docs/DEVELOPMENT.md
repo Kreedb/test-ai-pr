@@ -30,11 +30,11 @@ npm run dev
 | 命令 | 说明 |
 | --- | --- |
 | `npm run dev` | 启动带 HMR 的开发服务器 |
-| `npm run build` | 构建到 `dist/` |
+| `npm run build` | 构建到 `dist/`（构建前自动格式化） |
 | `npm run preview` | 本地预览生产构建 |
 | `npm test` | 运行 `node --test` 回归测试 |
 | `npm run format` | 用 Prettier 格式化代码 |
-| `npm run format:check` | 校验代码格式（CI 使用） |
+| `npm run format:check` | 校验代码格式 |
 
 ## 路径别名
 
@@ -58,7 +58,7 @@ import { parseSii } from 'sii-parser'
 
 站点发布在 GitHub Pages：https://kreedb.github.io/test-ai-pr/。
 
-部署由 `.github/workflows/deploy.yml` 处理：推送到 `main` 时自动运行，也可以在 Actions 页面手动触发（`workflow_dispatch`）。流程是 `npm ci`、`npm test`、`npm run build`，然后用 GitHub Pages 官方 actions 发布 `dist/`。
+部署由 `.github/workflows/deploy.yml` 处理：推送到 `main` 时自动运行，也可以在 Actions 页面手动触发（`workflow_dispatch`）。流程是 `npm ci`、`npm test`、`npm run build`（构建前会自动执行 `npm run format`），然后用 GitHub Pages 官方 actions 发布 `dist/`。
 
 这是项目站点，路径带仓库名前缀，所以 `vite.config.js` 设置 `base: '/test-ai-pr/'`，构建产物里的资源 URL 才能落在 `https://kreedb.github.io/test-ai-pr/` 下。如果以后换成自定义域名或用户站点仓库，把 `base` 改回 `/`。
 
@@ -122,7 +122,7 @@ import { padsToCircuitJson } from 'pads-to-circuit-json'
 - 新增 EDA 来源：在 `src/lib/formats/` 下新建 `<id>.js`，导出元数据、`losses`、`detect`、`convert`，然后在 `src/lib/formats/index.js` 的显式导入列表里加一行。支持矩阵、有损表、样例按钮和格式标签都从注册表派生，不需要改页面。
 - 新增页面：在 `src/pages/` 下新建 `NamePage.vue`，在普通 `<script>` 块里导出 `route`（`label`、`order`，需要首页卡片时再加 `tool`）。路径由文件名自动生成，导航、路由出口和首页工具列表都从页面自身派生。
 - 新增机器人型号：在 `src/lib/replay/models.js` 放关节偏移/转轴，在 `src/lib/replay/profiles.js` 注册机型、关节顺序与名称映射。消息字段不同的厂商还需要扩展 `src/lib/replay/rosbag.js` 的解码器。
-- 新增测试：按来源放到 `test/<id>.test.mjs`，公共的样例读取与转换辅助函数放在 `test-support/` 下（不要放进 `test/`：`node --test` 会把 `test/` 下的每个 `.js`/`.mjs` 当测试文件执行），避免所有格式共用一个巨型测试文件。
+- 新增测试：按所属页面放到 `test/<page>/` 下（`parser`、`replay`、`convert`），跨页面的全功能测试放 `test/` 根目录；公共辅助函数也放在对应页面目录，但 `node --test` 会执行 `test/` 下的每个 `.js`/`.mjs`，所以辅助文件不能有顶层副作用。
 - 新增可独立发布的解析器：在 `lib/<package-name>/` 下建立独立包（`package.json`、`src/index.js`、`README.md`），用包名在主项目里引用。`lib/` 不允许反向依赖 `src/`，由 `test/lib.test.mjs` 守护。
 
 ## 协作约定
@@ -141,10 +141,11 @@ import { padsToCircuitJson } from 'pads-to-circuit-json'
 
 ```bash
 npm ci
-npm run format:check
 npm test
 npm run build
 ```
+
+格式不再由独立的 CI 检查：`npm run build` 会先自动执行 `npm run format`，需要单独校验时仍可运行 `npm run format:check`。
 
 改动页面或模板后，再启动 `npm run dev` 并在浏览器里打开 `http://localhost:5173/test-ai-pr/` 做一次冒烟检查。
 
@@ -164,15 +165,13 @@ npm test
 
 ### 布局
 
-- `test/archive.test.mjs`：zip 展开、大小/数量上限与成员筛选。
-- `test/eagle.test.mjs`：EAGLE XML 识别、转换与镜像元件。
-- `test/pads.test.mjs`：PADS ASCII 解析、转换与上游 fixture。
-- `test/preview.test.mjs`：预览模型的几何、图层、网络与文字尺寸。
-- `test/replay.test.mjs`：ROS1 bag 解析、机型识别、正运动学与回放示例。
-- `test/registry.test.mjs`：格式注册表元数据与样例文件存在性。
-- `test/routes.test.mjs`：hash 路径归一化与匹配。
-- `test/sii.test.mjs`：`sii-parser` 的样例解析、CRC 与畸形输入。
+- `test/parser/`：EEPROM 解析器（`#/parser`）的 SII 解析、编辑模型与 ESI 导出测试。
+- `test/replay/`：机器人回放页（`#/replay`）的 bag 解析、机型识别与正运动学测试；`rosbag-fixture.mjs` 是共用样例辅助。
+- `test/convert/`：EDA 转 KiCad（`#/convert`）的格式识别、转换、预览与注册表测试。
+- `test/fixtures/`：转换器回归样例。
+- `test/routes.test.mjs`：hash 路径归一化与匹配（全功能测试，保留在 `test/` 根目录）。
 - `test/lib.test.mjs`：`lib/` 包的 README、入口与解耦约束。
+- `test/offline.test.mjs`：离线 Service Worker 生成。
 
 ### 提速约定
 

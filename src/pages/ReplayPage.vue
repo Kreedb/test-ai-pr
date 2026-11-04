@@ -117,12 +117,7 @@ const baseQuat = computed(() => {
   const series = imuSeries.value
   const index = imuFrame.value
   if (!series || index < 0) return [1, 0, 0, 0]
-  return normalizeQuat([
-    series.quat[0][index],
-    series.quat[1][index],
-    series.quat[2][index],
-    series.quat[3][index],
-  ])
+  return normalizeQuat([series.quat[0][index], series.quat[1][index], series.quat[2][index], series.quat[3][index]])
 })
 
 const baseEuler = computed(() => quatToEuler(baseQuat.value))
@@ -219,8 +214,7 @@ function pickTopic(list, preferred) {
 function medianInterval(times) {
   if (!times || times.length < 2) return 0.01
   const intervals = []
-  for (let index = 1; index < times.length; index += 1)
-    intervals.push(times[index] - times[index - 1])
+  for (let index = 1; index < times.length; index += 1) intervals.push(times[index] - times[index - 1])
   intervals.sort((left, right) => left - right)
   return intervals[Math.floor(intervals.length / 2)]
 }
@@ -247,9 +241,7 @@ async function applyTopics(bytes, jointName, imuName) {
     if (!joint) throw new Error(`话题 ${jointName} 没有可用的关节消息`)
     const imu = imuName ? decoded.series[imuName] : null
     const start = imu ? Math.max(joint.times[0], imu.times[0]) : joint.times[0]
-    const end = imu
-      ? Math.min(joint.times[joint.times.length - 1], imu.times[imu.times.length - 1])
-      : joint.times[joint.times.length - 1]
+    const end = imu ? Math.min(joint.times[joint.times.length - 1], imu.times[imu.times.length - 1]) : joint.times[joint.times.length - 1]
     if (!(end > start)) throw new Error('关节与 IMU 话题没有重叠的有效时间段')
 
     const detected = detectProfile(joint.names, joint.names.length, joint.named)
@@ -277,8 +269,7 @@ async function applyTopics(bytes, jointName, imuName) {
     if (joint.topic.includes('/motor/') && (detected.id === 'luna' || detected.id === 'oli')) {
       list.push({
         level: 'warn',
-        message:
-          '当前使用电机话题：并联踝/腰的电机角度与串行关节角不同，3D 姿态只作参考，不是实机串行关节角。',
+        message: '当前使用电机话题：并联踝/腰的电机角度与串行关节角不同，3D 姿态只作参考，不是实机串行关节角。',
       })
     }
     if (mapping.value.unmapped.length) {
@@ -498,8 +489,7 @@ function seek(event) {
 
 function onKeydown(event) {
   const tag = event.target?.tagName
-  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || event.target?.isContentEditable)
-    return
+  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || event.target?.isContentEditable) return
   if (event.code === 'Space') {
     event.preventDefault()
     toggle()
@@ -547,9 +537,7 @@ onBeforeUnmount(() => {
       </label>
 
       <div class="actions">
-        <button type="button" class="btn" :disabled="busy" @click="loadSample">
-          示例：{{ SAMPLE.label }}
-        </button>
+        <button type="button" class="btn" :disabled="busy" @click="loadSample">示例：{{ SAMPLE.label }}</button>
         <button type="button" class="btn ghost" :disabled="busy" @click="clearAll">清空</button>
         <span v-if="sampleName" class="muted small">示例：{{ sampleName }}</span>
         <span v-if="busy" class="muted small">正在解析 {{ progress }}%…</span>
@@ -589,34 +577,17 @@ onBeforeUnmount(() => {
         <RobotSkeletonView
           :points="pose?.points || null"
           :skeleton="profile?.skeleton || null"
-          :empty-message="
-            profile?.skeleton ? '当前时刻没有关节数据' : '未识别骨架，请展开下方关节角度查看数值'
-          "
+          :empty-message="profile?.skeleton ? '当前时刻没有关节数据' : '未识别骨架，请展开下方关节角度查看数值'"
         />
 
         <div class="playback-bar">
           <button type="button" class="btn primary icon-btn" @click="toggle">
             {{ playing ? '暂停' : '播放' }}
           </button>
-          <button type="button" class="btn ghost icon-btn" title="上一帧" @click="step(-1)">
-            ‹
-          </button>
-          <button type="button" class="btn ghost icon-btn" title="下一帧" @click="step(1)">
-            ›
-          </button>
-          <input
-            class="playback-range"
-            type="range"
-            min="0"
-            :max="duration"
-            step="0.001"
-            :value="current"
-            aria-label="回放时间"
-            @input="seek"
-          />
-          <span class="mono time-label"
-            >{{ formatTime(current) }} / {{ formatTime(duration) }}</span
-          >
+          <button type="button" class="btn ghost icon-btn" title="上一帧" @click="step(-1)">‹</button>
+          <button type="button" class="btn ghost icon-btn" title="下一帧" @click="step(1)">›</button>
+          <input class="playback-range" type="range" min="0" :max="duration" step="0.001" :value="current" aria-label="回放时间" @input="seek" />
+          <span class="mono time-label">{{ formatTime(current) }} / {{ formatTime(duration) }}</span>
           <select v-model.number="speed" class="mono" aria-label="播放速度">
             <option :value="0.25">0.25×</option>
             <option :value="0.5">0.5×</option>
@@ -655,25 +626,18 @@ onBeforeUnmount(() => {
           <label>
             <span>关节话题</span>
             <select v-model="jointTopic" :disabled="busy" @change="reparse">
-              <option v-for="topic in jointTopics" :key="topic.name" :value="topic.name">
-                {{ topic.name }} · {{ topic.type }}
-              </option>
+              <option v-for="topic in jointTopics" :key="topic.name" :value="topic.name">{{ topic.name }} · {{ topic.type }}</option>
             </select>
           </label>
           <label>
             <span>IMU 话题</span>
             <select v-model="imuTopic" :disabled="busy" @change="reparse">
               <option value="">不使用（底座姿态固定）</option>
-              <option v-for="topic in imuTopics" :key="topic.name" :value="topic.name">
-                {{ topic.name }} · {{ topic.type }}
-              </option>
+              <option v-for="topic in imuTopics" :key="topic.name" :value="topic.name">{{ topic.name }} · {{ topic.type }}</option>
             </select>
           </label>
         </div>
-        <p class="muted small">
-          关节按名称映射到骨架；没有名称的 bag 按机型配置的硬件下标顺序映射。
-          未接入的机型会显示关节数值，不会凭空生成模型。
-        </p>
+        <p class="muted small">关节按名称映射到骨架；没有名称的 bag 按机型配置的硬件下标顺序映射。 未接入的机型会显示关节数值，不会凭空生成模型。</p>
       </section>
 
       <section class="card">

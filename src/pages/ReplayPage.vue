@@ -48,7 +48,7 @@ const duration = ref(0)
 const current = ref(0)
 const playing = ref(false)
 const speed = ref(1)
-const loop = ref(true)
+const loop = ref(false)
 const jointGap = ref(0.1)
 
 let frameHandle = 0

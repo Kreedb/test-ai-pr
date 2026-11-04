@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
 // The whole app is static, so a build-time precache list makes every tool work
@@ -21,10 +21,23 @@ export function offlinePlugin(base, staticFiles = []) {
       handler(_options, bundle) {
         const built = Object.keys(bundle).filter((file) => !file.endsWith('.map'))
         const index = bundle['index.html']
+        const publicFiles = publicDir && existsSync(publicDir)
+          ? readdirSync(publicDir, { recursive: true, withFileTypes: true })
+            .filter((entry) => entry.isFile())
+            .map((entry) => join(entry.parentPath, entry.name))
+            .sort()
+          : []
+        // Runtime fetches are cached under this version, and samples are not
+        // content-hashed, so hash every public file: same name, new content must
+        // still produce a new cache.
         const revision = createHash('sha256')
           .update(String(index?.type === 'asset' ? index.source : ''))
-        // Hash public files too: same name, new content must still update the cache.
-        for (const file of staticFiles) revision.update(readFileSync(join(publicDir, file)))
+        for (const file of publicFiles) revision.update(file).update(readFileSync(file))
+
+        // A listed precache source that is missing must fail the build rather
+        // than ship a worker whose install step cannot complete.
+        const missing = staticFiles.filter((file) => !publicFiles.includes(join(publicDir, file)))
+        if (missing.length > 0) throw new Error(`Missing public file: ${missing.join(', ')}`)
 
         this.emitFile({
           type: 'asset',

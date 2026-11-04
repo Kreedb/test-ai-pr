@@ -3,6 +3,9 @@
 // changes, otherwise a stale index.html is served forever.
 
 import assert from 'node:assert/strict'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
 
 import { offlinePlugin, serviceWorkerSource } from '../build/offline.js'
@@ -46,6 +49,28 @@ test('the plugin emits sw.js for the bundle and public files', () => {
   assert.equal(emitted[0].fileName, 'sw.js')
   assert.ok(emitted[0].source.includes('/test-ai-pr/assets/index-abc.js'))
   assert.ok(emitted[0].source.includes('/test-ai-pr/convbin.svg'))
+})
+
+test('the cache version changes when a runtime-cached public file changes', () => {
+  const publicDir = mkdtempSync(join(tmpdir(), 'convbin-offline-'))
+  try {
+    writeFileSync(join(publicDir, 'sample.bin'), 'first')
+    const bundle = { 'index.html': { type: 'asset', source: '<html></html>' } }
+    const emitSource = () => {
+      const emitted = []
+      const plugin = offlinePlugin('/test-ai-pr/')
+      plugin.configResolved({ publicDir })
+      plugin.generateBundle.handler.call({ emitFile: (asset) => emitted.push(asset) }, {}, bundle)
+      return emitted[0].source
+    }
+
+    const before = emitSource()
+    writeFileSync(join(publicDir, 'sample.bin'), 'second')
+
+    assert.notEqual(before, emitSource())
+  } finally {
+    rmSync(publicDir, { recursive: true, force: true })
+  }
 })
 
 test('a missing public file fails the build instead of silently disabling offline', () => {

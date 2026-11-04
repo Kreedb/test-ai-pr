@@ -66,10 +66,6 @@ const selectedPcbItem = computed(
 const searchIndex = computed(() => buildSearchIndex(model.value, nets.value))
 const results = computed(() => searchPreview(searchIndex.value, query.value.trim()))
 
-const componentsWithBothSides = computed(
-  () => components.value.filter((component) => component.pcb && component.schematic).length,
-)
-
 // ---- layer visibility -----------------------------------------------------
 
 const hiddenLayers = ref(new Set())
@@ -359,8 +355,6 @@ watch(
 const activeNetPcbPads = computed(() => activeNet.value?.pcbPads || [])
 const activeNetSchematicPins = computed(() => activeNet.value?.schematicPins || [])
 
-const sheetCount = computed(() => schematic.value?.sheets.length || 0)
-
 const selectedLabel = computed(() => {
   const item = selectedPcbItem.value
   if (!item?.refdes) return ''
@@ -374,10 +368,43 @@ const selectedLabel = computed(() => {
       <h2>设计预览</h2>
       <span class="badge">只读</span>
     </div>
-    <p class="muted small">
-      直接渲染转换得到的 Circuit JSON：滚轮缩放、拖拽平移，点击元件或焊盘可定位，网络可在 PCB 与原理图之间互相跳转。
-      按住 Ctrl（macOS 为 ⌘）点击焊盘、引脚或网络名，可直接跳到另一视图的同名网络；PCB 视图按空格键翻转正反面。
-    </p>
+    <table class="data-table shortcut-table">
+      <caption>操作说明</caption>
+      <thead>
+        <tr>
+          <th>操作</th>
+          <th>方式</th>
+          <th>说明</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="nowrap">缩放</td>
+          <td class="nowrap">滚轮</td>
+          <td class="small">以指针位置为中心缩放；点击“适应”恢复全图</td>
+        </tr>
+        <tr>
+          <td class="nowrap">平移</td>
+          <td class="nowrap">按住左键拖拽</td>
+          <td class="small">移动画布视图</td>
+        </tr>
+        <tr>
+          <td class="nowrap">选择</td>
+          <td class="nowrap">单击焊盘、引脚或元件</td>
+          <td class="small">焊盘、引脚高亮所属网络并定位；元件选中并高亮</td>
+        </tr>
+        <tr>
+          <td class="nowrap">跨视图定位</td>
+          <td class="nowrap"><kbd>Ctrl</kbd> / <kbd>⌘</kbd> + 单击</td>
+          <td class="small">跳转到另一视图的同名网络</td>
+        </tr>
+        <tr>
+          <td class="nowrap">翻转板面</td>
+          <td class="nowrap"><kbd>空格</kbd></td>
+          <td class="small">仅 PCB 视图，切换正反面</td>
+        </tr>
+      </tbody>
+    </table>
 
     <div class="preview-toolbar">
       <div class="tabs" role="tablist">
@@ -423,12 +450,6 @@ const selectedLabel = computed(() => {
           </li>
         </ul>
         <p v-else-if="query.trim()" class="muted small no-results">没有匹配的网络、元件或引脚。</p>
-      </div>
-
-      <div class="preview-meta muted small">
-        <span v-if="pcb">{{ pcb.copperLayerCount }} 层铜 · {{ pcb.components.length }} 元件</span>
-        <span v-if="schematic">{{ sheetCount }} 张原理图 · {{ schematic.components.length }} 符号</span>
-        <span v-if="componentsWithBothSides">{{ componentsWithBothSides }} 个位号两侧都有</span>
       </div>
     </div>
 

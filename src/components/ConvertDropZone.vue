@@ -35,12 +35,12 @@ function onFileChange(event) {
       @change="onFileChange"
     />
     <span class="drop-title">
-      拖拽 Altium / Specctra / EAGLE / PADS 文件或 .zip 压缩包到这里,或点击选择文件
+      拖拽 Altium / Specctra / EAGLE / PADS 文件或 .zip 压缩包到这里，或点击选择文件
     </span>
     <span class="drop-hint">
-      支持 .PcbDoc、.SchDoc、.dsn、.ses、.brd、.sch、.asc,可一次选择整个工程,也可以直接给一个 .zip;
-      压缩包会在浏览器里解开,只取其中能转换的文件 · 单个文件最大
-      {{ formatBytes(maxInputBytes) }},合计最大 {{ formatBytes(maxTotalBytes) }}
+      支持 .PcbDoc、.SchDoc、.dsn、.ses、.brd、.sch、.asc，可一次选择整个工程，也可以直接上传 .zip；
+      压缩包会在浏览器内解开，仅保留可转换的文件。单个文件上限
+      {{ formatBytes(maxInputBytes) }}，合计上限 {{ formatBytes(maxTotalBytes) }}。
     </span>
   </label>
 </template>

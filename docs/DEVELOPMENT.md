@@ -89,11 +89,15 @@ src/lib/formats/           # 每种来源一个模块：元数据、有损说明
 src/lib/formats/index.js   # 显式格式注册表：支持矩阵、有损表与样例按钮的唯一来源
 src/lib/archive.js         # zip 压缩包展开与成员筛选（大小/数量/嵌套限制）
 src/lib/preview.js         # 只读预览模型：PCB/原理图几何、图层、网络索引与搜索（无 Vue 依赖）
+src/lib/replay/rosbag.js   # ROS1 bag v2 读取与 JointState / IMU 解码（无 Vue 依赖）
+src/lib/replay/profiles.js # 机型骨架、关节名映射与按机型识别
+src/lib/replay/pose.js     # 骨架正运动学与四元数工具（无 Vue 依赖）
+src/lib/replay/models.js   # LimX Luna / Oli 的关节偏移与转轴
 src/lib/route-path.js      # hash 路径归一化与路由匹配（无 Vue 依赖，供路由与链接共用）
 src/routes.js              # 按 src/pages/*Page.vue 自动收集路由、导航与首页工具卡片
 src/router.js              # 极简 hash 路由（GitHub Pages 子路径下无需重写规则）
-src/pages/                 # 导航页、解析器页、EDA 转换页
-src/components/            # 可编辑表格、PDO、DC、十六进制视图、设计预览、格式支持与有损表
+src/pages/                 # 导航页、解析器页、机器人回放页、EDA 转换页
+src/components/            # 可编辑表格、PDO、DC、十六进制视图、设计预览、机器人骨架、格式支持与有损表
 src/App.vue                # 页面外壳：品牌、导航、路由出口、页脚
 public/samples/            # 示例 EEPROM 转储、ESI XML、Altium / Specctra / EAGLE / PADS 工程文件
 build/offline.js           # 构建时生成离线用 Service Worker（预缓存全部产物与解析器示例）
@@ -115,6 +119,7 @@ import { padsToCircuitJson } from 'pads-to-circuit-json'
 
 - 新增 EDA 来源：在 `src/lib/formats/` 下新建 `<id>.js`，导出元数据、`losses`、`detect`、`convert`，然后在 `src/lib/formats/index.js` 的显式导入列表里加一行。支持矩阵、有损表、样例按钮和格式标签都从注册表派生，不需要改页面。
 - 新增页面：在 `src/pages/` 下新建 `NamePage.vue`，在普通 `<script>` 块里导出 `route`（`label`、`order`，需要首页卡片时再加 `tool`）。路径由文件名自动生成，导航、路由出口和首页工具列表都从页面自身派生。
+- 新增机器人型号：在 `src/lib/replay/models.js` 放关节偏移/转轴，在 `src/lib/replay/profiles.js` 注册机型、关节顺序与名称映射。消息字段不同的厂商还需要扩展 `src/lib/replay/rosbag.js` 的解码器。
 - 新增测试：按来源放到 `test/<id>.test.mjs`，公共的样例读取与转换辅助函数放在 `test-support/` 下（不要放进 `test/`：`node --test` 会把 `test/` 下的每个 `.js`/`.mjs` 当测试文件执行），避免所有格式共用一个巨型测试文件。
 - 新增可独立发布的解析器：在 `lib/<package-name>/` 下建立独立包（`package.json`、`src/index.js`、`README.md`），用包名在主项目里引用。`lib/` 不允许反向依赖 `src/`，由 `test/lib.test.mjs` 守护。
 
@@ -160,6 +165,7 @@ npm test
 - `test/eagle.test.mjs`：EAGLE XML 识别、转换与镜像元件。
 - `test/pads.test.mjs`：PADS ASCII 解析、转换与上游 fixture。
 - `test/preview.test.mjs`：预览模型的几何、图层、网络与文字尺寸。
+- `test/replay.test.mjs`：ROS1 bag 解析、机型识别、正运动学与回放示例。
 - `test/registry.test.mjs`：格式注册表元数据与样例文件存在性。
 - `test/routes.test.mjs`：hash 路径归一化与匹配。
 - `test/sii.test.mjs`：`sii-parser` 的样例解析、CRC 与畸形输入。

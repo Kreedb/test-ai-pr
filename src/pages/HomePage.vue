@@ -13,10 +13,11 @@ const primary = tools[0]
   <main class="app-main">
     <section class="card hero">
       <span class="hero-tag">convbin · 二进制工具箱</span>
-      <h2>SII EEPROM 解析与 EDA 格式转换</h2>
+      <h2>EEPROM、EDA 与机器人包工具</h2>
       <p>
         上传 .bin 转储即可查看并编辑全部 SII 字段，导出 EtherCATInfo XML，并用内置的 EEPROM 生成器重新编译校验；
-        也可以把 Altium、Specctra、EAGLE 或 PADS 工程转换成 KiCad 文件。
+        也可以把 Altium、Specctra、EAGLE 或 PADS 工程转换成 KiCad 文件，
+        或回放 ROS1 bag 里的关节与 IMU 数据来还原机器人姿态。
       </p>
       <div class="hero-actions">
         <a v-if="primary" class="btn primary" :href="routeHref(primary.path)">

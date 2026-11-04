@@ -16,7 +16,7 @@ const page = computed(() => active.value?.component || homeRoute.component)
         <div class="brand-mark" aria-hidden="true">CB</div>
         <div>
           <h1>convbin</h1>
-          <p>二进制工具箱 · SII EEPROM 解析、ESI XML 导出与 EDA 格式转换</p>
+          <p>二进制工具箱 · EEPROM 解析、EDA 转换与机器人 bag 回放</p>
         </div>
       </a>
 

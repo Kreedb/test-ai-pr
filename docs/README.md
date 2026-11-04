@@ -6,6 +6,7 @@
 | --- | --- |
 | [parser](parser/README.md) | EEPROM 解析器页面 |
 | [parser/sii-format.md](parser/sii-format.md) | SII 镜像布局与 ESI 映射规则 |
+| [replay](replay/README.md) | 机器人 bag 回放页面、机型骨架与限制 |
 | [convert](convert/README.md) | EDA 转 KiCad 页面与转换流水线 |
 | [convert/formats.md](convert/formats.md) | 支持的来源、识别方式与示例数据 |
 | [convert/losses.md](convert/losses.md) | 有损转换的类别与原因 |

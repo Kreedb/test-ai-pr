@@ -13,7 +13,7 @@ import lz4js from 'lz4js'
 
 export const BAG_MAGIC = '#ROSBAG V2.0\n'
 export const MAX_BAG_BYTES = 256 * 1024 * 1024
-export const MAX_CHUNK_BYTES = 512 * 1024 * 1024
+export const MAX_CHUNK_BYTES = MAX_BAG_BYTES
 
 const textDecoder = new TextDecoder()
 
@@ -129,7 +129,7 @@ export function inspectRosbag(bytes) {
 }
 
 export function topicKind(type = '') {
-  if (type.endsWith('/JointState')) return 'joint'
+  if (type === 'controller_msgs/JointState' || type === 'sensor_msgs/JointState') return 'joint'
   if (type === 'controller_msgs/IMUData' || type === 'sensor_msgs/Imu') return 'imu'
   return null
 }

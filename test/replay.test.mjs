@@ -54,6 +54,15 @@ test('inspects connections without decoding chunks', () => {
   )
 })
 
+test('does not offer unsupported JointState-like types', () => {
+  const bytes = bag(
+    [{ conn: 0, time: 10, data: encodeJointState({ names: ['a'], position: [0], time: 10 }) }],
+    [{ id: 0, topic: '/joint/state', type: 'my_robot/JointState' }],
+  )
+  const info = inspectRosbag(bytes)
+  assert.deepEqual(info.topics.map((topic) => topic.kind), [null])
+})
+
 test('decodes named joint state and IMU from an lz4 chunk', () => {
   const bytes = bag(
     [

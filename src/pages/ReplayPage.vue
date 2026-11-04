@@ -6,22 +6,24 @@ export const route = {
     tag: 'BAG',
     title: '机器人包回放',
     description:
-      '读取 ROS1 bag 的关节与 IMU 话题（支持未完成的 .active 自动恢复），按时间轴还原机器人姿态；内置 LimX Luna / Oli / TRON2A 骨架。',
+      '读取 ROS1 bag 的关节与 IMU 话题（支持未完成的 .active 自动恢复），按时间轴还原机器人姿态；可同时导入文本日志并按时间对照。内置 LimX Luna / Oli / TRON2A 骨架。',
     action: '打开回放',
   },
 }
 </script>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 
 import RobotSkeletonView from '@/components/RobotSkeletonView.vue'
 import { formatBytes } from '@/lib/format'
+import { MAX_LOG_BYTES, alignLog, parseLogText } from '@/lib/replay/logfile'
 import { buildJointValues, computePose, normalizeQuat, quatToEuler } from '@/lib/replay/pose'
 import { detectProfile, mapJoints } from '@/lib/replay/profiles'
 import { MAX_BAG_BYTES, inspectRosbag, readRosbag } from '@/lib/replay/rosbag'
 
 const SAMPLE = { file: 'samples/replay/luna-demo.bag', label: 'Luna 动作' }
+const LOG_ROWS = 200
 
 const fileName = ref('')
 const sampleName = ref('')
@@ -37,6 +39,12 @@ const profile = shallowRef(null)
 const mapping = shallowRef({ entries: [], unmapped: [] })
 const warnings = shallowRef([])
 const bagBytes = shallowRef(null)
+const logName = ref('')
+const logEntries = shallowRef([])
+const logWarnings = shallowRef([])
+const logError = ref('')
+const logBusy = ref(false)
+const logView = ref(null)
 const startTime = ref(0)
 const duration = ref(0)
 const current = ref(0)
@@ -53,6 +61,35 @@ const imuSeries = computed(() => result.value?.series?.[imuTopic.value] || null)
 const jointTopics = computed(() => topics.value.filter((topic) => topic.kind === 'joint'))
 const imuTopics = computed(() => topics.value.filter((topic) => topic.kind === 'imu'))
 const absoluteTime = computed(() => startTime.value + current.value)
+
+const logAligned = computed(() => {
+  if (!logEntries.value.length || !result.value) return { entries: [], basis: '', aligned: false }
+  return alignLog(logEntries.value, startTime.value, startTime.value + duration.value)
+})
+
+const logRows = computed(() => {
+  const entries = logAligned.value.entries
+  let low = 0
+  let high = entries.length
+  while (low < high) {
+    const middle = (low + high) >> 1
+    if (entries[middle].time <= absoluteTime.value) low = middle + 1
+    else high = middle
+  }
+  const start = Math.max(0, low - LOG_ROWS)
+  return entries.slice(start, low).map((row, offset) => ({ ...row, index: start + offset }))
+})
+
+const logBasis = computed(() => (logAligned.value.basis === 'clk' ? 'clk 单调时钟' : '墙钟时间'))
+
+watch(
+  () => logRows.value[logRows.value.length - 1]?.time ?? null,
+  () => {
+    nextTick(() => {
+      if (logView.value) logView.value.scrollTop = logView.value.scrollHeight
+    })
+  },
+)
 
 function indexAt(times, time) {
   if (!times?.length) return -1
@@ -158,6 +195,17 @@ function formatTime(seconds) {
   const minutes = Math.floor(value / 60)
   const rest = value - minutes * 60
   return `${sign}${minutes}:${rest.toFixed(2).padStart(5, '0')}`
+}
+
+function logRelative(row) {
+  if (!logAligned.value.aligned) return row.time.toFixed(3)
+  return formatTime(row.time - startTime.value)
+}
+
+function fileKind(name) {
+  if (/\.(bag|active)$/i.test(name)) return 'bag'
+  if (/\.(log|txt)$/i.test(name)) return 'log'
+  return ''
 }
 
 function pickTopic(list, preferred) {
@@ -301,15 +349,57 @@ async function handleFile(file) {
   }
 }
 
+async function handleLogs(files) {
+  const total = files.reduce((sum, file) => sum + file.size, 0)
+  if (total > MAX_LOG_BYTES) {
+    logError.value = `日志合计超过 ${formatBytes(MAX_LOG_BYTES)} 上限`
+    return
+  }
+  logBusy.value = true
+  try {
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    const texts = []
+    for (const file of files) texts.push(await file.text())
+    const parsed = parseLogText(texts.join('\n'))
+    if (!parsed.entries.length) {
+      throw new Error('日志里没有带时间戳的行（支持 clk(...)、[epoch] 或 YYYY-MM-DD HH:MM:SS.mmm）')
+    }
+    logEntries.value = parsed.entries
+    logWarnings.value = parsed.warnings
+    logError.value = ''
+    logName.value = files.map((file) => file.name).join(' + ')
+  } catch (cause) {
+    logError.value = `${files.map((file) => file.name).join(' + ')}：${messageOf(cause)}`
+  } finally {
+    logBusy.value = false
+  }
+}
+
+async function handleFiles(files) {
+  const list = [...files]
+  const bags = list.filter((file) => fileKind(file.name) === 'bag')
+  const logs = list.filter((file) => fileKind(file.name) === 'log')
+  if (!bags.length && !logs.length) {
+    fail(new Error('仅支持 ROS1 .bag / .active 和文本 .log / .txt 文件'))
+    return
+  }
+  if (bags.length > 1) {
+    fail(new Error('一次只能加载一个 bag 文件'))
+    return
+  }
+  if (bags[0]) await handleFile(bags[0])
+  if (logs.length) await handleLogs(logs)
+}
+
 function onDrop(event) {
   dragging.value = false
-  const file = event.dataTransfer?.files?.[0]
-  if (file) handleFile(file)
+  const files = event.dataTransfer?.files
+  if (files?.length) handleFiles(files)
 }
 
 function onFileChange(event) {
-  const file = event.target.files?.[0]
-  if (file) handleFile(file)
+  const files = event.target.files
+  if (files?.length) handleFiles(files)
   event.target.value = ''
 }
 
@@ -350,6 +440,10 @@ function clearAll() {
   pause()
   fail('')
   error.value = ''
+  logName.value = ''
+  logEntries.value = []
+  logWarnings.value = []
+  logError.value = ''
 }
 
 function toggle() {
@@ -431,8 +525,9 @@ onBeforeUnmount(() => {
   <main class="app-main">
     <section class="card input-card">
       <div class="card-head">
-        <h2>导入机器人 bag</h2>
+        <h2>导入机器人 bag 与日志</h2>
         <span v-if="fileName" class="badge">{{ fileName }}</span>
+        <span v-if="logName" class="badge">{{ logName }}</span>
       </div>
 
       <label
@@ -442,11 +537,12 @@ onBeforeUnmount(() => {
         @dragleave.prevent="dragging = false"
         @drop.prevent="onDrop"
       >
-        <input type="file" accept=".bag,.active" @change="onFileChange" />
-        <span class="drop-title">拖拽 ROS1 .bag / .active 到这里，或点击选择文件</span>
+        <input type="file" multiple accept=".bag,.active,.log,.txt" @change="onFileChange" />
+        <span class="drop-title">拖拽 ROS1 .bag / .active 与 .log 文本日志，或点击选择文件</span>
         <span class="drop-hint">
-          JointState + IMU · 未压缩或 lz4 · .active 自动恢复 · 最大
-          {{ formatBytes(MAX_BAG_BYTES) }} · 数据只在浏览器本地处理
+          JointState + IMU · 未压缩或 lz4 · .active 自动恢复 · 日志按 clk / 时间戳对齐 · bag 最大
+          {{ formatBytes(MAX_BAG_BYTES) }} · 日志最大 {{ formatBytes(MAX_LOG_BYTES) }} ·
+          数据只在浏览器本地处理
         </span>
       </label>
 
@@ -457,6 +553,7 @@ onBeforeUnmount(() => {
         <button type="button" class="btn ghost" :disabled="busy" @click="clearAll">清空</button>
         <span v-if="sampleName" class="muted small">示例：{{ sampleName }}</span>
         <span v-if="busy" class="muted small">正在解析 {{ progress }}%…</span>
+        <span v-if="logBusy" class="muted small">正在解析日志…</span>
       </div>
     </section>
 
@@ -607,6 +704,50 @@ onBeforeUnmount(() => {
         </details>
       </section>
     </template>
+
+    <section v-if="logName || logError" class="card log-card">
+      <div class="card-head">
+        <h2>日志时间线</h2>
+        <span v-if="logName" class="badge">{{ logName }}</span>
+      </div>
+
+      <p v-if="logError" class="warn-warn">{{ logError }}</p>
+      <template v-else>
+        <p class="muted small">
+          {{ logEntries.length.toLocaleString() }} 条带时间戳的日志
+          <template v-if="result">
+            · 按 {{ logBasis }} 对齐
+            <span v-if="!logAligned.aligned" class="warn-warn"
+              >· 日志时间与 bag 记录时间不重叠，无法匹配</span
+            >
+          </template>
+          <template v-else> · 导入 bag 后按播放时间显示</template>
+        </p>
+
+        <ul
+          v-if="result && logRows.length"
+          ref="logView"
+          class="log-view"
+          aria-label="当前回放时间之前的日志"
+        >
+          <li
+            v-for="row in logRows"
+            :key="row.index"
+            :class="`log-${row.level ? row.level.toLowerCase() : 'info'}`"
+          >
+            <span class="log-time mono">{{ logRelative(row) }}</span>
+            <span class="log-text mono">{{ row.text }}</span>
+          </li>
+        </ul>
+        <p v-else-if="result" class="muted small">当前回放时间之前没有日志。</p>
+
+        <ul v-if="logWarnings.length" class="warning-list">
+          <li v-for="(warning, index) in logWarnings" :key="index" :class="`warn-${warning.level}`">
+            {{ warning.message }}
+          </li>
+        </ul>
+      </template>
+    </section>
   </main>
 </template>
 
@@ -688,5 +829,50 @@ details summary {
 
 details[open] summary {
   margin-bottom: 12px;
+}
+
+.log-view {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 360px;
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-soft);
+  list-style: none;
+  font-size: 0.78rem;
+}
+
+.log-view li {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.log-time {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.log-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.log-w .log-text {
+  color: var(--warn);
+}
+
+.log-e .log-text,
+.log-f .log-text {
+  color: var(--err);
+}
+
+.log-d .log-text {
+  color: var(--muted);
 }
 </style>

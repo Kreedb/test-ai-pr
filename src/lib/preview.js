@@ -63,6 +63,38 @@ export function pcbFlipBounds(bounds, boardBounds) {
 }
 
 /**
+ * Locator rings drawn over the pads and vias of one net, in board millimetres.
+ * `items` is the already visibility-filtered PCB item list. The rings are plain
+ * geometry that a single CSS animation can blink: per-item SVG filters inside
+ * this layer made the whole board re-rasterize on every pan frame.
+ */
+export function pcbNetMarkers(items, netName) {
+  if (!netName) return []
+  const markers = []
+  for (const item of items || []) {
+    if (item.net !== netName) continue
+    const element = item.element || {}
+    const x = element.x ?? element.center?.x ?? 0
+    const y = element.y ?? element.center?.y ?? 0
+    let radius = 0
+    if (item.kind === 'via') {
+      radius = (element.outer_diameter || 0.6) / 2
+    } else if (item.kind === 'pad') {
+      // Pill and oval pads put their long side in `width`/`height` and only the
+      // end-cap in `radius`, so prefer the bounding half-size when it exists.
+      const width = element.rect_pad_width || element.width || element.outer_width || 0
+      const height = element.rect_pad_height || element.height || element.outer_height || width
+      radius = Math.max(width, height) / 2 || element.radius || (element.outer_diameter || 0) / 2 || (element.hole_diameter || 0) / 2
+    } else {
+      continue
+    }
+    // Tiny pads still need a ring big enough to find at a zoomed-out fit.
+    markers.push({ id: `mark:${item.id}`, x, y, radius: Math.max(radius, 0.3) + 0.12 })
+  }
+  return markers
+}
+
+/**
  * Font size, in schematic model units, of a `schematic_text`. `keepsOwnSize`
  * mirrors the writer: it honours `font_size` only while the schematic also keeps
  * its standalone graphics, and redraws everything else at the 1.27 mm default.

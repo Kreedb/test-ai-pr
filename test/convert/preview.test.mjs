@@ -23,6 +23,7 @@ import {
   indexNets,
   pcbFlipBounds,
   pcbFlipTransform,
+  pcbNetMarkers,
   pxPerMm,
   schematicTextSize,
   searchPreview,
@@ -297,6 +298,49 @@ test('schematic zoom is not 15x weaker than the board', () => {
   // what the schematic gets, not its ceiling.
   assert.ok(MAX_PX_PER_MM > 60, `cap ${MAX_PX_PER_MM} must exceed the old 60x`)
   assert.ok(pxPerMm(schematic.zoomOut, SCHEMATIC_MM_PER_UNIT) > 0)
+})
+
+test('net locator markers ring the pads and vias of one net', async () => {
+  // The PCB highlight blinks a ring over each pad and via of the net. They are
+  // plain circles in one group; a filter per item was the pan-stutter cause.
+  const model = buildPreviewModel((await eagleProject()).circuitJson)
+  const n1 = indexNets(model).find((net) => net.name === 'N$1')
+  assert.ok(n1)
+
+  const pads = model.pcb.items.filter((item) => item.kind === 'pad' && item.net === 'N$1')
+  const vias = model.pcb.items.filter((item) => item.kind === 'via' && item.net === 'N$1')
+  const markers = pcbNetMarkers(model.pcb.items, 'N$1')
+  assert.ok(pads.length >= 2, `N$1 pads: ${pads.length}`)
+  assert.equal(markers.length, pads.length + vias.length)
+
+  for (const marker of markers) {
+    assert.ok(Number.isFinite(marker.x) && Number.isFinite(marker.y), `bad centre on ${marker.id}`)
+    // Rings stay visible even on a pad smaller than the blink marker.
+    assert.ok(marker.radius > 0.3, `ring ${marker.id} radius ${marker.radius}`)
+  }
+
+  // N$4 reaches the board through a via alone, so a pad-only locator would
+  // leave the user with nothing to blink.
+  assert.ok(pcbNetMarkers(model.pcb.items, 'N$4').length >= 1)
+
+  // Pill pads carry only the end-cap in `radius`; the ring must follow the long
+  // side or it sits inside the copper on the F405 core board.
+  const f405 = buildPreviewModel((await coreBoardProject()).circuitJson)
+  const pill = f405.pcb.items.find((item) => item.kind === 'pad' && item.element.shape === 'rotated_pill' && item.net)
+  assert.ok(pill, 'expected a routed pill pad on the F405 board')
+  const [pillMarker] = pcbNetMarkers([pill], pill.net)
+  assert.ok(pillMarker.radius > Math.max(pill.element.width, pill.element.height) / 2, `pill ring ${pillMarker.radius} fits inside the pad`)
+
+  // Markers come only from the items they are given; the view passes its
+  // visibility-filtered list, so hidden layers contribute no rings.
+  assert.deepEqual(
+    pcbNetMarkers(
+      model.pcb.items.filter((item) => item.kind !== 'pad' && item.kind !== 'via'),
+      'N$1',
+    ),
+    [],
+  )
+  assert.deepEqual(pcbNetMarkers(model.pcb.items, ''), [])
 })
 
 test('pcb flip mirrors the board around its outline centre', () => {

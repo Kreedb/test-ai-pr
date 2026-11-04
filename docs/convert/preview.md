@@ -28,6 +28,7 @@
 - 交叉定位通过 `source_port_id` 连接 PCB 与原理图：`source_trace.connected_source_port_ids` → `pcb_port` / `schematic_port`。
 - 网络按名称索引，不按 `source_net_id`：EAGLE 会合并同名网络，KiCad 通过全局标签连接。
 - 高亮比较用元素上的普通网络名，不用模型内部的 `netKey`。
+- 网络高亮不要在单个图元上挂 SVG 滤镜：`filter: drop-shadow` 会让每个高亮焊盘成为独立滤镜区域，拖动时每帧都要重新光栅化。PCB 改成一个 `preview-net-markers` 组里的闪烁定位环（拖动中暂停动画，尊重 `prefers-reduced-motion`），原理图用描边换色和选中虚框。
 
 ## 文字尺寸
 

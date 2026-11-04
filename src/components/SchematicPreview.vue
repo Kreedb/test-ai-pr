@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 
-import { SCHEMATIC_TEXT_SIZE } from '@/lib/preview'
+import { SCHEMATIC_TEXT_SIZE, unionBounds } from '@/lib/preview'
 
 // Read-only schematic canvas. Coordinates are Circuit JSON schematic units
 // with Y up; PreviewViewport flips the world group for the DOM.
@@ -44,8 +44,6 @@ function classesOf(item) {
   const net = item.net || ''
   return {
     'preview-dim': Boolean(props.activeNet) && net !== props.activeNet,
-    'preview-hit': Boolean(props.activeNet) && net === props.activeNet,
-    'preview-selected': Boolean(props.selectedComponentId) && item.componentId === props.selectedComponentId,
   }
 }
 
@@ -60,6 +58,23 @@ const componentById = computed(() => {
   const map = new Map()
   for (const component of components.value) map.set(component.id, component)
   return map
+})
+
+// A dashed outline marks the selected part. The old highlight was an SVG filter,
+// which re-rasterized the drawing on every pan frame for no benefit here. The
+// union covers pins and value texts too, and keeps zero-sized symbols (the
+// renderer falls back to a 0.4 mm body) from collapsing to a 0x0 rect.
+const selectionBounds = computed(() => {
+  if (!props.selectedComponentId) return null
+  const own = items.value.filter((item) => item.componentId === props.selectedComponentId)
+  const bounds = unionBounds(own.map((item) => item.bounds))
+  if (bounds && (bounds.width || bounds.height)) return bounds
+  // A symbol with no size and no children is drawn as the minimum body box, so
+  // outline that instead of a 0x0 rect the user cannot see.
+  const component = components.value.find((item) => item.componentId === props.selectedComponentId)
+  if (!component) return bounds
+  const rect = componentRect(component)
+  return { minX: rect.x, minY: rect.y, maxX: rect.x + rect.width, maxY: rect.y + rect.height, width: rect.width, height: rect.height }
 })
 
 function componentRect(component) {
@@ -227,5 +242,18 @@ const textOf = (item) => {
         </text>
       </g>
     </g>
+
+    <rect
+      v-if="selectionBounds"
+      :x="selectionBounds.minX"
+      :y="selectionBounds.minY"
+      :width="selectionBounds.width"
+      :height="selectionBounds.height"
+      fill="none"
+      stroke="#5b8cff"
+      stroke-width="1.5"
+      stroke-dasharray="4 3"
+      vector-effect="non-scaling-stroke"
+    />
   </g>
 </template>

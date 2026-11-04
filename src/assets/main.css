@@ -1326,12 +1326,38 @@ section[id] {
   transition: opacity 0.12s ease;
 }
 
-.preview-hit {
-  filter: drop-shadow(0 0 3px rgba(255, 179, 64, 0.85));
+/* The locator rings on the active net blink as one group. A per-item SVG
+   filter used to be the highlight; it forced a filter region re-raster for
+   every highlighted pad on every pan frame, which is what stalled the drag.
+   `steps(1, end)` keeps the idle blink to two opacity changes per cycle
+   instead of repainting the highlighted area every frame. */
+.preview-net-markers {
+  pointer-events: none;
+  animation: preview-net-blink 1.1s steps(1, end) infinite;
 }
 
-.preview-selected {
-  filter: drop-shadow(0 0 4px rgba(91, 140, 255, 0.9));
+/* Panning rewrites the viewBox each frame, so freeze the blink while moving:
+   the rings stay visible and the moving view pays for no extra paint. */
+.preview-viewport.dragging .preview-net-markers {
+  animation: none;
+  opacity: 1;
+}
+
+@keyframes preview-net-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.15;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .preview-net-markers {
+    animation: none;
+  }
 }
 
 .preview-net-panel {

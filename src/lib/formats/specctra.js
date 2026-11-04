@@ -53,17 +53,14 @@ export const specctra = {
     return null
   },
   async convert(sources, warnings) {
-    const { DsnToCircuitJsonConverter, SesToCircuitJsonConverter } = await import(
-      'dsn-to-circuit-json'
-    )
+    const { DsnToCircuitJsonConverter, SesToCircuitJsonConverter } =
+      await import('dsn-to-circuit-json')
 
     const dsnSources = sources.filter((source) => source.format.kind === 'dsn')
     const dsn = dsnSources[0]
     const ses = sources.find((source) => source.format.kind === 'ses')
     if (!dsn) {
-      throw new EdaConversionError(
-        'SES 只是自动布线结果，必须同时上传同一工程的 .dsn 才能转换。',
-      )
+      throw new EdaConversionError('SES 只是自动布线结果，必须同时上传同一工程的 .dsn 才能转换。')
     }
     if (dsnSources.length > 1) {
       warnings.push({

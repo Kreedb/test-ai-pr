@@ -8,18 +8,8 @@
 // Format-specific work lives in `./formats/<id>.js`; this file owns the shared
 // upload limits, format validation and result envelope.
 
-import {
-  baseNameOf,
-  EdaConversionError,
-  fillSchematicValues,
-  toKicadFiles,
-} from './eda-shared.js'
-import {
-  CONVERTIBLE_FORMATS,
-  FORMATS_BY_ID,
-  detectSource,
-  formatLabel,
-} from './formats/index.js'
+import { baseNameOf, EdaConversionError, fillSchematicValues, toKicadFiles } from './eda-shared.js'
+import { CONVERTIBLE_FORMATS, FORMATS_BY_ID, detectSource, formatLabel } from './formats/index.js'
 
 export { EdaConversionError } from './eda-shared.js'
 export { detectSource } from './formats/index.js'

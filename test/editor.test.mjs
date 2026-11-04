@@ -141,4 +141,3 @@ test('adding a PDO or entry after a delete does not reuse an existing id', () =>
   const subIndices = pdo.entries.map((entry) => entry.subIndex)
   assert.equal(new Set(subIndices).size, subIndices.length, `duplicate subIndex in ${subIndices}`)
 })
-

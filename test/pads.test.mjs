@@ -118,7 +118,11 @@ test('a board with no routing warns once, not twice', async () => {
     (warning) =>
       warning.message.includes('没有 *ROUTE* 走线段') || warning.message.includes('输出里没有走线'),
   )
-  assert.equal(routingWarnings.length, 1, `expected one routing warning, got ${routingWarnings.length}`)
+  assert.equal(
+    routingWarnings.length,
+    1,
+    `expected one routing warning, got ${routingWarnings.length}`,
+  )
 })
 
 test('mirrored parts put their pads on the back and swap the pad order', async () => {
@@ -200,8 +204,17 @@ test('upstream fixtures convert without throwing', () => {
 
   // Copper cutouts and thermal vias must not throw even though the pour and
   // relief geometry is simplified.
-  for (const name of ['copper-cutouts.asc', 'thermal-vias.asc', 'decal-graphics.asc', 'decal-text.asc', 'text-layers.asc']) {
-    assert.doesNotThrow(() => padsToCircuitJson(parsePadsAscii(upstream(name))), `${name} should convert`)
+  for (const name of [
+    'copper-cutouts.asc',
+    'thermal-vias.asc',
+    'decal-graphics.asc',
+    'decal-text.asc',
+    'text-layers.asc',
+  ]) {
+    assert.doesNotThrow(
+      () => padsToCircuitJson(parsePadsAscii(upstream(name))),
+      `${name} should convert`,
+    )
   }
 
   // Thermal (RT/ST), antipad (RA/SA) and annular (A) rows are clearance
@@ -214,7 +227,10 @@ test('upstream fixtures convert without throwing', () => {
     thermal.map((via) => Number(via.outer_diameter.toFixed(4))),
     [1.016, 1.1176],
   )
-  assert.deepEqual(thermal.map((via) => via.hole_diameter), [0.508, 0.508])
+  assert.deepEqual(
+    thermal.map((via) => via.hole_diameter),
+    [0.508, 0.508],
+  )
 })
 
 test('route points from different nets never get joined', () => {

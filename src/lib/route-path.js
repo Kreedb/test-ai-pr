@@ -12,7 +12,7 @@ function normalizeRoutePath(value) {
 }
 
 export function routePath(id) {
-  return id === 'home' ? '/' : `/${id}`
+  return `/${id}`
 }
 
 export function pageRouteId(filePath) {

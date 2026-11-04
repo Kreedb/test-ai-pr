@@ -1,6 +1,6 @@
 // File-based page registry. A page owns its route metadata in a plain
 // `<script>` block; the file name supplies the id, so adding a page only
-// touches the new file.
+// touches the new file. The home view lives in App.vue, not in pages/.
 
 import { findRoute, pageRouteId, routePath } from '@/lib/route-path'
 
@@ -13,7 +13,6 @@ export const routes = Object.entries(pages)
   })
   .sort((left, right) => (left.order ?? 0) - (right.order ?? 0))
 
-export const homeRoute = routes.find((route) => route.id === 'home') || routes[0]
 export const toolRoutes = routes.filter((route) => route.tool)
 
 export function routeFor(value) {
@@ -21,5 +20,5 @@ export function routeFor(value) {
 }
 
 export function routeHref(value) {
-  return `#${(routeFor(value) || homeRoute).path}`
+  return `#${(routeFor(value) || { path: '/' }).path}`
 }

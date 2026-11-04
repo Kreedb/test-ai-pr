@@ -246,20 +246,16 @@ const textOf = (item) => {
         :fill="item.net && item.net === activeNet ? ACTIVE_COLOR : PIN_COLOR"
       />
       <g :transform="`translate(${pinStub(item).x1} ${pinStub(item).y1}) scale(1 -1)`">
-        <text
-          x="0"
-          :y="-TEXT_SIZE"
-          :font-size="TEXT_SIZE"
-          fill="#cbd5e1"
-          text-anchor="middle"
-        >
+        <text x="0" :y="-TEXT_SIZE" :font-size="TEXT_SIZE" fill="#cbd5e1" text-anchor="middle">
           {{ item.pin }}
         </text>
       </g>
     </g>
 
     <g v-for="item in texts" :key="item.id" :class="classesOf(item)">
-      <g :transform="`translate(${textOf(item).x} ${textOf(item).y}) scale(1 -1) rotate(${-textOf(item).rotation})`">
+      <g
+        :transform="`translate(${textOf(item).x} ${textOf(item).y}) scale(1 -1) rotate(${-textOf(item).rotation})`"
+      >
         <text
           x="0"
           y="0"

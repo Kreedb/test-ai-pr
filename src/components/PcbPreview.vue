@@ -48,7 +48,8 @@ function classesOf(item) {
   return {
     'preview-dim': Boolean(props.activeNet) && item.net !== props.activeNet,
     'preview-hit': Boolean(props.activeNet) && item.net === props.activeNet,
-    'preview-selected': Boolean(props.selectedComponentId) && item.componentId === props.selectedComponentId,
+    'preview-selected':
+      Boolean(props.selectedComponentId) && item.componentId === props.selectedComponentId,
   }
 }
 
@@ -68,7 +69,12 @@ function tracePolylines(element) {
       current = null
       continue
     }
-    const point = { x: entry.x, y: entry.y, layer: entry.layer || 'top', width: entry.width || 0.15 }
+    const point = {
+      x: entry.x,
+      y: entry.y,
+      layer: entry.layer || 'top',
+      width: entry.width || 0.15,
+    }
     if (current && current.layer === point.layer) {
       current.points.push({ x: point.x, y: point.y })
     } else {
@@ -139,7 +145,9 @@ const refdesLabels = computed(() =>
 
 const selectionBounds = computed(() => {
   if (!props.selectedComponentId) return null
-  const item = props.model.components.find((candidate) => candidate.componentId === props.selectedComponentId)
+  const item = props.model.components.find(
+    (candidate) => candidate.componentId === props.selectedComponentId,
+  )
   return item?.bounds || null
 })
 
@@ -161,7 +169,9 @@ const pinSummary = (item) => {
       :class="classesOf(item)"
       @click.stop="emit('select', item, $event)"
     >
-      <title>{{ item.kind === 'pad' ? pinSummary(item) : item.net ? `网络 ${item.net}` : item.kind }}</title>
+      <title>
+        {{ item.kind === 'pad' ? pinSummary(item) : item.net ? `网络 ${item.net}` : item.kind }}
+      </title>
 
       <path
         v-if="item.kind === 'board'"
@@ -284,7 +294,12 @@ const pinSummary = (item) => {
         />
         <g
           v-else-if="item.element.text"
-          :transform="textTransform(item.element.anchor_position?.x ?? 0, item.element.anchor_position?.y ?? 0)"
+          :transform="
+            textTransform(
+              item.element.anchor_position?.x ?? 0,
+              item.element.anchor_position?.y ?? 0,
+            )
+          "
         >
           <text
             x="0"
@@ -337,7 +352,14 @@ const pinSummary = (item) => {
       </template>
 
       <template v-else-if="item.kind === 'text'">
-        <g :transform="textTransform(item.element.anchor_position?.x ?? 0, item.element.anchor_position?.y ?? 0)">
+        <g
+          :transform="
+            textTransform(
+              item.element.anchor_position?.x ?? 0,
+              item.element.anchor_position?.y ?? 0,
+            )
+          "
+        >
           <text
             x="0"
             y="0"
@@ -353,11 +375,7 @@ const pinSummary = (item) => {
     </g>
 
     <g class="pcb-refdes">
-      <g
-        v-for="label in refdesLabels"
-        :key="label.id"
-        :transform="textTransform(label.x, label.y)"
-      >
+      <g v-for="label in refdesLabels" :key="label.id" :transform="textTransform(label.x, label.y)">
         <text x="0" y="0" :font-size="label.size" text-anchor="middle" fill="#9fb2c8" opacity="0.9">
           {{ label.text }}
         </text>

@@ -98,11 +98,9 @@ function normalizedDec(event, max = 0xffff) {
               @change="emit('update', index, 'enable', normalizedHex($event, 8))"
             />
             <div v-if="setBits(sm.enable, SM_ENABLE_BITS).length" class="chip-row compact">
-              <span
-                v-for="label in setBits(sm.enable, SM_ENABLE_BITS)"
-                :key="label"
-                class="chip"
-              >{{ label }}</span>
+              <span v-for="label in setBits(sm.enable, SM_ENABLE_BITS)" :key="label" class="chip">{{
+                label
+              }}</span>
             </div>
           </td>
           <td>

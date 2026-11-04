@@ -46,7 +46,9 @@ function baseName(path) {
 
 function isJunk(path) {
   const lower = path.toLowerCase()
-  return JUNK_PREFIXES.some((prefix) => lower.startsWith(prefix)) || JUNK_BASENAMES.has(baseName(lower))
+  return (
+    JUNK_PREFIXES.some((prefix) => lower.startsWith(prefix)) || JUNK_BASENAMES.has(baseName(lower))
+  )
 }
 
 // Two documents can share a file name in different folders. The page keys
@@ -113,7 +115,9 @@ export async function expandArchive(
   try {
     entries = readEntries(unzipSync, bytes)
   } catch (cause) {
-    throw new Error(`${name} 不是有效的 zip 压缩包，请重新打包后再上传。(${cause.message || cause})`)
+    throw new Error(
+      `${name} 不是有效的 zip 压缩包，请重新打包后再上传。(${cause.message || cause})`,
+    )
   }
 
   const skipped = []

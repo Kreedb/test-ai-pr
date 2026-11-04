@@ -67,18 +67,7 @@ const OLI_ORDER = [
   'right_wrist_roll_joint',
 ]
 
-const TRON_ORDER = [
-  'proximal_pitch_L',
-  'proximal_roll_L',
-  'proximal_yaw_L',
-  'knee_L',
-  'wheel_L',
-  'proximal_pitch_R',
-  'proximal_roll_R',
-  'proximal_yaw_R',
-  'knee_R',
-  'wheel_R',
-]
+const TRON_ORDER = ['proximal_pitch_L', 'proximal_roll_L', 'proximal_yaw_L', 'knee_L', 'wheel_L', 'proximal_pitch_R', 'proximal_roll_R', 'proximal_yaw_R', 'knee_R', 'wheel_R']
 
 // WF_TRON2A joint origins/axes from tron2-robot-description (Apache-2.0). The
 // base is lifted so the 0.1 m wheels touch z=0.
@@ -159,9 +148,7 @@ const TRON = [
 ]
 
 function makeProfile(id, label, skeleton, order) {
-  const joints = new Set(
-    skeleton.filter((node) => node.joint && node.axis).map((node) => node.joint),
-  )
+  const joints = new Set(skeleton.filter((node) => node.joint && node.axis).map((node) => node.joint))
   return { id, label, skeleton, order, joints, aliases: null }
 }
 
@@ -180,31 +167,14 @@ function canonicalJoint(name) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '_')
   const tokens = normalized.split('_').filter(Boolean)
-  const side =
-    tokens.includes('left') || tokens.includes('l')
-      ? 'left'
-      : tokens.includes('right') || tokens.includes('r')
-        ? 'right'
-        : ''
-  const part = [
-    'hip',
-    'knee',
-    'ankle',
-    'shoulder',
-    'elbow',
-    'wrist',
-    'head',
-    'waist',
-    'torso',
-  ].find((token) => tokens.includes(token))
+  const side = tokens.includes('left') || tokens.includes('l') ? 'left' : tokens.includes('right') || tokens.includes('r') ? 'right' : ''
+  const part = ['hip', 'knee', 'ankle', 'shoulder', 'elbow', 'wrist', 'head', 'waist', 'torso'].find((token) => tokens.includes(token))
   if (!part) return null
   if (part === 'knee') return side ? `${side}_knee_joint` : null
   if (part === 'elbow') return side ? `${side}_elbow_joint` : null
   // Remaining joints carry their rotation axis in the name; ankle defaults to
   // pitch when the axis token is omitted.
-  const axis =
-    ['pitch', 'roll', 'yaw'].find((token) => tokens.includes(token)) ||
-    (part === 'ankle' ? 'pitch' : null)
+  const axis = ['pitch', 'roll', 'yaw'].find((token) => tokens.includes(token)) || (part === 'ankle' ? 'pitch' : null)
   if (!axis) return null
   if (part === 'torso') return `waist_${axis}_joint`
   if (part === 'head') return `head_${axis}_joint`

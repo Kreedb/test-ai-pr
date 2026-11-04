@@ -64,18 +64,8 @@ function drawGrid(context, projectBasis, width, height) {
   for (let value = -2; value <= 2.0001; value += 0.5) {
     const major = Math.abs(value - Math.round(value)) < 1e-6
     const color = major ? 'rgba(148, 163, 184, 0.22)' : 'rgba(148, 163, 184, 0.1)'
-    line(
-      context,
-      project([value, -2, 0], projectBasis, width, height),
-      project([value, 2, 0], projectBasis, width, height),
-      color,
-    )
-    line(
-      context,
-      project([-2, value, 0], projectBasis, width, height),
-      project([2, value, 0], projectBasis, width, height),
-      color,
-    )
+    line(context, project([value, -2, 0], projectBasis, width, height), project([value, 2, 0], projectBasis, width, height), color)
+    line(context, project([-2, value, 0], projectBasis, width, height), project([2, value, 0], projectBasis, width, height), color)
   }
   const origin = project([0, 0, 0], projectBasis, width, height)
   line(context, origin, project([0.35, 0, 0], projectBasis, width, height), '#ff6b7a', 1.6)
@@ -123,12 +113,7 @@ function draw() {
     const to = projected[index]
     if (!from || !to) return
     const name = node.name
-    const color =
-      name.startsWith('left') || name.endsWith('_L')
-        ? '#5b8cff'
-        : name.startsWith('right') || name.endsWith('_R')
-          ? '#f5b942'
-          : '#c4b5fd'
+    const color = name.startsWith('left') || name.endsWith('_L') ? '#5b8cff' : name.startsWith('right') || name.endsWith('_R') ? '#f5b942' : '#c4b5fd'
     bones.push({
       from,
       to,

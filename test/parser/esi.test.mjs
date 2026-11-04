@@ -13,10 +13,10 @@ import { parseSii } from 'sii-parser'
 
 globalThis.DOMParser = DOMParser
 
-const { generateEsiXml, generateSiiFromEsi, verifyEsiXml } = await import('../src/lib/esi.js')
-const { createEditorModel, editorOptions, editorResult } = await import('../src/lib/editor.js')
+const { generateEsiXml, generateSiiFromEsi, verifyEsiXml } = await import('../../src/lib/esi.js')
+const { createEditorModel, editorOptions, editorResult } = await import('../../src/lib/editor.js')
 
-const root = fileURLToPath(new URL('..', import.meta.url))
+const root = fileURLToPath(new URL('../..', import.meta.url))
 const sample = (name) => new Uint8Array(readFileSync(join(root, 'public/samples', name)))
 const sampleText = (name) => readFileSync(join(root, 'public/samples', name), 'utf8')
 
@@ -41,15 +41,11 @@ test('the Sync1 cycle factor survives export and import', () => {
     element.sync1CycleFactor = factor
     // Factor 0 and factor 1 both write Factor="1">0; only SYNC1 being enabled
     // distinguishes 1×SYNC0 from the Limx zero.
-    element.assignActivate =
-      factor === 0 ? element.assignActivate & ~0x400 : element.assignActivate | 0x400
+    element.assignActivate = factor === 0 ? element.assignActivate & ~0x400 : element.assignActivate | 0x400
 
     const generated = generateEsiXml(editorResult(model, bytes), editorOptions(model, 'Limx'))
     const attribute = factor === 0 ? 1 : factor
-    assert.match(
-      generated.xml,
-      new RegExp(`<CycleTimeSync1 Factor="${attribute}">0</CycleTimeSync1>`),
-    )
+    assert.match(generated.xml, new RegExp(`<CycleTimeSync1 Factor="${attribute}">0</CycleTimeSync1>`))
 
     const recompiled = generateSiiFromEsi(generated.xml)
     assert.equal(parseSii(recompiled.bytes).dc.elements[0].sync1CycleFactor, factor)

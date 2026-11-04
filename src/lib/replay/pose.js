@@ -7,11 +7,7 @@ function multiply(left, right) {
   const out = new Array(16)
   for (let column = 0; column < 4; column += 1) {
     for (let row = 0; row < 4; row += 1) {
-      out[column * 4 + row] =
-        left[row] * right[column * 4] +
-        left[4 + row] * right[column * 4 + 1] +
-        left[8 + row] * right[column * 4 + 2] +
-        left[12 + row] * right[column * 4 + 3]
+      out[column * 4 + row] = left[row] * right[column * 4] + left[4 + row] * right[column * 4 + 1] + left[8 + row] * right[column * 4 + 2] + left[12 + row] * right[column * 4 + 3]
     }
   }
   return out

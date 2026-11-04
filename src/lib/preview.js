@@ -77,13 +77,7 @@ export function schematicTextSize(element, keepsOwnSize = false) {
   return (keepsOwnSize && isStandalone && element?.font_size) || SCHEMATIC_TEXT_SIZE
 }
 
-const COMPONENT_PRIMITIVE_TYPES = new Set([
-  'schematic_path',
-  'schematic_circle',
-  'schematic_arc',
-  'schematic_line',
-  'schematic_rect',
-])
+const COMPONENT_PRIMITIVE_TYPES = new Set(['schematic_path', 'schematic_circle', 'schematic_arc', 'schematic_line', 'schematic_rect'])
 
 // `circuit-json-to-kicad` only keeps a text's own `font_size` when it also keeps
 // standalone graphics (`preserveStandaloneGraphics`): some component must be
@@ -162,9 +156,7 @@ function copperLayersOf(element) {
   // A trace stores its layers inside `route[]`, not on the element, so without
   // this every trace reports the fallback top copper layer.
   if (Array.isArray(element.route) && element.route.length) {
-    const layers = element.route
-      .filter((entry) => entry.route_type !== 'via')
-      .map((entry) => copperLayer(entry.layer))
+    const layers = element.route.filter((entry) => entry.route_type !== 'via').map((entry) => copperLayer(entry.layer))
     const unique = [...new Set(layers)].filter((layer) => COPPER_RANK.has(layer))
     if (unique.length) return unique
   }
@@ -308,10 +300,7 @@ class ProjectIndex {
       if (net) this.schematicPortNet.set(port.schematic_port_id, net)
     }
     for (const component of this.list('source_component')) {
-      this.componentName.set(
-        component.source_component_id,
-        component.display_name || component.name || component.source_component_id || '',
-      )
+      this.componentName.set(component.source_component_id, component.display_name || component.name || component.source_component_id || '')
       this.componentValue.set(component.source_component_id, writerValueOf(component))
     }
   }
@@ -344,8 +333,7 @@ class ProjectIndex {
 // device name in the preview that the exported `.kicad_sch` leaves blank.
 function writerValueOf(component) {
   const displayValue = component.display_value
-  const resolvedValue =
-    displayValue && !String(displayValue).trim().startsWith('=') ? displayValue : ''
+  const resolvedValue = displayValue && !String(displayValue).trim().startsWith('=') ? displayValue : ''
   switch (component.ftype) {
     case 'simple_resistor':
       return component.display_resistance || 'R'
@@ -392,20 +380,10 @@ function pcbElementBounds(element) {
         return padBounds(boundsOf([center]), element.radius || 0)
       }
       if (element.shape === 'pill' || element.shape === 'rotated_pill') {
-        return rotatedRectBounds(
-          center,
-          element.width || 0,
-          element.height || 0,
-          element.ccw_rotation || 0,
-        )
+        return rotatedRectBounds(center, element.width || 0, element.height || 0, element.ccw_rotation || 0)
       }
       if (element.points) return boundsOf(element.points)
-      return rotatedRectBounds(
-        center,
-        element.width || 0,
-        element.height || 0,
-        element.ccw_rotation || 0,
-      )
+      return rotatedRectBounds(center, element.width || 0, element.height || 0, element.ccw_rotation || 0)
     }
     case 'pcb_plated_hole': {
       const center = { x: element.x, y: element.y }
@@ -514,22 +492,15 @@ function buildPcb(index) {
   }
   for (const element of index.list('pcb_copper_pour')) {
     trackCopper(element)
-    items.push(
-      withNet(
-        pcbItem(index, element, 'pour', copperLayersOf(element)),
-        index.netForSourceNet(element.source_net_id),
-      ),
-    )
+    items.push(withNet(pcbItem(index, element, 'pour', copperLayersOf(element)), index.netForSourceNet(element.source_net_id)))
   }
   for (const element of index.list('pcb_trace')) {
     trackCopper(element)
-    const net =
-      index.netForSourceNet(element.source_net_id) || index.netForTrace(element.source_trace_id)
+    const net = index.netForSourceNet(element.source_net_id) || index.netForTrace(element.source_trace_id)
     items.push(withNet(pcbItem(index, element, 'trace', copperLayersOf(element)), net))
   }
   for (const element of index.list('pcb_via')) {
-    const net =
-      index.netForSourceNet(element.source_net_id) || index.netForTrace(element.source_trace_id)
+    const net = index.netForSourceNet(element.source_net_id) || index.netForTrace(element.source_trace_id)
     items.push(withNet(pcbItem(index, element, 'via', copperLayersOf(element)), net))
   }
   for (const element of index.list('pcb_smtpad')) {
@@ -552,9 +523,7 @@ function buildPcb(index) {
     items.push(pcbItem(index, element, 'hole', ['holes']))
   }
   for (const element of index.list('pcb_component')) {
-    const item = pcbItem(index, element, 'component', [
-      element.layer === BOTTOM ? 'silk-bottom' : 'silk-top',
-    ])
+    const item = pcbItem(index, element, 'component', [element.layer === BOTTOM ? 'silk-bottom' : 'silk-top'])
     item.refdes = index.nameOf(element.source_component_id)
     // `componentId` is the join key with pads and the click selection, so it
     // stays the raw Circuit JSON id (the item `id` is kind-prefixed).
@@ -570,12 +539,7 @@ function buildPcb(index) {
   for (const element of index.list('pcb_courtyard_outline')) {
     items.push(pcbItem(index, element, 'courtyard', sideLayers(element.layer, 'courtyard')))
   }
-  for (const type of [
-    'pcb_silkscreen_path',
-    'pcb_silkscreen_line',
-    'pcb_silkscreen_circle',
-    'pcb_silkscreen_graphic',
-  ]) {
+  for (const type of ['pcb_silkscreen_path', 'pcb_silkscreen_line', 'pcb_silkscreen_circle', 'pcb_silkscreen_graphic']) {
     for (const element of index.list(type)) {
       items.push(pcbItem(index, element, 'graphic', sideLayers(element.layer, 'silk')))
     }
@@ -617,9 +581,7 @@ function buildPcb(index) {
   const bounds = unionBounds(items.map((item) => item.bounds))
   // Silkscreen text and designators can sit outside the edge cut, so the
   // initial fit frames the outline instead of the union over everything drawn.
-  const boardBounds = unionBounds(
-    items.filter((item) => item.kind === 'board').map((item) => item.bounds),
-  )
+  const boardBounds = unionBounds(items.filter((item) => item.kind === 'board').map((item) => item.bounds))
   return {
     items,
     layers,
@@ -682,9 +644,7 @@ function schematicElementBounds(element) {
 
 function buildSchematic(index) {
   const declaredSheets = index.list('schematic_sheet')
-  const sheets = declaredSheets.length
-    ? declaredSheets
-    : [{ schematic_sheet_id: undefined, name: '图纸 1' }]
+  const sheets = declaredSheets.length ? declaredSheets : [{ schematic_sheet_id: undefined, name: '图纸 1' }]
   const sheetIds = new Set(sheets.map((sheet) => sheet.schematic_sheet_id).filter(Boolean))
   // Items carry the same id the sheet list uses, including the synthesized
   // `sheet_0` for converters that omit `schematic_sheet_id`.
@@ -722,9 +682,7 @@ function buildSchematic(index) {
       sheet: sheetOf(component),
       componentId: component.schematic_component_id,
       refdes: index.nameOf(component.source_component_id),
-      value:
-        resolvedSymbolValue(component.symbol_display_value) ||
-        index.valueOf(component.source_component_id),
+      value: resolvedSymbolValue(component.symbol_display_value) || index.valueOf(component.source_component_id),
     })
     const ports = []
     for (const port of portsByComponent.get(component.schematic_component_id) || []) {
@@ -879,16 +837,12 @@ function buildSchematic(index) {
 export function buildPreviewModel(circuitJson) {
   const index = new ProjectIndex(circuitJson)
   const hasBoard = index.list('pcb_board').length > 0
-  const hasSchematic =
-    index.list('schematic_sheet').length > 0 ||
-    index.list('schematic_component').length > 0 ||
-    index.list('schematic_text').length > 0
+  const hasSchematic = index.list('schematic_sheet').length > 0 || index.list('schematic_component').length > 0 || index.list('schematic_text').length > 0
 
   // Every named net stays searchable even when it reaches no pad, e.g. a net
   // whose only copper is a via.
   const nets = new Map()
-  for (const net of index.netBySourceId.values())
-    nets.set(net.key, { key: net.key, name: net.name })
+  for (const net of index.netBySourceId.values()) nets.set(net.key, { key: net.key, name: net.name })
 
   return {
     hasBoard,
@@ -918,8 +872,7 @@ export function indexNets(model) {
   for (const net of model.nets || []) ensure(net.name, net.key)
 
   const componentById = new Map()
-  for (const component of model.pcb?.components || [])
-    componentById.set(component.componentId, component)
+  for (const component of model.pcb?.components || []) componentById.set(component.componentId, component)
 
   for (const pad of model.pcb?.pads || []) {
     if (!pad.net) continue
@@ -980,9 +933,7 @@ export function indexComponents(model) {
     entry.schematic = component
     entry.value = entry.value || component.value || ''
   }
-  return [...byName.values()].sort((a, b) =>
-    a.refdes.localeCompare(b.refdes, 'en', { numeric: true }),
-  )
+  return [...byName.values()].sort((a, b) => a.refdes.localeCompare(b.refdes, 'en', { numeric: true }))
 }
 
 /**
@@ -1047,11 +998,6 @@ export function searchPreview(entries, query, limit = 12) {
     const score = label === needle ? 0 : label.startsWith(needle) ? 1 : 2
     scored.push({ entry, score })
   }
-  scored.sort(
-    (a, b) =>
-      a.score - b.score ||
-      a.entry.label.length - b.entry.label.length ||
-      a.entry.label.localeCompare(b.entry.label, 'en', { numeric: true }),
-  )
+  scored.sort((a, b) => a.score - b.score || a.entry.label.length - b.entry.label.length || a.entry.label.localeCompare(b.entry.label, 'en', { numeric: true }))
   return scored.slice(0, limit).map((item) => item.entry)
 }

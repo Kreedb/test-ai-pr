@@ -45,8 +45,7 @@ function classesOf(item) {
   return {
     'preview-dim': Boolean(props.activeNet) && net !== props.activeNet,
     'preview-hit': Boolean(props.activeNet) && net === props.activeNet,
-    'preview-selected':
-      Boolean(props.selectedComponentId) && item.componentId === props.selectedComponentId,
+    'preview-selected': Boolean(props.selectedComponentId) && item.componentId === props.selectedComponentId,
   }
 }
 
@@ -90,9 +89,7 @@ function pinStub(pin) {
   const center = pin.element.center || { x: 0, y: 0 }
   const facing = FACING[pin.element.facing_direction] || FACING.right
   const size = component?.element.size || { width: 1, height: 1 }
-  const length =
-    pin.element.distance_from_component_edge ||
-    Math.min(Math.max(size.width || 1, size.height || 1) * 0.3, 0.8)
+  const length = pin.element.distance_from_component_edge || Math.min(Math.max(size.width || 1, size.height || 1) * 0.3, 0.8)
   return {
     x1: center.x,
     y1: center.y,
@@ -124,24 +121,14 @@ const textOf = (item) => {
     size: item.fontSize,
     color: element.color || '#94a3b8',
     rotation: element.rotation || 0,
-    anchor:
-      element.anchor === 'bottom_left'
-        ? 'start'
-        : element.anchor === 'bottom_right'
-          ? 'end'
-          : 'middle',
+    anchor: element.anchor === 'bottom_left' ? 'start' : element.anchor === 'bottom_right' ? 'end' : 'middle',
   }
 }
 </script>
 
 <template>
   <g class="schematic">
-    <g
-      v-for="item in graphics"
-      :key="item.id"
-      :class="classesOf(item)"
-      @click.stop="emit('select', item, $event)"
-    >
+    <g v-for="item in graphics" :key="item.id" :class="classesOf(item)" @click.stop="emit('select', item, $event)">
       <line
         v-if="item.element.x1 !== undefined"
         :x1="item.element.x1"
@@ -174,12 +161,7 @@ const textOf = (item) => {
       />
     </g>
 
-    <g
-      v-for="item in wires"
-      :key="item.id"
-      :class="classesOf(item)"
-      @click.stop="emit('select', item, $event)"
-    >
+    <g v-for="item in wires" :key="item.id" :class="classesOf(item)" @click.stop="emit('select', item, $event)">
       <title>{{ item.net ? `网络 ${item.net}` : '导线' }}</title>
       <line
         v-for="(edge, index) in item.element.edges || []"
@@ -203,12 +185,7 @@ const textOf = (item) => {
       />
     </g>
 
-    <g
-      v-for="item in components"
-      :key="item.id"
-      :class="classesOf(item)"
-      @click.stop="emit('select', item, $event)"
-    >
+    <g v-for="item in components" :key="item.id" :class="classesOf(item)" @click.stop="emit('select', item, $event)">
       <title>{{ [item.refdes, item.value].filter(Boolean).join(' · ') }}</title>
       <rect
         v-if="componentRect(item).isBox"
@@ -223,28 +200,10 @@ const textOf = (item) => {
       />
     </g>
 
-    <g
-      v-for="item in pins"
-      :key="item.id"
-      :class="classesOf(item)"
-      @click.stop="emit('select', item, $event)"
-    >
+    <g v-for="item in pins" :key="item.id" :class="classesOf(item)" @click.stop="emit('select', item, $event)">
       <title>{{ [item.refdes, item.pin, item.net].filter(Boolean).join(' · ') }}</title>
-      <line
-        :x1="pinStub(item).x1"
-        :y1="pinStub(item).y1"
-        :x2="pinStub(item).x2"
-        :y2="pinStub(item).y2"
-        :stroke="PIN_COLOR"
-        :stroke-width="PIN_STROKE"
-        vector-effect="non-scaling-stroke"
-      />
-      <circle
-        :cx="pinStub(item).x1"
-        :cy="pinStub(item).y1"
-        :r="PIN_DOT_RADIUS"
-        :fill="item.net && item.net === activeNet ? ACTIVE_COLOR : PIN_COLOR"
-      />
+      <line :x1="pinStub(item).x1" :y1="pinStub(item).y1" :x2="pinStub(item).x2" :y2="pinStub(item).y2" :stroke="PIN_COLOR" :stroke-width="PIN_STROKE" vector-effect="non-scaling-stroke" />
+      <circle :cx="pinStub(item).x1" :cy="pinStub(item).y1" :r="PIN_DOT_RADIUS" :fill="item.net && item.net === activeNet ? ACTIVE_COLOR : PIN_COLOR" />
       <g :transform="`translate(${pinStub(item).x1} ${pinStub(item).y1}) scale(1 -1)`">
         <text x="0" :y="-TEXT_SIZE" :font-size="TEXT_SIZE" fill="#cbd5e1" text-anchor="middle">
           {{ item.pin }}
@@ -253,36 +212,17 @@ const textOf = (item) => {
     </g>
 
     <g v-for="item in texts" :key="item.id" :class="classesOf(item)">
-      <g
-        :transform="`translate(${textOf(item).x} ${textOf(item).y}) scale(1 -1) rotate(${-textOf(item).rotation})`"
-      >
-        <text
-          x="0"
-          y="0"
-          :font-size="textOf(item).size"
-          :fill="textOf(item).color"
-          :text-anchor="textOf(item).anchor"
-        >
+      <g :transform="`translate(${textOf(item).x} ${textOf(item).y}) scale(1 -1) rotate(${-textOf(item).rotation})`">
+        <text x="0" y="0" :font-size="textOf(item).size" :fill="textOf(item).color" :text-anchor="textOf(item).anchor">
           {{ textOf(item).text }}
         </text>
       </g>
     </g>
 
-    <g
-      v-for="item in labels"
-      :key="item.id"
-      :class="classesOf(item)"
-      @click.stop="emit('select', item, $event)"
-    >
+    <g v-for="item in labels" :key="item.id" :class="classesOf(item)" @click.stop="emit('select', item, $event)">
       <title>{{ item.text }}</title>
       <g :transform="`translate(${labelText(item).x} ${labelText(item).y}) scale(1 -1)`">
-        <text
-          x="0"
-          y="0"
-          :font-size="labelText(item).size"
-          :fill="item.net && item.net === activeNet ? ACTIVE_COLOR : WIRE_COLOR"
-          :text-anchor="labelText(item).anchor"
-        >
+        <text x="0" y="0" :font-size="labelText(item).size" :fill="item.net && item.net === activeNet ? ACTIVE_COLOR : WIRE_COLOR" :text-anchor="labelText(item).anchor">
           {{ labelText(item).text }}
         </text>
       </g>

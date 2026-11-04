@@ -26,10 +26,7 @@ export const MAX_TOTAL_BYTES = 120 * MB
 function unsupportedMessage(source, format) {
   const entry = FORMATS_BY_ID[format.id]
   if (entry?.status === 'planned') {
-    return new EdaConversionError(
-      `暂不支持 ${source.name}:${formatLabel(format.id)} 尚未接入，本期先集成已有的开源转换器。`,
-      entry.note,
-    )
+    return new EdaConversionError(`暂不支持 ${source.name}:${formatLabel(format.id)} 尚未接入，本期先集成已有的开源转换器。`, entry.note)
   }
   const supported = CONVERTIBLE_FORMATS.map((id) => FORMATS_BY_ID[id].label).join('、')
   return new EdaConversionError(`无法识别 ${source.name}。当前支持 ${supported}。`)
@@ -46,18 +43,14 @@ export async function convertEda(sources) {
 
   const prepared = sources.map((source) => {
     if (source.bytes.byteLength > MAX_INPUT_BYTES) {
-      throw new EdaConversionError(
-        `${source.name} 超过 ${MAX_INPUT_BYTES / MB} MiB，浏览器内转换会卡死，请先删掉不需要的图层或拆分工程。`,
-      )
+      throw new EdaConversionError(`${source.name} 超过 ${MAX_INPUT_BYTES / MB} MiB，浏览器内转换会卡死，请先删掉不需要的图层或拆分工程。`)
     }
     return { ...source, format: detectSource(source.name, source.bytes) }
   })
 
   const totalBytes = prepared.reduce((sum, source) => sum + source.bytes.byteLength, 0)
   if (totalBytes > MAX_TOTAL_BYTES) {
-    throw new EdaConversionError(
-      `本次上传合计 ${Math.round(totalBytes / MB)} MiB，超过 ${MAX_TOTAL_BYTES / MB} MiB 上限，请分批转换。`,
-    )
+    throw new EdaConversionError(`本次上传合计 ${Math.round(totalBytes / MB)} MiB，超过 ${MAX_TOTAL_BYTES / MB} MiB 上限，请分批转换。`)
   }
 
   const formats = new Set(prepared.map((source) => source.format.id))
@@ -66,9 +59,7 @@ export async function convertEda(sources) {
     throw unsupportedMessage(unknown, unknown.format)
   }
   if (formats.size > 1) {
-    throw new EdaConversionError(
-      '一次只能转换同一类来源的文件，请把 Altium、Specctra、EAGLE 与 PADS 文件分开上传。',
-    )
+    throw new EdaConversionError('一次只能转换同一类来源的文件，请把 Altium、Specctra、EAGLE 与 PADS 文件分开上传。')
   }
   const [formatId] = formats
   const format = FORMATS_BY_ID[formatId]
@@ -89,11 +80,7 @@ function finish(files, circuitJson, source, summary, warnings, started) {
   if (!files.length) {
     throw new EdaConversionError('转换器没有产生任何 KiCad 文件，原始文档可能不包含设计内容。')
   }
-  if (
-    summary.board &&
-    summary.board.tracks === 0 &&
-    !warnings.some((warning) => warning.code === 'no-routing')
-  ) {
+  if (summary.board && summary.board.tracks === 0 && !warnings.some((warning) => warning.code === 'no-routing')) {
     warnings.push({
       level: 'warn',
       message: '输出里没有走线，只有焊盘和放置信息；如果原设计有布线，请检查来源是否完整。',

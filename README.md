@@ -24,7 +24,7 @@ npm run dev
 | 命令 | 说明 |
 | --- | --- |
 | `npm run dev` | 启动带 HMR 的开发服务器 |
-| `npm run build` | 构建到 `dist/` |
+| `npm run build` | 构建到 `dist/`（构建前自动格式化） |
 | `npm run preview` | 本地预览生产构建 |
 | `npm test` | 运行 `node --test` 回归测试 |
 

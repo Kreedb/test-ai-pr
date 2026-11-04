@@ -40,8 +40,6 @@ const rows = computed(() => {
       <span class="hex-bytes">{{ row.hex }}</span>
       <span class="hex-ascii">{{ row.ascii }}</span>
     </div>
-    <p v-if="bytes.length > limit" class="muted small">
-      仅显示前 {{ limit }} 字节，共 {{ bytes.length }} 字节。
-    </p>
+    <p v-if="bytes.length > limit" class="muted small">仅显示前 {{ limit }} 字节，共 {{ bytes.length }} 字节。</p>
   </div>
 </template>

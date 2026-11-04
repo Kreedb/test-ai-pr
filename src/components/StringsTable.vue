@@ -24,17 +24,10 @@ const emit = defineEmits(['update-text', 'remove'])
           <td class="mono">{{ entry.index }}</td>
           <td class="mono">{{ stringByteLength(entry.text) }}</td>
           <td>
-            <input
-              class="table-input mono"
-              :value="entry.text"
-              spellcheck="false"
-              @input="emit('update-text', entry.index, $event.target.value)"
-            />
+            <input class="table-input mono" :value="entry.text" spellcheck="false" @input="emit('update-text', entry.index, $event.target.value)" />
           </td>
           <td class="row-actions">
-            <button type="button" class="btn small ghost" @click="emit('remove', entry.index)">
-              删除
-            </button>
+            <button type="button" class="btn small ghost" @click="emit('remove', entry.index)">删除</button>
           </td>
         </tr>
       </tbody>

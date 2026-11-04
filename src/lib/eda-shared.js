@@ -16,13 +16,7 @@ export class EdaConversionError extends Error {
 // those parts reach KiCad with an empty Value. Copy the resolved display value
 // into the field the writer reads; the writer also derives the library symbol
 // id, the footprint name and the PCB `MPN` property from it.
-const VALUE_FROM_DISPLAY_TYPES = new Set([
-  'simple_chip',
-  'simple_connector',
-  'simple_diode',
-  'simple_led',
-  'simple_switch',
-])
+const VALUE_FROM_DISPLAY_TYPES = new Set(['simple_chip', 'simple_connector', 'simple_diode', 'simple_led', 'simple_switch'])
 
 // An Altium field can contain a formula (`='LED-'+Color`) that the converter
 // cannot evaluate. Exporting the literal expression is worse than leaving the
@@ -75,10 +69,7 @@ function countByType(circuitJson, type) {
 
 export function summarize(circuitJson) {
   const nets = countByType(circuitJson, 'source_net')
-  const pads =
-    countByType(circuitJson, 'pcb_smtpad') +
-    countByType(circuitJson, 'pcb_plated_hole') +
-    countByType(circuitJson, 'pcb_hole')
+  const pads = countByType(circuitJson, 'pcb_smtpad') + countByType(circuitJson, 'pcb_plated_hole') + countByType(circuitJson, 'pcb_hole')
   const tracks = countByType(circuitJson, 'pcb_trace')
   const vias = countByType(circuitJson, 'pcb_via')
   const zones = countByType(circuitJson, 'pcb_copper_pour')

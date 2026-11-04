@@ -3,9 +3,7 @@ import { LOSS_GROUPS } from '@/lib/formats/index.js'
 
 // One row per (source, lossy category), so the table can be scanned by format or
 // by what kind of information is at risk rather than read as six bullet lists.
-const rows = LOSS_GROUPS.flatMap((group) =>
-  group.items.map((item) => ({ source: group.source, target: group.target, ...item })),
-)
+const rows = LOSS_GROUPS.flatMap((group) => group.items.map((item) => ({ source: group.source, target: group.target, ...item })))
 </script>
 
 <template>

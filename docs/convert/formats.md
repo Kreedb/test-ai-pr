@@ -1,6 +1,6 @@
 # 格式支持
 
-格式注册表在 `src/lib/formats/index.js`，每个来源一个模块，页面上的支持矩阵、有损表与样例按钮都从注册表派生。支持矩阵不再在这里复制一份，以注册表和转换页 `#/convert` 为准；新增或修改来源后运行 `test/registry.test.mjs`。
+格式注册表在 `src/lib/formats/index.js`，每个来源一个模块，页面上的支持矩阵、有损表与样例按钮都从注册表派生。支持矩阵不再在这里复制一份，以注册表和转换页 `#/convert` 为准；新增或修改来源后运行 `test/convert/registry.test.mjs`。
 
 ## 识别方式
 

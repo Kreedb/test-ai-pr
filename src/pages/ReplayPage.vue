@@ -619,7 +619,7 @@ onBeforeUnmount(() => {
           </div>
           <div>
             <dt>时钟</dt>
-            <dd>bag 记录时间</dd>
+            <dd class="mono">{{ absoluteTime.toFixed(3) }} s</dd>
           </div>
         </dl>
 

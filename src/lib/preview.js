@@ -658,7 +658,9 @@ function buildSchematic(index) {
   const declaredSheets = index.list('schematic_sheet')
   const sheets = declaredSheets.length ? declaredSheets : [{ schematic_sheet_id: undefined, name: '图纸 1' }]
   const sheetIds = new Set(sheets.map((sheet) => sheet.schematic_sheet_id).filter(Boolean))
-  const defaultSheet = sheets[0].schematic_sheet_id
+  // Items carry the same id the sheet list uses, including the synthesized
+  // `sheet_0` for converters that omit `schematic_sheet_id`.
+  const defaultSheet = sheets[0].schematic_sheet_id || 'sheet_0'
   const keepsOwnTextSizes = keepsTextSizes(index)
 
   // Elements that name a sheet the converter never declared stay visible on the
@@ -814,7 +816,7 @@ function buildSchematic(index) {
 
   const sheetList = sheets.map((sheet, position) => {
     const id = sheet.schematic_sheet_id || `sheet_${position}`
-    const sheetItems = items.filter((item) => item.sheet === sheet.schematic_sheet_id)
+    const sheetItems = items.filter((item) => item.sheet === id)
     return {
       id,
       name: sheet.name || sheet.display_name || `图纸 ${position + 1}`,
@@ -956,6 +958,7 @@ export function buildSearchIndex(model, nets) {
       label: net.name,
       detail: `网络 · PCB ${net.pcbPads.length} 焊盘 · 原理图 ${net.schematicPins.length} 引脚`,
       net: net.name,
+      sheet: net.schematicPins[0]?.sheet || net.labels[0]?.sheet || null,
       hasPcb: net.pcbPads.length > 0,
       hasSchematic: net.schematicPins.length > 0 || net.labels.length > 0,
     })
@@ -967,6 +970,7 @@ export function buildSearchIndex(model, nets) {
       label: component.refdes,
       detail: [component.value, '元件'].filter(Boolean).join(' · '),
       refdes: component.refdes,
+      sheet: component.schematic?.sheet || null,
       hasPcb: Boolean(component.pcb),
       hasSchematic: Boolean(component.schematic),
     })
@@ -979,6 +983,8 @@ export function buildSearchIndex(model, nets) {
       detail: pin.net ? `原理图引脚 · ${pin.net}` : '原理图引脚',
       refdes: pin.refdes,
       net: pin.net,
+      sheet: pin.sheet || null,
+      bounds: pin.bounds || null,
       hasSchematic: true,
       hasPcb: false,
     })

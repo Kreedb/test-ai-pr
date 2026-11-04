@@ -113,7 +113,7 @@ export async function expandArchive(
   try {
     entries = readEntries(unzipSync, bytes)
   } catch (cause) {
-    throw new Error(`${name} 不是有效的 zip 压缩包,请重新打包后再上传。(${cause.message || cause})`)
+    throw new Error(`${name} 不是有效的 zip 压缩包，请重新打包后再上传。(${cause.message || cause})`)
   }
 
   const skipped = []
@@ -153,9 +153,9 @@ export async function expandArchive(
 
   if (!selected.length) {
     const detail = skipped.length
-      ? `压缩包里的 ${skipped.length} 个文件都被跳过了(${skipped.map((item) => SKIP_REASON_LABELS[item.reason]).join('、')})。`
+      ? `压缩包里的 ${skipped.length} 个文件都被跳过了（${skipped.map((item) => SKIP_REASON_LABELS[item.reason]).join('、')}）。`
       : '压缩包里没有文件。'
-    throw new Error(`${name} 里没有可用的文件:${detail}`)
+    throw new Error(`${name} 里没有可用的文件：${detail}`)
   }
 
   // fflate reports members by their raw name, which Windows-built archives may
@@ -182,7 +182,7 @@ export async function expandArchive(
       currentSize = 0
       file.ondata = (err, chunk, final) => {
         if (err) {
-          reject(new Error(`${name} 解压失败,压缩包可能已损坏。(${err.message || err})`))
+          reject(new Error(`${name} 解压失败，压缩包可能已损坏。(${err.message || err})`))
           return
         }
         if (blown) return
@@ -210,13 +210,13 @@ export async function expandArchive(
     try {
       stream.push(bytes, true)
     } catch (cause) {
-      reject(new Error(`${name} 解压失败,压缩包可能已损坏。(${cause.message || cause})`))
+      reject(new Error(`${name} 解压失败，压缩包可能已损坏。(${cause.message || cause})`))
       return
     }
     if (blown) {
       reject(
         new Error(
-          `${name} 解压后超过合计上限,可能是压缩包声明的文件大小与实际不符,请重新打包后再上传。`,
+          `${name} 解压后超过合计上限，可能是压缩包声明的文件大小与实际不符，请重新打包后再上传。`,
         ),
       )
       return
@@ -231,7 +231,7 @@ export async function expandArchive(
     files.push({ name: fileName, bytes: content, path })
   }
 
-  if (!files.length) throw new Error(`${name} 解压后没有任何内容,压缩包可能已损坏。`)
+  if (!files.length) throw new Error(`${name} 解压后没有任何内容，压缩包可能已损坏。`)
 
   return { files, skipped }
 }

@@ -26,8 +26,8 @@
     "circuit-json-to-kicad": "0.0.262",
     "dsn-to-circuit-json": "0.0.8",
     "dsnts": "^0.1.12",
-    "earcut": "^3.2.4",
     "eagle-to-circuit-json": "^0.1.0",
+    "earcut": "^3.2.4",
     "fflate": "^0.8.2",
     "graphics-debug": "^0.0.101",
     "kicadts": "0.0.63",
@@ -38,6 +38,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.10",
+    "@xmldom/xmldom": "^0.9.12",
     "vite": "^8.3.5"
   },
   "overrides": {

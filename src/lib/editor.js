@@ -12,6 +12,10 @@
 
 import { DATA_TYPE_NAMES, FMMU_USAGE } from 'sii-parser'
 
+import { latin1Bytes, stringByteLength } from './format.js'
+
+export { latin1Bytes, stringByteLength }
+
 const clone = (value) => JSON.parse(JSON.stringify(value))
 
 function emptyMailbox() {
@@ -169,21 +173,6 @@ export function editorOptions(model, vendorName = '') {
 // ---------------------------------------------------------------------------
 // String table <-> name fields
 // ---------------------------------------------------------------------------
-
-export function latin1Bytes(text) {
-  const bytes = []
-  for (const char of String(text ?? '')) {
-    const code = char.codePointAt(0)
-    bytes.push(code <= 0xff ? code : 0x3f)
-  }
-  return bytes
-}
-
-export function stringByteLength(text) {
-  let length = 0
-  for (const _char of String(text ?? '')) length += 1
-  return length
-}
 
 function nameSlots(model) {
   const slots = []

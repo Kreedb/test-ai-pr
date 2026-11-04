@@ -391,7 +391,7 @@ const selectedLabel = computed(() => {
         <tr>
           <td class="nowrap">选择</td>
           <td class="nowrap">单击焊盘、引脚或元件</td>
-          <td class="small">高亮所属网络并定位</td>
+          <td class="small">焊盘、引脚高亮所属网络并定位；元件选中并高亮</td>
         </tr>
         <tr>
           <td class="nowrap">跨视图定位</td>

@@ -5,7 +5,7 @@
 // seconds. The bag's record time can be either the monotonic clock or epoch, so
 // keep both and let `alignLog` pick the basis that overlaps the bag.
 
-export const MAX_LOG_BYTES = 32 * 1024 * 1024
+export const MAX_LOG_BYTES = 256 * 1024 * 1024
 
 const MAX_ENTRIES = 500000
 const CLK = /\bclk\(([0-9]+(?:\.[0-9]+)?)\)/

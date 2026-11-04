@@ -956,6 +956,7 @@ export function buildSearchIndex(model, nets) {
       label: net.name,
       detail: `网络 · PCB ${net.pcbPads.length} 焊盘 · 原理图 ${net.schematicPins.length} 引脚`,
       net: net.name,
+      sheet: net.schematicPins[0]?.sheet || net.labels[0]?.sheet || null,
       hasPcb: net.pcbPads.length > 0,
       hasSchematic: net.schematicPins.length > 0 || net.labels.length > 0,
     })
@@ -967,6 +968,7 @@ export function buildSearchIndex(model, nets) {
       label: component.refdes,
       detail: [component.value, '元件'].filter(Boolean).join(' · '),
       refdes: component.refdes,
+      sheet: component.schematic?.sheet || null,
       hasPcb: Boolean(component.pcb),
       hasSchematic: Boolean(component.schematic),
     })
@@ -979,6 +981,8 @@ export function buildSearchIndex(model, nets) {
       detail: pin.net ? `原理图引脚 · ${pin.net}` : '原理图引脚',
       refdes: pin.refdes,
       net: pin.net,
+      sheet: pin.sheet || null,
+      bounds: pin.bounds || null,
       hasSchematic: true,
       hasPcb: false,
     })

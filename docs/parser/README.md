@@ -12,7 +12,7 @@
 - 固定头：PDI Control、ESC Configuration、配置站别名、厂商 ID、产品码、修订号、序列号、邮箱配置、EEPROM 大小与版本。
 - 固定头 CRC-8（poly `0x07`，init `0xFF`，覆盖前 14 字节）。
 - 类别：Strings、General、FMMU、SyncManager、TxPDO / RxPDO 及条目、DC 操作模式；未知/厂商自定义类别保留原始数据。
-- 所有解析出的字段都可以直接编辑，列表支持新增与删除：固定头与身份、邮箱、General、字符串、FMMU、SyncManager、PDO 与条目、DC 操作模式。
+- 数据类别与列表条目支持新增、修改和删除：General、字符串、FMMU、SyncManager、PDO 与条目、DC 操作模式；固定头与身份、邮箱字段可直接编辑。
 - 名称字段与 SII 字符串表双向同步；在名称字段中输入新名称会自动创建字符串。
 
 ## 输出

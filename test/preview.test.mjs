@@ -243,6 +243,17 @@ test('search ranks exact and prefix matches above substring hits', async () => {
   assert.deepEqual(searchPreview(entries, 'no-such-net'), [])
 })
 
+test('search hits carry the schematic sheet they belong to', async () => {
+  const model = buildPreviewModel((await coreBoardProject()).circuitJson)
+  const entries = buildSearchIndex(model, indexNets(model))
+
+  const pins = entries.filter((entry) => entry.kind === 'pin')
+  assert.ok(pins.length > 0)
+  assert.ok(pins.every((pin) => pin.sheet), 'pin hits need their sheet to focus it')
+  assert.ok(new Set(pins.map((pin) => pin.sheet)).size > 1, 'pins span multiple sheets')
+  assert.ok(entries.filter((entry) => entry.kind === 'component').every((item) => item.sheet))
+})
+
 test('schematic text uses the size the KiCad writer draws', () => {
   // `circuit-json-to-kicad` scales schematic coordinates by 15 and draws text
   // at 1.27 mm, so text with no size of its own must be 1.27 / 15 model units.

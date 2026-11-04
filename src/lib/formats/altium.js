@@ -84,7 +84,7 @@ export const altium = {
   extensions: ['.PcbDoc', '.SchDoc'],
   status: 'supported',
   converts: 'PCB + 原理图',
-  note: 'PCB 与原理图都支持,可一次选中同一工程的 .PcbDoc 和多张 .SchDoc 一起转换,网表会在两者之间对齐。',
+  note: 'PCB 与原理图都支持，可一次选中同一工程的 .PcbDoc 和多张 .SchDoc 一起转换，网表会在两者之间对齐。',
   samples: [
     {
       label: 'STM32F411 四层板（Altium 项目）',
@@ -117,42 +117,42 @@ export const altium = {
           category: '层数上限',
           detail: '最多 10 层铜层；层数更多的板直接转换失败。',
           reason:
-            'Circuit JSON 只定义 top/bottom/inner1–inner8 十个铜层,超过 10 层的板在中间模型里没有可用的图层名。',
+            'Circuit JSON 只定义 top/bottom/inner1–inner8 十个铜层，超过 10 层的板在中间模型里没有可用的图层名。',
         },
         {
           category: '设计规则',
           detail: '只导出全局最小线宽与过孔尺寸；间距、差分对、规则优先级、网络类、Room、层叠材料不导出。',
           reason:
-            'altiumts 会解析规则表,但 altium-to-circuit-json 只把全局 Width 与 RoutingVias 的最小值写进 pcb_board;其余规则、网络类与层叠材料没有进入 Circuit JSON,而且 KiCad 侧还要写进 .kicad_pro/.kicad_dru。',
+            'altiumts 会解析规则表，但 altium-to-circuit-json 只把全局 Width 与 RoutingVias 的最小值写进 pcb_board；其余规则、网络类与层叠材料没有进入 Circuit JSON，而且 KiCad 侧还要写进 .kicad_pro/.kicad_dru。',
         },
         {
           category: '敷铜',
           detail: '以 zone 输出，填充算法与优先级重算，需在 KiCad 重新灌注。',
           reason:
-            'zone 的填充结果由 KiCad 按当前规则重新计算,源文件里的灌注多边形和优先级不能直接复用。',
+            'zone 的填充结果由 KiCad 按当前规则重新计算，源文件里的灌注多边形和优先级不能直接复用。',
         },
         {
           category: '封装与库',
           detail: '按焊盘几何重建，不引用封装库；库名、封装名不保留，BOM 字段只保留型号。',
           reason:
-            'altiumts 能读出 footprint 与 footprintLibrary,但 altium-to-circuit-json 没有把它们写进中间模型;写出器只能按焊盘重建封装并保留型号,其他 BOM 字段也没有映射。',
+            'altiumts 能读出 footprint 与 footprintLibrary，但 altium-to-circuit-json 没有把它们写进中间模型；写出器只能按焊盘重建封装并保留型号，其他 BOM 字段也没有映射。',
         },
         {
           category: '3D 模型',
           detail: 'STEP 与嵌入式模型不写入，需手动重新指定。',
           reason:
-            '模型是独立的 STEP 文件(或 Altium 内嵌压缩流),浏览器转换只产出文本工程,不携带二进制模型资源。',
+            '模型是独立的 STEP 文件（或 Altium 内嵌压缩流），浏览器转换只产出文本工程，不携带二进制模型资源。',
         },
         {
           category: '文字与丝印',
           detail: '换成 KiCad 字体，字号、对齐、旋转有细微偏差。',
-          reason: 'KiCad 只能用内置笔画字体,源字体、字距与对齐没有等价字段。',
+          reason: 'KiCad 只能用内置笔画字体，源字体、字距与对齐没有等价字段。',
         },
         {
           category: '其他标注',
           detail: '尺寸标注、钻孔表、Gerber/装配输出设置、板级变体不导出。',
           reason:
-            'Gerber/装配输出与板级变体不在板图数据里;尺寸标注虽有 pcb_fabrication_note_dimension 元素,但 circuit-json-to-kicad 尚未写出它。',
+            'Gerber/装配输出与板级变体不在板图数据里；尺寸标注虽有 pcb_fabrication_note_dimension 元素，但 circuit-json-to-kicad 尚未写出它。',
         },
       ],
     },
@@ -165,30 +165,30 @@ export const altium = {
           category: '符号图形',
           detail: '重建为通用符号或“方框 + 引脚”，厂商图形、引脚长度与样式被简化。',
           reason:
-            '外部 .SchLib 符号库不解析,只有内置映射或方框 + 引脚两种重建方式,厂商图形、引脚长度与样式因此被简化。',
+            '外部 .SchLib 符号库不解析，只有内置映射或方框 + 引脚两种重建方式，厂商图形、引脚长度与样式因此被简化。',
         },
         {
           category: '层次结构',
           detail: '多张 .SchDoc 输出根图 + 子图，但根图没有图纸引脚；图纸符号、端口与总线入口只重画为图形，总线不导出。',
           reason:
-            'Circuit JSON 没有总线对象,altium-to-circuit-json 也不产出图纸引脚;图纸符号与端口只按图形和文字重画,所以层间连接只能靠网络名/电源符号合并。',
+            'Circuit JSON 没有总线对象，altium-to-circuit-json 也不产出图纸引脚；图纸符号与端口只按图形和文字重画，所以层间连接只能靠网络名/电源符号合并。',
         },
         {
           category: '设计数据',
           detail: 'ERC 标记、掩膜、参数集、设计变体、PCB 注释不导出。',
-          reason: 'ERC 标记、掩膜、参数集与设计变体只存在于 Altium 工程数据库,不进入中间模型。',
+          reason: 'ERC 标记、掩膜、参数集与设计变体只存在于 Altium 工程数据库，不进入中间模型。',
         },
         {
           category: '文字与图形',
           detail: '字体、字号、颜色、线宽按近似值输出，注释框和图片可能丢失。',
           reason:
-            '字体、颜色与线宽需要 KiCad 的对应字段,转换器只按位置近似重建;注释框和图片没有原理图图形元素。',
+            '字体、颜色与线宽需要 KiCad 的对应字段，转换器只按位置近似重建；注释框和图片没有原理图图形元素。',
         },
         {
           category: '封装与库',
           detail: '封装映射只保留名称，符号与封装的绑定需在 KiCad 重新确认。',
           reason:
-            'altiumts 的 Implementation 记录带有封装名,但 altium-to-circuit-json 没有把它写进 source_component;写出器只能按型号或符号名推导 Footprint 属性,无法与源封装库对应。',
+            'altiumts 的 Implementation 记录带有封装名，但 altium-to-circuit-json 没有把它写进 source_component；写出器只能按型号或符号名推导 Footprint 属性，无法与源封装库对应。',
         },
       ],
     },
@@ -214,7 +214,7 @@ export const altium = {
       const parsed = parseAltiumFile(normalizeAltiumAscii(source.bytes))
       if (source.format.kind === 'pcb') {
         if (documents.pcb) {
-          throw new EdaConversionError('一次只能转换一块板:检测到多个 .PcbDoc,请分批转换。')
+          throw new EdaConversionError('一次只能转换一块板：检测到多个 .PcbDoc，请分批转换。')
         }
         documents.pcb = parsed.document
       } else {
@@ -263,7 +263,7 @@ export const altium = {
         warnings.push({
           level: 'warn',
           message:
-            '板图与原理图的网络表在工程级合并时被串成了同一个网络(上游转换器的已知问题),已改为分别转换再合并:两侧的网络名和网络标签保持正确,但 KiCad 里封装与符号不会按位号自动绑定,需要手动关联。',
+            '板图与原理图的网络表在工程级合并时被串成了同一个网络（上游转换器的已知问题），已改为分别转换再合并：两侧的网络名和网络标签保持正确，但 KiCad 里封装与符号不会按位号自动绑定，需要手动关联。',
         })
       }
     }
@@ -272,19 +272,19 @@ export const altium = {
     if (documents.schematics.length > 1) {
       warnings.push({
         level: 'info',
-        message: `检测到 ${documents.schematics.length} 张原理图,将输出层次化工程(根图 + 每张子图各一个 .kicad_sch)。`,
+        message: `检测到 ${documents.schematics.length} 张原理图，将输出层次化工程（根图 + 每张子图各一个 .kicad_sch）。`,
       })
     }
     if (summary.models > 0) {
       warnings.push({
         level: 'info',
-        message: `原始设计含 ${summary.models} 个 3D 模型,.kicad_pcb 不携带模型数据,需要在 KiCad 里重新关联。`,
+        message: `原始设计含 ${summary.models} 个 3D 模型，.kicad_pcb 不携带模型数据，需要在 KiCad 里重新关联。`,
       })
     }
     if (!summary.hasBoard) {
       warnings.push({
         level: 'info',
-        message: '本次只转换了原理图,没有板级数据,因此不生成 .kicad_pcb。',
+        message: '本次只转换了原理图，没有板级数据，因此不生成 .kicad_pcb。',
       })
     }
 

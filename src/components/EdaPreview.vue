@@ -55,6 +55,11 @@ function netByName(name) {
   return nets.value.find((net) => net.name === name) || null
 }
 
+function showSheet(sheetId) {
+  const index = schematic.value?.sheets.findIndex((sheet) => sheet.id === sheetId) ?? -1
+  if (index >= 0) activeSheetIndex.value = index
+}
+
 const activeNet = computed(() => (activeNetName.value ? netByName(activeNetName.value) : null))
 
 const netNeedle = computed(() => activeNet.value?.name || '')
@@ -142,12 +147,15 @@ function netBoundsOnPcb(net) {
 
 function netBoundsOnSchematic(net) {
   if (!net) return null
-  const points = [...net.schematicPins, ...net.labels]
+  const sheetId = activeSheet.value?.id
+  const points = [...net.schematicPins, ...net.labels].filter(
+    (point) => !sheetId || point.sheet === sheetId,
+  )
   if (!points.length) return null
   return padBounds(unionBounds(points.map((point) => point.bounds)), 1.5)
 }
 
-function selectNet(name, { jumpTo = '' } = {}) {
+function selectNet(name, { jumpTo = '', sheet = '' } = {}) {
   activeNetName.value = name || ''
   selectedPcbId.value = ''
   selectedComponentId.value = ''
@@ -164,9 +172,7 @@ function selectNet(name, { jumpTo = '' } = {}) {
     if (destination === 'schematic') {
       // A net can reach the schematic through a label alone, in which case
       // that label decides which sheet to show.
-      const sheetId = net?.schematicPins[0]?.sheet || net?.labels[0]?.sheet
-      const index = schematic.value?.sheets.findIndex((sheet) => sheet.id === sheetId) ?? -1
-      if (index >= 0) activeSheetIndex.value = index
+      showSheet(sheet || net?.schematicPins[0]?.sheet || net?.labels[0]?.sheet)
     }
   }
   nextTick(() => {
@@ -259,18 +265,27 @@ function onSearchSelect(entry) {
   // moved to.
   query.value = ''
   if (entry.kind === 'net') {
-    selectNet(entry.label)
+    // Stay in the current view when the net is drawn there, so a hit on
+    // another sheet moves the sheet instead of switching to the PCB tab.
+    const here = tab.value === 'pcb' ? netHasPcb(entry.label) : netHasSchematic(entry.label)
+    selectNet(entry.label, { jumpTo: here ? tab.value : '', sheet: entry.sheet })
     return
   }
   if (entry.kind === 'component') {
     activeNetName.value = ''
-    selectComponent(entry.refdes)
+    selectComponent(entry.refdes, entry.sheet)
     return
   }
-  selectNet(entry.net)
+  // A pin hit belongs to one sheet: highlight its net but frame the pin itself.
+  activeNetName.value = entry.net || ''
+  selectedPcbId.value = ''
+  selectedComponentId.value = ''
+  tab.value = 'schematic'
+  showSheet(entry.sheet)
+  nextTick(() => focusBounds(entry.bounds ? padBounds(entry.bounds, 1) : null))
 }
 
-function selectComponent(refdes) {
+function selectComponent(refdes, sheet) {
   const component = components.value.find((entry) => entry.refdes === refdes)
   if (!component) return
   const wantsPcb = tab.value === 'pcb'
@@ -280,11 +295,12 @@ function selectComponent(refdes) {
     const destination = component.pcb ? 'pcb' : component.schematic ? 'schematic' : ''
     if (!destination || destination === tab.value) return
     tab.value = destination
-    return selectComponent(refdes)
+    return selectComponent(refdes, sheet)
   }
   selectedComponentId.value = target.componentId
   selectedPcbId.value = wantsPcb ? component.pcb.id : ''
   activeNetName.value = ''
+  if (!wantsPcb) showSheet(sheet || target.sheet)
   const bounds = target.bounds
   nextTick(() => focusBounds(bounds ? padBounds(bounds, 1) : null))
 }
@@ -368,43 +384,45 @@ const selectedLabel = computed(() => {
       <h2>设计预览</h2>
       <span class="badge">只读</span>
     </div>
-    <table class="data-table shortcut-table">
-      <caption>操作说明</caption>
-      <thead>
-        <tr>
-          <th>操作</th>
-          <th>方式</th>
-          <th>说明</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td class="nowrap">缩放</td>
-          <td class="nowrap">滚轮</td>
-          <td class="small">以指针位置为中心缩放；点击“适应”恢复全图</td>
-        </tr>
-        <tr>
-          <td class="nowrap">平移</td>
-          <td class="nowrap">按住左键拖拽</td>
-          <td class="small">移动画布视图</td>
-        </tr>
-        <tr>
-          <td class="nowrap">选择</td>
-          <td class="nowrap">单击焊盘、引脚或元件</td>
-          <td class="small">焊盘、引脚高亮所属网络并定位；元件选中并高亮</td>
-        </tr>
-        <tr>
-          <td class="nowrap">跨视图定位</td>
-          <td class="nowrap"><kbd>Ctrl</kbd> / <kbd>⌘</kbd> + 单击</td>
-          <td class="small">跳转到另一视图的同名网络</td>
-        </tr>
-        <tr>
-          <td class="nowrap">翻转板面</td>
-          <td class="nowrap"><kbd>空格</kbd></td>
-          <td class="small">仅 PCB 视图，切换正反面</td>
-        </tr>
-      </tbody>
-    </table>
+    <details class="shortcut-help">
+      <summary>操作说明</summary>
+      <table class="data-table shortcut-table">
+        <thead>
+          <tr>
+            <th>操作</th>
+            <th>方式</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="nowrap">缩放</td>
+            <td class="nowrap">滚轮</td>
+            <td class="small">以指针位置为中心缩放；点击“适应”恢复全图</td>
+          </tr>
+          <tr>
+            <td class="nowrap">平移</td>
+            <td class="nowrap">按住左键拖拽</td>
+            <td class="small">移动画布视图</td>
+          </tr>
+          <tr>
+            <td class="nowrap">选择</td>
+            <td class="nowrap">单击焊盘、引脚或元件</td>
+            <td class="small">焊盘、引脚高亮所属网络并定位；元件选中并高亮</td>
+          </tr>
+          <tr>
+            <td class="nowrap">跨视图定位</td>
+            <td class="nowrap"><kbd>Ctrl</kbd> / <kbd>⌘</kbd> + 单击</td>
+            <td class="small">跳转到另一视图的同名网络</td>
+          </tr>
+          <tr>
+            <td class="nowrap">翻转板面</td>
+            <td class="nowrap"><kbd>空格</kbd></td>
+            <td class="small">仅 PCB 视图，切换正反面</td>
+          </tr>
+        </tbody>
+      </table>
+    </details>
 
     <div class="preview-toolbar">
       <div class="tabs" role="tablist">
@@ -601,7 +619,6 @@ const selectedLabel = computed(() => {
               <th>网络</th>
               <th>PCB</th>
               <th>原理图</th>
-              <th />
             </tr>
           </thead>
           <tbody>
@@ -622,27 +639,9 @@ const selectedLabel = computed(() => {
               </td>
               <td>{{ net.pcbPads.length }}</td>
               <td>{{ net.schematicPins.length }}</td>
-              <td class="row-actions">
-                <button
-                  v-if="pcb && net.pcbPads.length"
-                  type="button"
-                  class="btn small ghost"
-                  @click="selectNet(net.name, { jumpTo: 'pcb' })"
-                >
-                  定位 PCB
-                </button>
-                <button
-                  v-if="schematic && (net.schematicPins.length || net.labels.length)"
-                  type="button"
-                  class="btn small ghost"
-                  @click="selectNet(net.name, { jumpTo: 'schematic' })"
-                >
-                  定位原理图
-                </button>
-              </td>
             </tr>
             <tr v-if="!nets.length">
-              <td colspan="4" class="muted small">这个设计没有网络信息。</td>
+              <td colspan="3" class="muted small">这个设计没有网络信息。</td>
             </tr>
           </tbody>
         </table>

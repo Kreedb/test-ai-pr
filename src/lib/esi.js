@@ -24,7 +24,7 @@ import {
   crc8Sii,
 } from 'sii-parser'
 
-import { portsWord as portsToWord } from './format.js'
+import { latin1Bytes, portsWord as portsToWord } from './format.js'
 
 const GENERAL_CATEGORY_BYTES = 32
 const PDO_ENTRY_FLAGS = 0x1000
@@ -283,15 +283,6 @@ function toHexString(bytes) {
   return Array.from(bytes, (byte) => byte.toString(16).toUpperCase().padStart(2, '0')).join('')
 }
 
-function encodeSiiString(value) {
-  const bytes = []
-  for (const char of value) {
-    const code = char.codePointAt(0)
-    bytes.push(code <= 0xff ? code : 0x3f)
-  }
-  return bytes.slice(0, 255)
-}
-
 class StringTable {
   constructor() {
     this.entries = []
@@ -315,7 +306,7 @@ class StringTable {
   encode() {
     const bytes = [this.entries.length]
     for (const value of this.entries) {
-      const encoded = encodeSiiString(value)
+      const encoded = latin1Bytes(value).slice(0, 255)
       bytes.push(encoded.length)
       bytes.push(...encoded)
     }
@@ -516,11 +507,23 @@ function buildDcCategory(opModes) {
     const cycleTimeSync0 = child(opMode.element, 'CycleTimeSync0')
     const cycleTimeSync1 = child(opMode.element, 'CycleTimeSync1')
     const sync0Factor = parseNumber(cycleTimeSync0?.getAttribute('Factor') ?? '1') || 1
+    // Sync1 stores its factor in the attribute. Factor 1 with a zero text is
+    // how the Limx reference pair writes a zero factor, so let a small nonzero
+    // text override Factor 1; that also reads XML from older versions of this
+    // app, while a real cycle time stays out of the 16-bit factor field.
+    const sync1FactorAttr = parseNumber(cycleTimeSync1?.getAttribute('Factor'))
+    const sync1FactorText = parseNumber(textOf(cycleTimeSync1))
+    const sync1Factor =
+      sync1FactorAttr > 1
+        ? sync1FactorAttr
+        : sync1FactorText > 0 && sync1FactorText <= 0xffff
+          ? sync1FactorText
+          : 0
 
     writer.u32(parseNumber(textOf(cycleTimeSync0)) >>> 0)
     writer.u32(parseNumber(textOf(child(opMode.element, 'ShiftTimeSync0'))) >>> 0)
     writer.u32(parseNumber(textOf(child(opMode.element, 'ShiftTimeSync1'))) >>> 0)
-    writer.u16(parseNumber(textOf(cycleTimeSync1)) & 0xffff)
+    writer.u16(sync1Factor & 0xffff)
     writer.u16(parseNumber(textOf(child(opMode.element, 'AssignActivate'))) & 0xffff)
     writer.u16(sync0Factor & 0xffff)
     writer.u8(opMode.nameIndex)
@@ -1039,6 +1042,7 @@ export function generateEsiXml(result, options = {}) {
   if (dc?.elements?.length) {
     push(4, '<Dc>')
     for (const element of dc.elements) {
+      const sync1Factor = Number(element.sync1CycleFactor) || 0
       push(5, '<OpMode>')
       push(6, `<Name>${escapeXml(element.name || `OpMode ${element.index}`)}</Name>`)
       if (element.description) push(6, `<Desc>${escapeXml(element.description)}</Desc>`)
@@ -1048,7 +1052,10 @@ export function generateEsiXml(result, options = {}) {
         `<CycleTimeSync0 Factor="${element.sync0CycleFactor ?? 1}">${element.sync0CycleTime ?? 0}</CycleTimeSync0>`,
       )
       push(6, `<ShiftTimeSync0>${element.sync0ShiftTime ?? 0}</ShiftTimeSync0>`)
-      push(6, `<CycleTimeSync1 Factor="1">${element.sync1CycleFactor ?? 0}</CycleTimeSync1>`)
+      push(
+        6,
+        `<CycleTimeSync1 Factor="${sync1Factor === 0 ? 1 : sync1Factor}">${sync1Factor === 1 ? 1 : 0}</CycleTimeSync1>`,
+      )
       push(6, `<ShiftTimeSync1>${element.sync1ShiftTime ?? 0}</ShiftTimeSync1>`)
       push(5, '</OpMode>')
     }

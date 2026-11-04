@@ -369,7 +369,7 @@ function clearAll() {
           :key="sample.label"
           type="button"
           class="btn"
-          :disabled="busy"
+          :disabled="busy || entries.length > 0"
           @click="loadSample(sample)"
         >
           示例：{{ sample.label }}

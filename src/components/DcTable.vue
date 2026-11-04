@@ -7,6 +7,20 @@ defineProps({
 })
 
 const emit = defineEmits(['update', 'add', 'remove'])
+
+// Write the parsed value back so an invalid entry does not keep its raw text
+// when the model value happens to stay the same.
+function normalizedHex(event, bits = 16) {
+  const value = parseHexValue(event.target.value) & ((1 << bits) - 1)
+  event.target.value = hex(value, bits / 4)
+  return value
+}
+
+function normalizedDec(event, max = 0xffff) {
+  const value = Math.min(Math.max(parseDecValue(event.target.value), 0), max)
+  event.target.value = String(value)
+  return value
+}
 </script>
 
 <template>
@@ -42,7 +56,7 @@ const emit = defineEmits(['update', 'add', 'remove'])
             class="mono"
             :value="hex(element.assignActivate, 4)"
             spellcheck="false"
-            @change="emit('update', index, 'assignActivate', parseHexValue($event.target.value) & 0xffff)"
+            @change="emit('update', index, 'assignActivate', normalizedHex($event))"
           />
         </label>
         <label class="field">
@@ -50,7 +64,7 @@ const emit = defineEmits(['update', 'add', 'remove'])
           <input
             class="mono"
             :value="element.sync0CycleTime"
-            @change="emit('update', index, 'sync0CycleTime', parseDecValue($event.target.value) >>> 0)"
+            @change="emit('update', index, 'sync0CycleTime', normalizedDec($event, 0xffffffff))"
           />
         </label>
         <label class="field">
@@ -58,7 +72,7 @@ const emit = defineEmits(['update', 'add', 'remove'])
           <input
             class="mono"
             :value="element.sync0ShiftTime"
-            @change="emit('update', index, 'sync0ShiftTime', parseDecValue($event.target.value) >>> 0)"
+            @change="emit('update', index, 'sync0ShiftTime', normalizedDec($event, 0xffffffff))"
           />
         </label>
         <label class="field">
@@ -66,15 +80,15 @@ const emit = defineEmits(['update', 'add', 'remove'])
           <input
             class="mono"
             :value="element.sync0CycleFactor"
-            @change="emit('update', index, 'sync0CycleFactor', parseDecValue($event.target.value) & 0xffff)"
+            @change="emit('update', index, 'sync0CycleFactor', normalizedDec($event))"
           />
         </label>
         <label class="field">
-          <span>Sync1 周期时间</span>
+          <span>Sync1 周期因子</span>
           <input
             class="mono"
             :value="element.sync1CycleFactor"
-            @change="emit('update', index, 'sync1CycleFactor', parseDecValue($event.target.value) & 0xffff)"
+            @change="emit('update', index, 'sync1CycleFactor', normalizedDec($event))"
           />
         </label>
         <label class="field">
@@ -82,7 +96,7 @@ const emit = defineEmits(['update', 'add', 'remove'])
           <input
             class="mono"
             :value="element.sync1ShiftTime"
-            @change="emit('update', index, 'sync1ShiftTime', parseDecValue($event.target.value) >>> 0)"
+            @change="emit('update', index, 'sync1ShiftTime', normalizedDec($event, 0xffffffff))"
           />
         </label>
       </div>

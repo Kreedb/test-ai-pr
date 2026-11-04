@@ -5,16 +5,16 @@ export const route = {
   tool: {
     tag: 'BAG',
     title: '机器人包回放',
-    description:
-      '读取 ROS1 bag 的关节与 IMU 话题（支持未完成的 .active 自动恢复），按时间轴还原机器人姿态；可同时导入文本日志并按时间对照。内置 LimX Luna / Oli / TRON2A 骨架。',
+    description: '读取 ROS1 bag 的关节与 IMU 话题（支持未完成的 .active 自动恢复），按时间轴还原机器人姿态；可同时导入文本日志并按时间对照。内置 LimX Luna / Oli / TRON2A 骨架。',
     action: '打开回放',
   },
 }
 </script>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 
+import LogTimeline from '@/components/LogTimeline.vue'
 import RobotSkeletonView from '@/components/RobotSkeletonView.vue'
 import { formatBytes } from '@/lib/format'
 import { MAX_LOG_BYTES, alignLog, parseLogText } from '@/lib/replay/logfile'
@@ -23,7 +23,6 @@ import { detectProfile, mapJoints } from '@/lib/replay/profiles'
 import { MAX_BAG_BYTES, inspectRosbag, readRosbag } from '@/lib/replay/rosbag'
 
 const SAMPLE = { file: 'samples/replay/luna-demo.bag', label: 'Luna 动作' }
-const LOG_ROWS = 200
 
 const fileName = ref('')
 const sampleName = ref('')
@@ -44,7 +43,6 @@ const logEntries = shallowRef([])
 const logWarnings = shallowRef([])
 const logError = ref('')
 const logBusy = ref(false)
-const logView = ref(null)
 const startTime = ref(0)
 const duration = ref(0)
 const current = ref(0)
@@ -67,7 +65,10 @@ const logAligned = computed(() => {
   return alignLog(logEntries.value, startTime.value, startTime.value + duration.value)
 })
 
-const logRows = computed(() => {
+const logRows = computed(() => logAligned.value.entries)
+
+const logIndex = computed(() => {
+  if (!logAligned.value.aligned) return -1
   const entries = logAligned.value.entries
   let low = 0
   let high = entries.length
@@ -76,20 +77,10 @@ const logRows = computed(() => {
     if (entries[middle].time <= absoluteTime.value) low = middle + 1
     else high = middle
   }
-  const start = Math.max(0, low - LOG_ROWS)
-  return entries.slice(start, low).map((row, offset) => ({ ...row, index: start + offset }))
+  return low ? low - 1 : -1
 })
 
 const logBasis = computed(() => (logAligned.value.basis === 'clk' ? 'clk 单调时钟' : '墙钟时间'))
-
-watch(
-  () => logRows.value[logRows.value.length - 1]?.time ?? null,
-  () => {
-    nextTick(() => {
-      if (logView.value) logView.value.scrollTop = logView.value.scrollHeight
-    })
-  },
-)
 
 function indexAt(times, time) {
   if (!times?.length) return -1
@@ -190,11 +181,6 @@ function formatTime(seconds) {
   const minutes = Math.floor(value / 60)
   const rest = value - minutes * 60
   return `${sign}${minutes}:${rest.toFixed(2).padStart(5, '0')}`
-}
-
-function logRelative(row) {
-  if (!logAligned.value.aligned) return row.time.toFixed(3)
-  return formatTime(row.time - startTime.value)
 }
 
 function fileKind(name) {
@@ -520,19 +506,12 @@ onBeforeUnmount(() => {
         <span v-if="logName" class="badge">{{ logName }}</span>
       </div>
 
-      <label
-        class="drop-zone"
-        :class="{ dragging }"
-        @dragover.prevent="dragging = true"
-        @dragleave.prevent="dragging = false"
-        @drop.prevent="onDrop"
-      >
+      <label class="drop-zone" :class="{ dragging }" @dragover.prevent="dragging = true" @dragleave.prevent="dragging = false" @drop.prevent="onDrop">
         <input type="file" multiple accept=".bag,.active,.log,.txt" @change="onFileChange" />
         <span class="drop-title">拖拽 ROS1 .bag / .active 与 .log 文本日志，或点击选择文件</span>
         <span class="drop-hint">
           JointState + IMU · 未压缩或 lz4 · .active 自动恢复 · 日志按 clk / 时间戳对齐 · bag 最大
-          {{ formatBytes(MAX_BAG_BYTES) }} · 日志最大 {{ formatBytes(MAX_LOG_BYTES) }} ·
-          数据只在浏览器本地处理
+          {{ formatBytes(MAX_BAG_BYTES) }} · 日志最大 {{ formatBytes(MAX_LOG_BYTES) }} · 数据只在浏览器本地处理
         </span>
       </label>
 
@@ -566,55 +545,6 @@ onBeforeUnmount(() => {
             {{ warning.message }}
           </li>
         </ul>
-      </section>
-
-      <section class="card">
-        <div class="card-head">
-          <h2>姿态回放</h2>
-          <span v-if="atGap" class="chip warn-chip">DATA GAP</span>
-        </div>
-
-        <RobotSkeletonView
-          :points="pose?.points || null"
-          :skeleton="profile?.skeleton || null"
-          :empty-message="profile?.skeleton ? '当前时刻没有关节数据' : '未识别骨架，请展开下方关节角度查看数值'"
-        />
-
-        <div class="playback-bar">
-          <button type="button" class="btn primary icon-btn" @click="toggle">
-            {{ playing ? '暂停' : '播放' }}
-          </button>
-          <button type="button" class="btn ghost icon-btn" title="上一帧" @click="step(-1)">‹</button>
-          <button type="button" class="btn ghost icon-btn" title="下一帧" @click="step(1)">›</button>
-          <input class="playback-range" type="range" min="0" :max="duration" step="0.001" :value="current" aria-label="回放时间" @input="seek" />
-          <span class="mono time-label">{{ formatTime(current) }} / {{ formatTime(duration) }}</span>
-          <select v-model.number="speed" class="mono" aria-label="播放速度">
-            <option :value="0.25">0.25×</option>
-            <option :value="0.5">0.5×</option>
-            <option :value="1">1×</option>
-            <option :value="2">2×</option>
-          </select>
-          <label class="loop-label"><input v-model="loop" type="checkbox" /> 循环</label>
-        </div>
-
-        <dl class="kv pose-kv">
-          <div>
-            <dt>底座位姿</dt>
-            <dd class="mono">RPY {{ baseEuler.map((value) => value.toFixed(1)).join('° / ') }}°</dd>
-          </div>
-          <div>
-            <dt>关节帧</dt>
-            <dd class="mono">{{ jointFrame + 1 }} / {{ jointSeries?.count ?? 0 }}</dd>
-          </div>
-          <div>
-            <dt>IMU 帧</dt>
-            <dd class="mono">{{ imuSeries ? imuFrame + 1 : '—' }}</dd>
-          </div>
-          <div>
-            <dt>时钟</dt>
-            <dd>bag 记录时间</dd>
-          </div>
-        </dl>
       </section>
 
       <section class="card">
@@ -667,6 +597,55 @@ onBeforeUnmount(() => {
           </div>
         </details>
       </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>姿态回放</h2>
+          <span v-if="atGap" class="chip warn-chip">DATA GAP</span>
+        </div>
+
+        <dl class="kv pose-kv">
+          <div>
+            <dt>底座位姿</dt>
+            <dd class="mono">RPY {{ baseEuler.map((value) => value.toFixed(1)).join('° / ') }}°</dd>
+          </div>
+          <div>
+            <dt>关节帧</dt>
+            <dd class="mono">{{ jointFrame + 1 }} / {{ jointSeries?.count ?? 0 }}</dd>
+          </div>
+          <div>
+            <dt>IMU 帧</dt>
+            <dd class="mono">{{ imuSeries ? imuFrame + 1 : '—' }}</dd>
+          </div>
+          <div>
+            <dt>时钟</dt>
+            <dd>bag 记录时间</dd>
+          </div>
+        </dl>
+
+        <RobotSkeletonView
+          :points="pose?.points || null"
+          :skeleton="profile?.skeleton || null"
+          :empty-message="profile?.skeleton ? '当前时刻没有关节数据' : '未识别骨架，请展开上方关节角度查看数值'"
+        />
+
+        <div class="playback-bar">
+          <button type="button" class="btn primary icon-btn" @click="toggle">
+            {{ playing ? '暂停' : '播放' }}
+          </button>
+          <button type="button" class="btn ghost icon-btn" title="上一帧" @click="step(-1)">‹</button>
+          <button type="button" class="btn ghost icon-btn" title="下一帧" @click="step(1)">›</button>
+          <input class="playback-range" type="range" min="0" :max="duration" step="0.001" :value="current" aria-label="回放时间" @input="seek" />
+          <span class="mono time-label">{{ formatTime(current) }} / {{ formatTime(duration) }}</span>
+          <select v-model.number="speed" class="mono" aria-label="播放速度">
+            <option :value="0.25">0.25×</option>
+            <option :value="0.5">0.5×</option>
+            <option :value="1">1×</option>
+            <option :value="2">2×</option>
+          </select>
+          <label class="loop-label"><input v-model="loop" type="checkbox" /> 循环</label>
+        </div>
+      </section>
     </template>
 
     <section v-if="logName || logError" class="card log-card">
@@ -681,29 +660,12 @@ onBeforeUnmount(() => {
           {{ logEntries.length.toLocaleString() }} 条带时间戳的日志
           <template v-if="result">
             · 按 {{ logBasis }} 对齐
-            <span v-if="!logAligned.aligned" class="warn-warn"
-              >· 日志时间与 bag 记录时间不重叠，无法匹配</span
-            >
+            <span v-if="!logAligned.aligned" class="warn-warn">· 日志时间与 bag 记录时间不重叠，无法匹配</span>
           </template>
           <template v-else> · 导入 bag 后按播放时间显示</template>
         </p>
 
-        <ul
-          v-if="result && logRows.length"
-          ref="logView"
-          class="log-view"
-          aria-label="当前回放时间之前的日志"
-        >
-          <li
-            v-for="row in logRows"
-            :key="row.index"
-            :class="`log-${row.level ? row.level.toLowerCase() : 'info'}`"
-          >
-            <span class="log-time mono">{{ logRelative(row) }}</span>
-            <span class="log-text mono">{{ row.text }}</span>
-          </li>
-        </ul>
-        <p v-else-if="result" class="muted small">当前回放时间之前没有日志。</p>
+        <LogTimeline v-if="result && logRows.length" :rows="logRows" :active="logIndex" :aligned="logAligned.aligned" :start-time="startTime" />
 
         <ul v-if="logWarnings.length" class="warning-list">
           <li v-for="(warning, index) in logWarnings" :key="index" :class="`warn-${warning.level}`">
@@ -750,7 +712,7 @@ onBeforeUnmount(() => {
 }
 
 .pose-kv {
-  margin-top: 14px;
+  margin: 14px 0;
 }
 
 .topic-grid {
@@ -793,50 +755,5 @@ details summary {
 
 details[open] summary {
   margin-bottom: 12px;
-}
-
-.log-view {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  max-height: 360px;
-  margin: 12px 0 0;
-  padding: 10px 12px;
-  overflow: auto;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg-soft);
-  list-style: none;
-  font-size: 0.78rem;
-}
-
-.log-view li {
-  display: flex;
-  gap: 10px;
-  align-items: baseline;
-}
-
-.log-time {
-  flex: 0 0 auto;
-  color: var(--muted);
-  font-size: 0.74rem;
-}
-
-.log-text {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.log-w .log-text {
-  color: var(--warn);
-}
-
-.log-e .log-text,
-.log-f .log-text {
-  color: var(--err);
-}
-
-.log-d .log-text {
-  color: var(--muted);
 }
 </style>

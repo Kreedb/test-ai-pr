@@ -62,8 +62,7 @@ export function parseLogText(text) {
     const clock = clocksOf(line)
     // `clk(...)` can also appear inside a wrapped message, so a clk-only line
     // is a new entry only when it is a header (level marker or unindented).
-    const starts =
-      clock.wall !== null || (clock.clk !== null && (LEVEL.test(line) || !/^\s/.test(line)))
+    const starts = clock.wall !== null || (clock.clk !== null && (LEVEL.test(line) || !/^\s/.test(line)))
     if (!starts) {
       if (current) current.text += `\n${line}`
       else if (line.trim()) orphan += 1
@@ -78,8 +77,7 @@ export function parseLogText(text) {
   }
 
   for (const entry of entries) entry.text = entry.text.replace(/\s+$/, '')
-  if (orphan)
-    warnings.push({ level: 'warn', message: `日志开头有 ${orphan} 行没有时间戳，已忽略。` })
+  if (orphan) warnings.push({ level: 'warn', message: `日志开头有 ${orphan} 行没有时间戳，已忽略。` })
   if (truncated) {
     warnings.push({
       level: 'warn',

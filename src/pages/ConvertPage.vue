@@ -436,9 +436,8 @@ function clearAll() {
         <span class="badge">有损转换</span>
       </div>
       <p class="muted small">
-        所有来源先解析成统一的中间模型 Circuit JSON，再统一写出 KiCad（.kicad_pcb / .kicad_sch / .kicad_pro），
-        因此新增一种来源只需要补一个解析器。下表按“来源 + 信息类别”列出会被简化或丢失的内容，
-        请在 KiCad 打开后逐项核对，再重新灌注敷铜、补 3D 模型和设计规则。
+        所有来源先解析为统一的 Circuit JSON，再写出 KiCad（.kicad_pcb / .kicad_sch / .kicad_pro）。
+        下表按“来源 × 信息类别”列出会被简化或丢失的内容；导入 KiCad 后请逐项核对，并重新设置敷铜、3D 模型与设计规则。
       </p>
       <LossTable />
     </section>

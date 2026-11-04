@@ -7,7 +7,9 @@ bag 不上传，解析与渲染都在本机完成。
 
 - ROS1 bag v2（`.bag`），最大 256 MiB。
 - 数据块支持未压缩与 lz4；bz2 需要先用 `rosbag decompress` 转成未压缩或 lz4。
-- 中断录制留下的 `.bag.active` / `.active` 不是完整 bag，需要先用 BagRepair 之类工具修复为 `.bag` 再导入。
+- 中断录制留下的 `.bag.active` / `.active` 可以直接导入：页面按 BagRepair 的方式顺序扫描数据块，
+  自动恢复截断前的完整消息并跳过尾部不完整的数据块。不重建索引，也不生成新的 `.bag`；
+  尾部缺失的字节和未写完的最后一个压缩块无法找回。真正的文本 `.log.active` 不是 bag，不能打开。
 
 ## 自动识别的话题
 

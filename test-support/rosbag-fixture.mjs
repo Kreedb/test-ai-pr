@@ -73,7 +73,7 @@ function header(fields) {
   return out.build()
 }
 
-function record(fields, data) {
+export function record(fields, data) {
   const head = header(fields)
   const out = new Out()
   out.u32(head.length).push(head).u32(data.length).push(data)
@@ -165,7 +165,7 @@ export function encodeSensorImu({ quat = [1, 0, 0, 0], time = 0, frameId = 'imu'
   return out.build()
 }
 
-export function buildRosbag({ connections, messages, compression = 'none' }) {
+export function buildRosbag({ connections, messages, compression = 'none', topLevelConnections = true }) {
   const connectionRecords = connections.map((connection) => {
     const data = header({
       topic: connection.topic,
@@ -216,7 +216,9 @@ export function buildRosbag({ connections, messages, compression = 'none' }) {
 
   const out = new Out()
   out.push(encoder.encode('#ROSBAG V2.0\n')).push(bagHeader)
-  for (const connection of connectionRecords) out.push(connection)
+  if (topLevelConnections) {
+    for (const connection of connectionRecords) out.push(connection)
+  }
   out.push(chunkRecord)
   return out.build()
 }

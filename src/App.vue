@@ -2,22 +2,19 @@
 import { computed } from 'vue'
 
 import { useRoute } from '@/router'
-import { homeRoute, routeFor, routeHref, routes } from '@/routes'
+import { routeFor, routeHref, routes, toolRoutes } from '@/routes'
 
 const path = useRoute()
 const active = computed(() => routeFor(path.value))
-const page = computed(() => active.value?.component || homeRoute.component)
+const tools = toolRoutes.map((route) => ({ path: route.path, ...route.tool }))
 </script>
 
 <template>
   <div class="app">
     <header class="app-header">
-      <a class="brand" :href="routeHref(homeRoute.path)">
+      <a class="brand" href="#/">
         <div class="brand-mark" aria-hidden="true">CB</div>
-        <div>
-          <h1>convbin</h1>
-          <p>二进制工具箱 · EEPROM 解析、EDA 转换与机器人 bag 回放</p>
-        </div>
+        <h1>convbin</h1>
       </a>
 
       <nav class="app-nav" aria-label="主导航">
@@ -37,10 +34,30 @@ const page = computed(() => active.value?.component || homeRoute.component)
       </a>
     </header>
 
-    <component :is="page" />
+    <component :is="active.component" v-if="active" />
+
+    <main v-else class="app-main">
+      <section class="card hero">
+        <span class="hero-tag">convbin · 二进制工具箱</span>
+        <h2>EEPROM、EDA 与机器人包工具</h2>
+        <p>
+          所有工具都在浏览器本地运行，文件不会上传到服务器。页面支持 PWA 离线缓存，
+          首次打开后断网也能继续使用。
+        </p>
+      </section>
+
+      <section class="tool-grid" aria-label="工具列表">
+        <a v-for="tool in tools" :key="tool.path" class="tool-card" :href="routeHref(tool.path)">
+          <span class="tool-tag">{{ tool.tag }}</span>
+          <h2>{{ tool.title }}</h2>
+          <p>{{ tool.description }}</p>
+          <span class="tool-link">{{ tool.action }} →</span>
+        </a>
+      </section>
+    </main>
 
     <footer class="app-footer">
-      <span>convbin · {{ active?.label }} · 数据仅在浏览器本地处理</span>
+      <span>convbin · {{ active?.label || '首页' }} · 数据仅在浏览器本地处理</span>
     </footer>
   </div>
 </template>

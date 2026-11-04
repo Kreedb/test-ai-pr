@@ -96,9 +96,9 @@ src/lib/replay/models.js   # LimX Luna / Oli 的关节偏移与转轴
 src/lib/route-path.js      # hash 路径归一化与路由匹配（无 Vue 依赖，供路由与链接共用）
 src/routes.js              # 按 src/pages/*Page.vue 自动收集路由、导航与首页工具卡片
 src/router.js              # 极简 hash 路由（GitHub Pages 子路径下无需重写规则）
-src/pages/                 # 导航页、解析器页、机器人回放页、EDA 转换页
+src/pages/                 # 解析器页、机器人回放页、EDA 转换页（首页在 App.vue）
 src/components/            # 可编辑表格、PDO、DC、十六进制视图、设计预览、机器人骨架、格式支持与有损表
-src/App.vue                # 页面外壳：品牌、导航、路由出口、页脚
+src/App.vue                # 页面外壳：品牌、导航、首页、路由出口、页脚
 public/samples/            # 示例 EEPROM 转储、ESI XML、Altium / Specctra / EAGLE / PADS 工程文件
 build/offline.js           # 构建时生成离线用 Service Worker（预缓存全部产物与解析器示例）
 ```

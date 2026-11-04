@@ -126,12 +126,6 @@ p {
   box-shadow: 0 6px 20px rgba(91, 140, 255, 0.35);
 }
 
-.brand p {
-  margin-top: 2px;
-  color: var(--muted);
-  font-size: 0.82rem;
-}
-
 .gh-link {
   flex: 0 0 auto;
   padding: 6px 12px;
@@ -745,12 +739,7 @@ section[id] {
   color: var(--muted);
 }
 
-.hero-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 6px;
-}
+
 
 .tool-grid {
   display: grid;
@@ -1451,10 +1440,6 @@ section[id] {
 
   .card {
     padding: 14px;
-  }
-
-  .brand p {
-    display: none;
   }
 
   .stat-value {

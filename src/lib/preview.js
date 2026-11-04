@@ -658,7 +658,9 @@ function buildSchematic(index) {
   const declaredSheets = index.list('schematic_sheet')
   const sheets = declaredSheets.length ? declaredSheets : [{ schematic_sheet_id: undefined, name: '图纸 1' }]
   const sheetIds = new Set(sheets.map((sheet) => sheet.schematic_sheet_id).filter(Boolean))
-  const defaultSheet = sheets[0].schematic_sheet_id
+  // Items carry the same id the sheet list uses, including the synthesized
+  // `sheet_0` for converters that omit `schematic_sheet_id`.
+  const defaultSheet = sheets[0].schematic_sheet_id || 'sheet_0'
   const keepsOwnTextSizes = keepsTextSizes(index)
 
   // Elements that name a sheet the converter never declared stay visible on the
@@ -814,7 +816,7 @@ function buildSchematic(index) {
 
   const sheetList = sheets.map((sheet, position) => {
     const id = sheet.schematic_sheet_id || `sheet_${position}`
-    const sheetItems = items.filter((item) => item.sheet === sheet.schematic_sheet_id)
+    const sheetItems = items.filter((item) => item.sheet === id)
     return {
       id,
       name: sheet.name || sheet.display_name || `图纸 ${position + 1}`,

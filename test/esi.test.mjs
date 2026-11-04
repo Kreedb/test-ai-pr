@@ -37,14 +37,18 @@ test('the Sync1 cycle factor survives export and import', () => {
   const bytes = sample('limx-tron2.bin')
   for (const factor of [0, 1, 4]) {
     const model = createEditorModel(parseSii(bytes))
-    model.dc.elements[0].sync1CycleFactor = factor
+    const element = model.dc.elements[0]
+    element.sync1CycleFactor = factor
+    // Factor 0 and factor 1 both write Factor="1">0; only SYNC1 being enabled
+    // distinguishes 1×SYNC0 from the Limx zero.
+    element.assignActivate =
+      factor === 0 ? element.assignActivate & ~0x400 : element.assignActivate | 0x400
 
     const generated = generateEsiXml(editorResult(model, bytes), editorOptions(model, 'Limx'))
     const attribute = factor === 0 ? 1 : factor
-    const text = factor === 1 ? 1 : 0
     assert.match(
       generated.xml,
-      new RegExp(`<CycleTimeSync1 Factor="${attribute}">${text}</CycleTimeSync1>`),
+      new RegExp(`<CycleTimeSync1 Factor="${attribute}">0</CycleTimeSync1>`),
     )
 
     const recompiled = generateSiiFromEsi(generated.xml)

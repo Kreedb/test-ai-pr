@@ -386,8 +386,11 @@ test('preview survives a hand-built model with missing optional fields', () => {
 
   assert.equal(model.hasBoard, true)
   assert.equal(model.hasSchematic, true)
-  // One undeclared sheet is synthesised so the schematic tab can render.
+  // One undeclared sheet is synthesised so the schematic tab can render, and
+  // its items carry that sheet's id even though the source omitted it.
   assert.equal(model.schematic.sheets.length, 1)
+  assert.equal(model.schematic.sheets[0].id, 'sheet_0')
+  assert.ok(model.schematic.items.every((item) => item.sheet === 'sheet_0'))
   assert.equal(model.schematic.sheets[0].items.filter((item) => item.kind === 'component').length, 1)
   assert.equal(model.pcb.items.find((item) => item.kind === 'pad').refdes, 'R1')
   assert.ok(model.schematic.items.some((item) => item.kind === 'label' && item.text === 'ORPHAN'))

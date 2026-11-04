@@ -507,24 +507,28 @@ function buildDcCategory(opModes) {
     const cycleTimeSync0 = child(opMode.element, 'CycleTimeSync0')
     const cycleTimeSync1 = child(opMode.element, 'CycleTimeSync1')
     const sync0Factor = parseNumber(cycleTimeSync0?.getAttribute('Factor') ?? '1') || 1
-    // Sync1 stores its factor in the attribute. Factor 1 with a zero text is
-    // how the Limx reference pair writes a zero factor, so let a small nonzero
-    // text override Factor 1; that also reads XML from older versions of this
-    // app, while a real cycle time stays out of the 16-bit factor field.
+    const assignActivate = parseNumber(textOf(child(opMode.element, 'AssignActivate'))) & 0xffff
+    // The factor lives in the attribute; a nonzero element text is an absolute
+    // cycle time in ESI, so it is only read back as a factor for exports from
+    // older versions of this app, which always wrote Factor="1" and put the
+    // factor in the text. Factor 1 with a zero text is the Limx zero when SYNC1
+    // is disabled, and a real 1×SYNC0 factor when SYNC1 is enabled.
     const sync1FactorAttr = parseNumber(cycleTimeSync1?.getAttribute('Factor'))
     const sync1FactorText = parseNumber(textOf(cycleTimeSync1))
     const sync1Factor =
       sync1FactorAttr > 1
         ? sync1FactorAttr
-        : sync1FactorText > 0 && sync1FactorText <= 0xffff
+        : sync1FactorText > 0
           ? sync1FactorText
-          : 0
+          : assignActivate & 0x400
+            ? 1
+            : 0
 
     writer.u32(parseNumber(textOf(cycleTimeSync0)) >>> 0)
     writer.u32(parseNumber(textOf(child(opMode.element, 'ShiftTimeSync0'))) >>> 0)
     writer.u32(parseNumber(textOf(child(opMode.element, 'ShiftTimeSync1'))) >>> 0)
     writer.u16(sync1Factor & 0xffff)
-    writer.u16(parseNumber(textOf(child(opMode.element, 'AssignActivate'))) & 0xffff)
+    writer.u16(assignActivate)
     writer.u16(sync0Factor & 0xffff)
     writer.u8(opMode.nameIndex)
     writer.u8(0) // description string index; ESI Desc is not stored in SII
@@ -1054,7 +1058,7 @@ export function generateEsiXml(result, options = {}) {
       push(6, `<ShiftTimeSync0>${element.sync0ShiftTime ?? 0}</ShiftTimeSync0>`)
       push(
         6,
-        `<CycleTimeSync1 Factor="${sync1Factor === 0 ? 1 : sync1Factor}">${sync1Factor === 1 ? 1 : 0}</CycleTimeSync1>`,
+        `<CycleTimeSync1 Factor="${sync1Factor === 0 ? 1 : sync1Factor}">0</CycleTimeSync1>`,
       )
       push(6, `<ShiftTimeSync1>${element.sync1ShiftTime ?? 0}</ShiftTimeSync1>`)
       push(5, '</OpMode>')

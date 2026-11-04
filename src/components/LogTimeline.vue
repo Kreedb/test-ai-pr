@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 
 const props = defineProps({
   rows: { type: Array, default: () => [] },
@@ -32,6 +32,7 @@ function center() {
 }
 
 watch(() => [props.active, props.rows.length], center, { flush: 'post' })
+onMounted(center)
 </script>
 
 <template>

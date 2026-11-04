@@ -440,17 +440,6 @@ const selectedLabel = computed(() => {
         </button>
       </div>
 
-      <button
-        v-if="tab === 'pcb' && pcb"
-        type="button"
-        class="btn small ghost"
-        :aria-pressed="pcbFlipped"
-        :title="pcbFlipped ? '空格键翻到正面' : '空格键翻到背面'"
-        @click="togglePcbFlip"
-      >
-        翻转正反面
-      </button>
-
       <div class="preview-search">
         <input
           v-model="query"

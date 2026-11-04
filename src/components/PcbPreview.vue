@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 
-import { copperLayerLabel, pcbFlipTransform } from '@/lib/preview'
+import { copperLayerLabel, pcbFlipTransform, pcbNetMarkers } from '@/lib/preview'
 
 // Read-only PCB canvas drawn from the preview model. Coordinates are
 // millimetres with Y up; PreviewViewport flips the world group, so everything
@@ -45,8 +45,6 @@ function classesOf(item) {
   if (item.kind === 'board' || item.kind === 'cutout') return {}
   return {
     'preview-dim': Boolean(props.activeNet) && item.net !== props.activeNet,
-    'preview-hit': Boolean(props.activeNet) && item.net === props.activeNet,
-    'preview-selected': Boolean(props.selectedComponentId) && item.componentId === props.selectedComponentId,
   }
 }
 
@@ -124,6 +122,10 @@ function orderOf(item) {
       return 11
   }
 }
+
+// Blinking locator rings over the selected net's pads and vias. One group and
+// one animation, never a filter per item.
+const netMarkers = computed(() => pcbNetMarkers(rendered.value, props.activeNet))
 
 // Reference designators are drawn from the board's silkscreen side, so hiding
 // the silk layer hides them too.
@@ -288,6 +290,10 @@ const pinSummary = (item) => {
           {{ label.text }}
         </text>
       </g>
+    </g>
+
+    <g v-if="netMarkers.length" class="preview-net-markers" aria-hidden="true">
+      <circle v-for="marker in netMarkers" :key="marker.id" :cx="marker.x" :cy="marker.y" :r="marker.radius" fill="none" stroke="#ffb340" stroke-width="1.4" vector-effect="non-scaling-stroke" />
     </g>
 
     <rect

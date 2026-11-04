@@ -12,7 +12,7 @@
 import lz4js from 'lz4js'
 
 export const BAG_MAGIC = '#ROSBAG V2.0\n'
-export const MAX_BAG_BYTES = 256 * 1024 * 1024
+export const MAX_BAG_BYTES = 2048 * 1024 * 1024
 export const MAX_CHUNK_BYTES = MAX_BAG_BYTES
 
 const textDecoder = new TextDecoder()

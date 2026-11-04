@@ -13,7 +13,7 @@ export const route = {
 </script>
 
 <script setup>
-import { computed, reactive, ref, shallowRef, watch } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, shallowRef, watch } from 'vue'
 
 import CategoryTable from '@/components/CategoryTable.vue'
 import DcTable from '@/components/DcTable.vue'
@@ -177,14 +177,19 @@ function messageOf(cause) {
 function setHex(target, key, event, bits = 16) {
   const value = parseHexValue(event.target.value)
   target[key] = bits >= 32 ? value >>> 0 : value & ((1 << bits) - 1)
+  // A model value that does not change would leave the typed text in place, so
+  // write the parsed value back explicitly.
+  event.target.value = hex(target[key], bits / 4)
 }
 
 function setDec(target, key, event, max = 0xffff) {
   target[key] = Math.min(Math.max(parseDecValue(event.target.value), 0), max)
+  event.target.value = String(target[key])
 }
 
 function setSigned(target, key, event) {
   target[key] = Math.max(-32768, Math.min(32767, parseDecValue(event.target.value)))
+  event.target.value = String(target[key])
 }
 
 function toggleBit(target, key, bit, event) {
@@ -208,6 +213,7 @@ function setEepromSize(event) {
   const bytes = Math.max(128, Math.round(value / 128) * 128)
   model.info.eepromSizeBytes = bytes
   model.info.eepromSizeRaw = bytes / 128 - 1
+  event.target.value = String(bytes)
 }
 
 function setName(owner, nameKey, indexKey, event) {
@@ -287,8 +293,16 @@ function regenerate() {
   }
 }
 
-watch(model, regenerate, { deep: true })
-watch(vendorName, regenerate)
+// Rebuilding the XML and recompiling the full image on every keystroke stalls
+// large dumps, so batch rapid edits into one run.
+let regenerateTimer = null
+function scheduleRegenerate() {
+  clearTimeout(regenerateTimer)
+  regenerateTimer = setTimeout(regenerate, 150)
+}
+watch(model, scheduleRegenerate, { deep: true })
+watch(vendorName, scheduleRegenerate)
+onBeforeUnmount(() => clearTimeout(regenerateTimer))
 
 function applyParsed(parsed, name, sample) {
   source.value = { name, bytes: parsed.bytes, parsed }
@@ -298,6 +312,10 @@ function applyParsed(parsed, name, sample) {
   sampleName.value = sample || ''
   error.value = ''
   exportError.value = ''
+  // The debounced regenerate has not run yet; drop the previous dump's output
+  // so a quick download cannot grab the wrong file.
+  output.value = null
+  check.value = null
 }
 
 function fail(cause) {
@@ -436,7 +454,7 @@ function scrollToSection(id) {
         :key="sample.file"
         type="button"
         class="btn"
-        :disabled="busy"
+        :disabled="busy || Boolean(source)"
         @click="loadSample(sample)"
       >
         示例：{{ sample.label }}
@@ -1021,7 +1039,7 @@ function scrollToSection(id) {
     <h2>等待输入</h2>
     <p>
       上传 .bin 格式的 SII EEPROM 转储后，可在此编辑固定头、General、字符串、FMMU、SyncManager、PDO 与 DC，
-      并导出 ESI XML。所有解析出的字段都支持新增、修改和删除。
+      并导出 ESI XML。数据类别与列表条目支持新增、修改和删除，固定头字段可直接编辑。
     </p>
   </section>
 </main>

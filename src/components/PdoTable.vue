@@ -24,6 +24,20 @@ const SYNC_CHOICES = PDO_SYNC_NAMES.map((name, value) => ({ value, name }))
 function totalBits(pdo) {
   return pdo.entries.reduce((sum, entry) => sum + (Number(entry.bitLength) || 0), 0)
 }
+
+// Write the parsed value back so an invalid entry does not keep its raw text
+// when the model value happens to stay the same.
+function normalizedHex(event, bits = 16) {
+  const value = parseHexValue(event.target.value) & ((1 << bits) - 1)
+  event.target.value = hex(value, bits / 4)
+  return value
+}
+
+function normalizedDec(event, max = 0xffff) {
+  const value = Math.min(Math.max(parseDecValue(event.target.value), 0), max)
+  event.target.value = String(value)
+  return value
+}
 </script>
 
 <template>
@@ -45,7 +59,7 @@ function totalBits(pdo) {
             class="mono"
             :value="hex(pdo.index, 4)"
             spellcheck="false"
-            @change="emit('update-pdo', pdoIndex, 'index', parseHexValue($event.target.value) & 0xffff)"
+            @change="emit('update-pdo', pdoIndex, 'index', normalizedHex($event))"
           />
         </label>
         <label class="field">
@@ -53,7 +67,7 @@ function totalBits(pdo) {
           <input
             class="mono"
             :value="pdo.syncManager"
-            @change="emit('update-pdo', pdoIndex, 'syncManager', parseDecValue($event.target.value) & 0xff)"
+            @change="emit('update-pdo', pdoIndex, 'syncManager', normalizedDec($event, 0xff))"
           />
         </label>
         <label class="field">
@@ -80,7 +94,7 @@ function totalBits(pdo) {
             class="mono"
             :value="hex(pdo.flags, 4)"
             spellcheck="false"
-            @change="emit('update-pdo', pdoIndex, 'flags', parseHexValue($event.target.value) & 0xffff)"
+            @change="emit('update-pdo', pdoIndex, 'flags', normalizedHex($event))"
           />
         </label>
       </div>
@@ -95,7 +109,7 @@ function totalBits(pdo) {
         <table class="data-table editable-table">
           <thead>
             <tr>
-              <th>索引:子索引</th>
+              <th>索引：子索引</th>
               <th>名称</th>
               <th>数据类型</th>
               <th>位长</th>
@@ -110,13 +124,13 @@ function totalBits(pdo) {
                   class="table-input mono narrow"
                   :value="hex(entry.index, 4)"
                   spellcheck="false"
-                  @change="emit('update-entry', pdoIndex, entryIndex, 'index', parseHexValue($event.target.value) & 0xffff)"
+                  @change="emit('update-entry', pdoIndex, entryIndex, 'index', normalizedHex($event))"
                 />
                 :
                 <input
                   class="table-input mono narrow"
                   :value="entry.subIndex"
-                  @change="emit('update-entry', pdoIndex, entryIndex, 'subIndex', parseDecValue($event.target.value) & 0xff)"
+                  @change="emit('update-entry', pdoIndex, entryIndex, 'subIndex', normalizedDec($event, 0xff))"
                 />
               </td>
               <td>
@@ -141,7 +155,7 @@ function totalBits(pdo) {
                 <input
                   class="table-input mono narrow"
                   :value="entry.bitLength"
-                  @change="emit('update-entry', pdoIndex, entryIndex, 'bitLength', parseDecValue($event.target.value) & 0xff)"
+                  @change="emit('update-entry', pdoIndex, entryIndex, 'bitLength', normalizedDec($event, 0xff))"
                 />
               </td>
               <td>
@@ -149,7 +163,7 @@ function totalBits(pdo) {
                   class="table-input mono narrow"
                   :value="hex(entry.flags, 4)"
                   spellcheck="false"
-                  @change="emit('update-entry', pdoIndex, entryIndex, 'flags', parseHexValue($event.target.value) & 0xffff)"
+                  @change="emit('update-entry', pdoIndex, entryIndex, 'flags', normalizedHex($event))"
                 />
               </td>
               <td class="row-actions">

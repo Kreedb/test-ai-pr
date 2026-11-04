@@ -37,6 +37,20 @@ export function parseDecValue(text, fallback = 0) {
   return Number.isFinite(value) ? value : fallback
 }
 
+// SII strings are single-byte Latin-1; anything above 0xFF becomes `?`.
+export function latin1Bytes(text) {
+  const bytes = []
+  for (const char of String(text ?? '')) {
+    const code = char.codePointAt(0)
+    bytes.push(code <= 0xff ? code : 0x3f)
+  }
+  return bytes
+}
+
+export function stringByteLength(text) {
+  return latin1Bytes(text).length
+}
+
 // Packs up to four port nibbles into the SII General `portsWord`.
 export function portsWord(ports) {
   let word = 0

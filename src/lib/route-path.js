@@ -1,7 +1,7 @@
 // Route path helpers shared by the router and link builders. Keeping the
 // matching rules here lets plain Node tests cover them without Vue components.
 
-export function normalizeRoutePath(value) {
+function normalizeRoutePath(value) {
   const raw = String(value ?? '')
     .replace(/^#/, '')
     .split('?')[0]

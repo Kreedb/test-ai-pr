@@ -123,7 +123,7 @@ test('nets join the board and the schematic through the shared port ids', async 
   assert.ok(connected.length >= 3, `only ${connected.length} nets reach a pad or pin`)
 
   // SOT23-3.brd routes N$1 with a pad on the board and a pin on the sheet; a
-  // net that only resolved on one side would break the cross-probe button.
+  // net that only resolved on one side would break cross-probing.
   const n1 = nets.find((net) => net.name === 'N$1')
   assert.ok(n1, 'expected the N$1 net')
   assert.ok(n1.pcbPads.length >= 2, `N$1 pcb pads: ${n1.pcbPads.length}`)
@@ -241,6 +241,17 @@ test('search ranks exact and prefix matches above substring hits', async () => {
 
   assert.deepEqual(searchPreview(entries, '   '), [])
   assert.deepEqual(searchPreview(entries, 'no-such-net'), [])
+})
+
+test('search hits carry the schematic sheet they belong to', async () => {
+  const model = buildPreviewModel((await coreBoardProject()).circuitJson)
+  const entries = buildSearchIndex(model, indexNets(model))
+
+  const pins = entries.filter((entry) => entry.kind === 'pin')
+  assert.ok(pins.length > 0)
+  assert.ok(pins.every((pin) => pin.sheet), 'pin hits need their sheet to focus it')
+  assert.ok(new Set(pins.map((pin) => pin.sheet)).size > 1, 'pins span multiple sheets')
+  assert.ok(entries.filter((entry) => entry.kind === 'component').every((item) => item.sheet))
 })
 
 test('schematic text uses the size the KiCad writer draws', () => {
@@ -375,8 +386,11 @@ test('preview survives a hand-built model with missing optional fields', () => {
 
   assert.equal(model.hasBoard, true)
   assert.equal(model.hasSchematic, true)
-  // One undeclared sheet is synthesised so the schematic tab can render.
+  // One undeclared sheet is synthesised so the schematic tab can render, and
+  // its items carry that sheet's id even though the source omitted it.
   assert.equal(model.schematic.sheets.length, 1)
+  assert.equal(model.schematic.sheets[0].id, 'sheet_0')
+  assert.ok(model.schematic.items.every((item) => item.sheet === 'sheet_0'))
   assert.equal(model.schematic.sheets[0].items.filter((item) => item.kind === 'component').length, 1)
   assert.equal(model.pcb.items.find((item) => item.kind === 'pad').refdes, 'R1')
   assert.ok(model.schematic.items.some((item) => item.kind === 'label' && item.text === 'ORPHAN'))

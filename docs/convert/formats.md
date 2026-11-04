@@ -1,15 +1,6 @@
 # 格式支持
 
-格式注册表在 `src/lib/formats/index.js`，每个来源一个模块，页面上的支持矩阵、有损表与样例按钮都从注册表派生。
-
-| 来源 | 扩展名 | 状态 | 转换内容 |
-| --- | --- | --- | --- |
-| Altium Designer | `.PcbDoc`、`.SchDoc` | 支持 | PCB + 原理图 |
-| Specctra DSN / SES | `.dsn`、`.ses` | 支持 | PCB（走线需 SES） |
-| EAGLE XML | `.brd`、`.sch` | 支持 | PCB + 原理图 |
-| PADS Layout ASCII | `.asc` | 支持 | PCB |
-| Cadence Allegro / OrCAD PCB | `.brd` | 计划中 | 暂不支持 |
-| OrCAD Capture | `.dsn`、`.edif` | 计划中 | 暂不支持 |
+格式注册表在 `src/lib/formats/index.js`，每个来源一个模块，页面上的支持矩阵、有损表与样例按钮都从注册表派生。支持矩阵不再在这里复制一份，以注册表和转换页 `#/convert` 为准；新增或修改来源后运行 `test/registry.test.mjs`。
 
 ## 识别方式
 

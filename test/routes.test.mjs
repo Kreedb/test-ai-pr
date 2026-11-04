@@ -5,12 +5,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import {
-  findRoute,
-  normalizeRoutePath,
-  pageRouteId,
-  routePath,
-} from '../src/lib/route-path.js'
+import { findRoute, pageRouteId, routePath } from '../src/lib/route-path.js'
 
 const routes = [
   { id: 'home', path: '/' },
@@ -30,15 +25,10 @@ test('page ids come from the file name', () => {
 })
 
 test('hash paths normalize before matching', () => {
-  assert.equal(normalizeRoutePath(''), '/')
-  assert.equal(normalizeRoutePath('#/'), '/')
-  assert.equal(normalizeRoutePath('#/parser/'), '/parser')
-  assert.equal(normalizeRoutePath('#/convert?sample=1'), '/convert')
-  assert.equal(normalizeRoutePath('parser'), '/parser')
-})
-
-test('only registered paths match', () => {
-  assert.equal(findRoute(routes, '#/parser')?.id, 'parser')
+  assert.equal(findRoute(routes, '')?.id, 'home')
+  assert.equal(findRoute(routes, '#/')?.id, 'home')
   assert.equal(findRoute(routes, '#/parser/')?.id, 'parser')
+  assert.equal(findRoute(routes, '#/convert?sample=1')?.id, 'convert')
+  assert.equal(findRoute(routes, 'parser')?.id, 'parser')
   assert.equal(findRoute(routes, '#/missing'), null)
 })

@@ -123,7 +123,7 @@ test('nets join the board and the schematic through the shared port ids', async 
   assert.ok(connected.length >= 3, `only ${connected.length} nets reach a pad or pin`)
 
   // SOT23-3.brd routes N$1 with a pad on the board and a pin on the sheet; a
-  // net that only resolved on one side would break the cross-probe button.
+  // net that only resolved on one side would break cross-probing.
   const n1 = nets.find((net) => net.name === 'N$1')
   assert.ok(n1, 'expected the N$1 net')
   assert.ok(n1.pcbPads.length >= 2, `N$1 pcb pads: ${n1.pcbPads.length}`)

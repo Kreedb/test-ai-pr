@@ -17,6 +17,7 @@ import {
   encodeJointState,
   encodeSensorImu,
   encodeSensorJointState,
+  record,
 } from '../test-support/rosbag-fixture.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
@@ -52,6 +53,81 @@ test('inspects connections without decoding chunks', () => {
     info.topics.map((topic) => [topic.name, topic.type, topic.kind]),
     [['/joint/state', 'controller_msgs/JointState', 'joint']],
   )
+})
+
+test('finds connection metadata stored inside chunks (active recording)', () => {
+  const bytes = buildRosbag({
+    connections: [JOINT_CONNECTION, IMU_CONNECTION],
+    messages: [
+      { conn: 0, time: 10, data: encodeJointState({ names: ['a'], position: [0.5], time: 10 }) },
+      { conn: 1, time: 10, data: encodeImu({ quat: [0.5, 0.5, 0.5, 0.5], time: 10 }) },
+    ],
+    compression: 'lz4',
+    topLevelConnections: false,
+  })
+  const info = inspectRosbag(bytes)
+  assert.deepEqual(
+    info.topics.map((topic) => [topic.name, topic.kind]),
+    [
+      ['/ImuData', 'imu'],
+      ['/joint/state', 'joint'],
+    ],
+  )
+  const { series, warnings } = readRosbag(bytes, { topics: ['/joint/state', '/ImuData'] })
+  assert.equal(series['/joint/state'].count, 1)
+  assert.equal(series['/ImuData'].count, 1)
+  assert.deepEqual(warnings, [])
+})
+
+test('keeps complete records when an active recording has a truncated tail', () => {
+  const full = buildRosbag({
+    connections: [JOINT_CONNECTION],
+    messages: [{ conn: 0, time: 10, data: encodeJointState({ names: ['a'], position: [0.5], time: 10 }) }],
+    compression: 'lz4',
+    topLevelConnections: false,
+  })
+  // An interrupted writer leaves a complete chunk header whose declared data
+  // never arrived. Truncate the record body but keep header and length.
+  const dangling = record(
+    {
+      op: new Uint8Array([0x05]),
+      compression: 'lz4',
+      size: new Uint8Array(new Uint32Array([0]).buffer),
+    },
+    new Uint8Array([1, 2, 3]),
+  ).slice(0, -3)
+  const bytes = new Uint8Array(full.length + dangling.length)
+  bytes.set(full)
+  bytes.set(dangling, full.length)
+
+  const info = inspectRosbag(bytes)
+  assert.deepEqual(info.topics.map((topic) => topic.name), ['/joint/state'])
+  const { series, warnings } = readRosbag(bytes, { topics: ['/joint/state'] })
+  assert.equal(series['/joint/state'].count, 1)
+  assert.ok(warnings.some((warning) => /尾部记录不完整/.test(warning.message)))
+})
+
+test('skips an unfinished zero-length lz4 chunk', () => {
+  const full = bag(
+    [{ conn: 0, time: 10, data: encodeJointState({ names: ['a'], position: [0.5], time: 10 }) }],
+    [JOINT_CONNECTION],
+  )
+  // rosbag writers leave the open chunk header at size 0 until it is closed.
+  const empty = record(
+    {
+      op: new Uint8Array([0x05]),
+      compression: 'lz4',
+      size: new Uint8Array(new Uint32Array([0]).buffer),
+    },
+    new Uint8Array(0),
+  )
+  const bytes = new Uint8Array(full.length + empty.length)
+  bytes.set(full)
+  bytes.set(empty, full.length)
+
+  const { series, warnings } = readRosbag(bytes, { topics: ['/joint/state'] })
+  assert.equal(series['/joint/state'].count, 1)
+  assert.deepEqual(warnings, [])
 })
 
 test('does not offer unsupported JointState-like types', () => {

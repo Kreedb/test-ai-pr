@@ -5,7 +5,7 @@ export const route = {
   tool: {
     tag: 'BAG',
     title: '机器人包回放',
-    description: '读取 ROS1 bag 的关节与 IMU 话题，按时间轴还原机器人姿态；内置 LimX Luna / Oli / TRON2A 骨架。',
+    description: '读取 ROS1 bag 的关节与 IMU 话题（支持未完成的 .active 自动恢复），按时间轴还原机器人姿态；内置 LimX Luna / Oli / TRON2A 骨架。',
     action: '打开回放',
   },
 }
@@ -198,6 +198,9 @@ async function applyTopics(bytes, jointName, imuName) {
     resetPlayback()
 
     const list = [...decoded.warnings]
+    if (/\.active$/i.test(fileName.value)) {
+      list.unshift({ level: 'info', message: '已按未完成录制打开 .active 文件，自动保留尾部截断前的完整数据块。' })
+    }
     if (!detected.skeleton) {
       list.push({ level: 'warn', message: `没有匹配的骨架（${detected.label}），仍会显示关节数值，但不会绘制 3D 姿态。` })
     }
@@ -251,12 +254,8 @@ async function loadBytes(bytes, name, sample) {
 }
 
 async function handleFile(file) {
-  if (/\.active$/i.test(file.name)) {
-    fail(new Error('未完成的 .active 文件需要先用 BagRepair 修复为 .bag，再导入回放。'))
-    return
-  }
-  if (!/\.bag$/i.test(file.name)) {
-    fail(new Error('仅支持 ROS1 .bag 文件'))
+  if (!/\.(bag|active)$/i.test(file.name)) {
+    fail(new Error('仅支持 ROS1 .bag / .active 文件'))
     return
   }
   if (file.size === 0) {
@@ -419,10 +418,10 @@ onBeforeUnmount(() => {
       @dragleave.prevent="dragging = false"
       @drop.prevent="onDrop"
     >
-      <input type="file" accept=".bag" @change="onFileChange" />
-      <span class="drop-title">拖拽 ROS1 .bag 到这里，或点击选择文件</span>
+      <input type="file" accept=".bag,.active" @change="onFileChange" />
+      <span class="drop-title">拖拽 ROS1 .bag / .active 到这里，或点击选择文件</span>
       <span class="drop-hint">
-        JointState + IMU · 未压缩或 lz4 · 最大 {{ formatBytes(MAX_BAG_BYTES) }} · 数据只在浏览器本地处理
+        JointState + IMU · 未压缩或 lz4 · .active 自动恢复 · 最大 {{ formatBytes(MAX_BAG_BYTES) }} · 数据只在浏览器本地处理
       </span>
     </label>
 

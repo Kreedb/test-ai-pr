@@ -43,6 +43,9 @@ function parseFields(bytes, start, end) {
   return fields
 }
 
+// Returns false when the file ends inside a record. An interrupted `.active`
+// recording is a normal ROS1 bag with a truncated tail, so callers keep the
+// complete records before it instead of failing the whole file.
 function eachRecord(bytes, start, end, visit) {
   const view = viewOf(bytes)
   let offset = start
@@ -50,19 +53,16 @@ function eachRecord(bytes, start, end, visit) {
     const recordStart = offset
     const headerLength = view.getUint32(offset, true)
     offset += 4
-    if (offset + headerLength + 4 > end) {
-      throw new Error('bag 记录不完整，文件可能被截断')
-    }
+    if (offset + headerLength + 4 > end) return false
     const header = parseFields(bytes, offset, offset + headerLength)
     offset += headerLength
     const dataLength = view.getUint32(offset, true)
     offset += 4
-    if (offset + dataLength > end) {
-      throw new Error('bag 记录数据不完整，文件可能被截断')
-    }
+    if (offset + dataLength > end) return false
     visit(header, bytes.subarray(offset, offset + dataLength), recordStart)
     offset += dataLength
   }
+  return offset === end
 }
 
 function timeOf(field) {
@@ -86,6 +86,35 @@ function connectionMeta(header, data, previous) {
   }
 }
 
+function decompressChunk(header, data) {
+  const compression = header.compression ? text(header.compression) : 'none'
+  const declared = header.size?.length >= 4 ? viewOf(header.size).getUint32(0, true) : null
+  let raw = data
+  if (compression === 'lz4') {
+    // An interrupted recording leaves its open chunk header at size 0; its
+    // bytes were not finalized, so there is nothing safe to decode.
+    if (declared === 0) return new Uint8Array(0)
+    // lz4js allocates maxSize before decoding. Pass the chunk's declared
+    // uncompressed size so a hostile frame cannot request a huge buffer.
+    if (declared === null) throw new Error('lz4 数据块缺少解压后大小')
+    if (declared > MAX_CHUNK_BYTES) {
+      throw new Error(`bag 数据块声明解压后 ${declared} 字节，超过 ${MAX_CHUNK_BYTES / 1024 / 1024} MiB 上限`)
+    }
+    raw = lz4js.decompress(data, declared)
+    if (raw.length !== declared) {
+      throw new Error('bag 数据块解压后大小与声明不符')
+    }
+  } else if (compression && compression !== 'none') {
+    throw new Error(
+      `暂不支持 ${compression} 压缩的 bag。请重新录制为 lz4 / 未压缩，或先用 rosbag decompress 展开。`,
+    )
+  }
+  if (raw.length > MAX_CHUNK_BYTES) {
+    throw new Error(`bag 数据块解压后超过 ${MAX_CHUNK_BYTES / 1024 / 1024} MiB，拒绝继续解析`)
+  }
+  return raw
+}
+
 export function isRosbag(bytes) {
   if (bytes.byteLength < BAG_MAGIC.length) return false
   for (let index = 0; index < BAG_MAGIC.length; index += 1) {
@@ -94,9 +123,14 @@ export function isRosbag(bytes) {
   return true
 }
 
+// `readRosbag` reuses the inspection of the exact same byte buffer: an
+// interrupted `.active` file needs a full chunk scan just to find connections.
+const inspections = new WeakMap()
+
 /**
  * Read the connection table without touching chunk payloads. This is cheap
- * enough to run before choosing a joint / IMU topic.
+ * enough to run before choosing a joint / IMU topic, except for `.active`
+ * files whose connections only exist inside chunks.
  */
 export function inspectRosbag(bytes) {
   if (!(bytes instanceof Uint8Array)) throw new Error('bag 数据必须是 Uint8Array')
@@ -108,12 +142,31 @@ export function inspectRosbag(bytes) {
   }
 
   const connections = new Map()
-  eachRecord(bytes, BAG_MAGIC.length, bytes.length, (header, data) => {
+  const collect = (header, data) => {
     if (header.op?.[0] !== 0x07) return
     const id = connIdOf(header)
     if (id === null) return
     connections.set(id, connectionMeta(header, data, connections.get(id)))
-  })
+  }
+  eachRecord(bytes, BAG_MAGIC.length, bytes.length, collect)
+
+  if (!connections.size) {
+    // Interrupted `.active` recordings keep their connection records inside
+    // the chunks instead of writing them after the file header.
+    let chunkError = null
+    eachRecord(bytes, BAG_MAGIC.length, bytes.length, (header, data) => {
+      if (header.op?.[0] !== 0x05) return
+      let raw
+      try {
+        raw = decompressChunk(header, data)
+      } catch (cause) {
+        chunkError ||= cause
+        return
+      }
+      eachRecord(raw, 0, raw.length, collect)
+    })
+    if (!connections.size && chunkError) throw chunkError
+  }
 
   const topics = [...connections.values()]
     .filter((connection) => connection.topic)
@@ -125,7 +178,9 @@ export function inspectRosbag(bytes) {
     }))
     .sort((left, right) => left.name.localeCompare(right.name))
 
-  return { version: BAG_MAGIC.trim().split(' ').pop(), topics, connections }
+  const result = { version: BAG_MAGIC.trim().split(' ').pop(), topics, connections }
+  inspections.set(bytes, result)
+  return result
 }
 
 export function topicKind(type = '') {
@@ -417,7 +472,7 @@ function dedupe(series) {
  * Returns `{ series, topics, warnings }`, where `series` is keyed by topic.
  */
 export function readRosbag(bytes, { topics = [], onProgress } = {}) {
-  const { connections } = inspectRosbag(bytes)
+  const { connections } = inspections.get(bytes) || inspectRosbag(bytes)
   const wanted = new Set(topics)
   const accumulators = new Map()
   const byTopic = new Map()
@@ -456,28 +511,7 @@ export function readRosbag(bytes, { topics = [], onProgress } = {}) {
   const total = bytes.length
   let lastProgress = -1
   const readChunk = (header, data) => {
-    const compression = header.compression ? text(header.compression) : 'none'
-    const declared = header.size?.length >= 4 ? viewOf(header.size).getUint32(0, true) : null
-    let raw = data
-    if (compression === 'lz4') {
-      // lz4js allocates maxSize before decoding. Pass the chunk's declared
-      // uncompressed size so a hostile frame cannot request a huge buffer.
-      if (declared === null) throw new Error('lz4 数据块缺少解压后大小')
-      if (declared > MAX_CHUNK_BYTES) {
-        throw new Error(`bag 数据块声明解压后 ${declared} 字节，超过 ${MAX_CHUNK_BYTES / 1024 / 1024} MiB 上限`)
-      }
-      raw = lz4js.decompress(data, declared)
-      if (raw.length !== declared) {
-        throw new Error('bag 数据块解压后大小与声明不符')
-      }
-    } else if (compression && compression !== 'none') {
-      throw new Error(
-        `暂不支持 ${compression} 压缩的 bag。请重新录制为 lz4 / 未压缩，或先用 rosbag decompress 展开。`,
-      )
-    }
-    if (raw.length > MAX_CHUNK_BYTES) {
-      throw new Error(`bag 数据块解压后超过 ${MAX_CHUNK_BYTES / 1024 / 1024} MiB，拒绝继续解析`)
-    }
+    const raw = decompressChunk(header, data)
     eachRecord(raw, 0, raw.length, (recordHeader, recordData) => {
       if (recordHeader.op?.[0] !== 0x02) return
       const id = connIdOf(recordHeader)
@@ -496,7 +530,7 @@ export function readRosbag(bytes, { topics = [], onProgress } = {}) {
     })
   }
 
-  eachRecord(bytes, BAG_MAGIC.length, bytes.length, (header, data, recordStart) => {
+  const complete = eachRecord(bytes, BAG_MAGIC.length, bytes.length, (header, data, recordStart) => {
     if (onProgress && recordStart / total - lastProgress >= 0.05) {
       lastProgress = recordStart / total
       onProgress(Math.min(1, lastProgress))
@@ -516,6 +550,13 @@ export function readRosbag(bytes, { topics = [], onProgress } = {}) {
       else decodeImu(accumulator, data, timestamp)
     }
   })
+
+  if (!complete) {
+    warnings.push({
+      level: 'warn',
+      message: '文件尾部记录不完整，已保留截断前的完整数据块。',
+    })
+  }
 
   const series = {}
   const seen = new Set()

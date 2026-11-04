@@ -1,12 +1,13 @@
 # convbin
 
-一个在浏览器中运行的二进制工具箱，当前包含 EtherCAT SII/ESI 与 EDA 格式转换工具，基于 Vite + Vue 3。所有数据只在本地处理，不会上传。
+一个在浏览器中运行的二进制工具箱，当前包含 EtherCAT SII/ESI、EDA 格式转换与机器人 bag 回放工具，基于 Vite + Vue 3。所有数据只在本地处理，不会上传。
 
 线上地址：https://kreedb.github.io/test-ai-pr/
 
 ## 工具
 
 - **EEPROM 解析器**（`#/parser`）：解析 SII EEPROM 转储，编辑字段并导出 ESI XML，内置逐字节往返校验。
+- **机器人回放**（`#/replay`）：读取 ROS1 bag 的关节与 IMU 话题，按时间轴还原机器人姿态；内置 LimX Luna / Oli / TRON2A 骨架。
 - **EDA 转 KiCad**（`#/convert`）：把 Altium、Specctra、EAGLE XML、PADS ASCII 工程转换成 `.kicad_pcb` / `.kicad_sch` / `.kicad_pro`，带只读设计预览。
 
 ## 快速开始
@@ -32,6 +33,7 @@ npm run dev
 文档索引见 [`docs/`](docs/README.md)，开发、构建与部署约定见 [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)：
 
 - [EEPROM 解析器](docs/parser/README.md) · [SII 格式与 ESI 映射](docs/parser/sii-format.md)
+- [机器人包回放](docs/replay/README.md)
 - [EDA 转 KiCad](docs/convert/README.md) · [格式支持](docs/convert/formats.md) · [有损转换](docs/convert/losses.md) · [设计预览](docs/convert/preview.md)
 - [第三方组件与数据说明](docs/THIRD-PARTY-NOTICES.md)
 

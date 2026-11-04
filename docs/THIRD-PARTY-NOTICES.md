@@ -25,6 +25,7 @@ EAGLE XML 与 PADS Layout ASCII 的字段映射是本仓库自己的代码（`li
 | `fast-xml-parser` | 5.11.x | MIT | EAGLE XML 解析 |
 | `fflate` | 0.8.3 | MIT | 多文件打包下载、zip 压缩包展开 |
 | `graphics-debug` | 0.0.101 | MIT | DSN 转换器的调试图形 |
+| `lz4js` | 0.2.0 | ISC | ROS1 bag 的 lz4 数据块解压 |
 | `zod` | 3.25.76 | MIT | Circuit JSON 校验 |
 | `vue` | 3.5.x | MIT | 前端框架 |
 
@@ -48,6 +49,15 @@ EAGLE XML 与 PADS Layout ASCII 的字段映射是本仓库自己的代码（`li
 | `test/fixtures/pads/*.asc` | [tscircuit/padsts](https://github.com/tscircuit/padsts) 的 `tests/fixtures` PADS ASCII 回归资产 | MIT，Copyright (c) 2025 tscircuit Inc. |
 | `public/samples/akd-eeprom.bin` | [ethercrab-rs/ethercrab](https://github.com/ethercrab-rs/ethercrab) 测试数据 | 见上游仓库 |
 | `public/samples/limx-tron2.bin`、`limx-tron2.xml` | Limx Dynamics Tron2 EEPROM 转储与 TwinCAT ESI | 见上游 |
+| `public/samples/replay/luna-demo.bag` | 由 `test-support/rosbag-fixture.mjs` 生成的合成 Luna 关节与 IMU 数据 | 本仓库原创，随 GPL-3.0 发布 |
+
+## 机器人骨架数据
+
+`src/lib/replay/models.js` 与 `src/lib/replay/profiles.js` 里的 Luna / Oli / TRON2A 关节偏移与转轴取自 LimX Dynamics 的
+[luna-description](https://github.com/limxdynamics/luna-description)、
+[humanoid-description](https://github.com/limxdynamics/humanoid-description) 与
+[tron2-robot-description](https://github.com/limxdynamics/tron2-robot-description) 模型（Apache-2.0）。
+仓库只保留运动学链的数值，不包含 STL 网格、碰撞体或上游代码；回放工具本身是本仓库的实现。
 
 ## 商标
 

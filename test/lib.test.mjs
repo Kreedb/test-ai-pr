@@ -39,10 +39,7 @@ test('lib packages do not import the app', () => {
     const packageDir = join(libRoot, name)
     for (const file of sourceFiles(join(libRoot, name, 'src'))) {
       const source = readFileSync(file, 'utf8')
-      assert.ok(
-        !/from\s+['"]@\//.test(source),
-        `${file} imports the app alias`,
-      )
+      assert.ok(!/from\s+['"]@\//.test(source), `${file} imports the app alias`)
       for (const match of source.matchAll(/from\s+['"](\.[^'"]+)['"]/g)) {
         const target = resolve(dirname(file), match[1])
         assert.ok(

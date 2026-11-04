@@ -121,7 +121,8 @@ export const altium = {
         },
         {
           category: '设计规则',
-          detail: '只导出全局最小线宽与过孔尺寸；间距、差分对、规则优先级、网络类、Room、层叠材料不导出。',
+          detail:
+            '只导出全局最小线宽与过孔尺寸；间距、差分对、规则优先级、网络类、Room、层叠材料不导出。',
           reason:
             'altiumts 会解析规则表，但 altium-to-circuit-json 只把全局 Width 与 RoutingVias 的最小值写进 pcb_board；其余规则、网络类与层叠材料没有进入 Circuit JSON，而且 KiCad 侧还要写进 .kicad_pro/.kicad_dru。',
         },
@@ -169,7 +170,8 @@ export const altium = {
         },
         {
           category: '层次结构',
-          detail: '多张 .SchDoc 输出根图 + 子图，但根图没有图纸引脚；图纸符号、端口与总线入口只重画为图形，总线不导出。',
+          detail:
+            '多张 .SchDoc 输出根图 + 子图，但根图没有图纸引脚；图纸符号、端口与总线入口只重画为图形，总线不导出。',
           reason:
             'Circuit JSON 没有总线对象，altium-to-circuit-json 也不产出图纸引脚；图纸符号与端口只按图形和文字重画，所以层间连接只能靠网络名/电源符号合并。',
         },
@@ -209,7 +211,11 @@ export const altium = {
     // Prefer the source document name over the converter's generic fallback so
     // a multi-page project shows one readable tab per page instead of repeated
     // "Altium schematic" labels.
-    const sheetNameOf = (name) => String(name || '').split('/').pop().replace(/\.[^.]+$/, '')
+    const sheetNameOf = (name) =>
+      String(name || '')
+        .split('/')
+        .pop()
+        .replace(/\.[^.]+$/, '')
     for (const source of sources) {
       const parsed = parseAltiumFile(normalizeAltiumAscii(source.bytes))
       if (source.format.kind === 'pcb') {

@@ -473,7 +473,9 @@ function buildSyncManagerCategory(smElements, bitsBySm, warnings) {
       control: parseNumber(element.getAttribute('ControlByte')) & 0xff,
       status: 0,
       enable: element.hasAttribute('Enable')
-        ? (flagAttribute(element, 'Enable') ? 0x01 : 0x00)
+        ? flagAttribute(element, 'Enable')
+          ? 0x01
+          : 0x00
         : 0x01,
       type: (index + 1) & 0xff,
       name: textOf(element),
@@ -667,7 +669,8 @@ export function generateSiiFromEsi(xmlText, options = {}) {
   if (flagAttribute(coe, 'SegmentedSdo')) {
     warnings.push({
       level: 'info',
-      message: 'CoE 的 SegmentedSdo 属性只存在于 ESI 中，SII 的 CoE Details 字节没有对应位，已忽略。',
+      message:
+        'CoE 的 SegmentedSdo 属性只存在于 ESI 中，SII 的 CoE Details 字节没有对应位，已忽略。',
     })
   }
 
@@ -772,7 +775,8 @@ export function generateSiiFromEsi(xmlText, options = {}) {
   if (txPdos.length > 0) addCategory(CATEGORY_TYPE.TX_PDO, tx.data)
   if (rxPdos.length > 0) addCategory(CATEGORY_TYPE.RX_PDO, rx.data)
   if (opModes.length > 0) addCategory(CATEGORY_TYPE.DC, buildDcCategory(opModes))
-  if (child(device, 'Fmmu')) addCategory(CATEGORY_TYPE.FMMU, buildFmmuCategory(children(device, 'Fmmu')), 0xff)
+  if (child(device, 'Fmmu'))
+    addCategory(CATEGORY_TYPE.FMMU, buildFmmuCategory(children(device, 'Fmmu')), 0xff)
 
   // TwinCAT emits FMMU before SyncManager; keep the canonical order.
   const orderedCategories = [
@@ -838,15 +842,17 @@ export function generateSiiFromEsi(xmlText, options = {}) {
 // ---------------------------------------------------------------------------
 
 function escapeXml(value) {
-  return String(value ?? '')
-    // XML 1.0 forbids most C0 control characters; SII strings can carry them
-    // after Latin-1 decoding (for example NUL padding).
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;')
+  return (
+    String(value ?? '')
+      // XML 1.0 forbids most C0 control characters; SII strings can carry them
+      // after Latin-1 decoding (for example NUL padding).
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;')
+  )
 }
 
 function hexValue(value) {
@@ -1001,9 +1007,7 @@ export function generateEsiXml(result, options = {}) {
       if (!typeName) {
         warnings.push({
           level: 'warn',
-          message: `PDO 0x${pdo.index
-            .toString(16)
-            .toUpperCase()} 的条目 0x${entry.index
+          message: `PDO 0x${pdo.index.toString(16).toUpperCase()} 的条目 0x${entry.index
             .toString(16)
             .toUpperCase()} 使用未知 SII 数据类型码 ${entry.dataType}，导出为 OCTET_STRING，重新生成时会变化。`,
         })
@@ -1056,10 +1060,7 @@ export function generateEsiXml(result, options = {}) {
         `<CycleTimeSync0 Factor="${element.sync0CycleFactor ?? 1}">${element.sync0CycleTime ?? 0}</CycleTimeSync0>`,
       )
       push(6, `<ShiftTimeSync0>${element.sync0ShiftTime ?? 0}</ShiftTimeSync0>`)
-      push(
-        6,
-        `<CycleTimeSync1 Factor="${sync1Factor === 0 ? 1 : sync1Factor}">0</CycleTimeSync1>`,
-      )
+      push(6, `<CycleTimeSync1 Factor="${sync1Factor === 0 ? 1 : sync1Factor}">0</CycleTimeSync1>`)
       push(6, `<ShiftTimeSync1>${element.sync1ShiftTime ?? 0}</ShiftTimeSync1>`)
       push(5, '</OpMode>')
     }
@@ -1105,7 +1106,11 @@ export function generateEsiXml(result, options = {}) {
       message: `General 类别的 Ebus 电流 ${general.ebusCurrent} mA 未写入 ESI，重新生成时为 0。`,
     })
   }
-  if (general && general.physicalMemoryAddress !== null && general.physicalMemoryAddress !== 0x0002) {
+  if (
+    general &&
+    general.physicalMemoryAddress !== null &&
+    general.physicalMemoryAddress !== 0x0002
+  ) {
     warnings.push({
       level: 'info',
       message: `General 类别的物理内存地址 0x${Number(general.physicalMemoryAddress ?? 0)
@@ -1117,10 +1122,16 @@ export function generateEsiXml(result, options = {}) {
     warnings.push({ level: 'info', message: 'General 标志位“Enable SafeOp”无法在 ESI 中表达。' })
   }
   if ((general?.flags ?? 0) & 0x10) {
-    warnings.push({ level: 'info', message: 'General 标志位“Physical Memory 识别”无法在 ESI 中表达。' })
+    warnings.push({
+      level: 'info',
+      message: 'General 标志位“Physical Memory 识别”无法在 ESI 中表达。',
+    })
   }
   if ((info.eepromSizeRaw ?? 0) !== Math.floor(byteSize / 128) - 1) {
-    warnings.push({ level: 'warn', message: 'EEPROM 大小字段与输入长度不一致，导出值按输入长度计算。' })
+    warnings.push({
+      level: 'warn',
+      message: 'EEPROM 大小字段与输入长度不一致，导出值按输入长度计算。',
+    })
   }
 
   return { xml: `${lines.join('\n')}\n`, warnings }

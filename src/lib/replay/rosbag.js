@@ -82,7 +82,9 @@ function connectionMeta(header, data, previous) {
     ...(header.topic ? { topic: text(header.topic) } : {}),
     type: fields.type ? text(fields.type) : previous?.type || '',
     md5: fields.md5sum ? text(fields.md5sum) : previous?.md5 || '',
-    definition: fields.message_definition ? text(fields.message_definition) : previous?.definition || '',
+    definition: fields.message_definition
+      ? text(fields.message_definition)
+      : previous?.definition || '',
   }
 }
 
@@ -98,7 +100,9 @@ function decompressChunk(header, data) {
     // uncompressed size so a hostile frame cannot request a huge buffer.
     if (declared === null) throw new Error('lz4 数据块缺少解压后大小')
     if (declared > MAX_CHUNK_BYTES) {
-      throw new Error(`bag 数据块声明解压后 ${declared} 字节，超过 ${MAX_CHUNK_BYTES / 1024 / 1024} MiB 上限`)
+      throw new Error(
+        `bag 数据块声明解压后 ${declared} 字节，超过 ${MAX_CHUNK_BYTES / 1024 / 1024} MiB 上限`,
+      )
     }
     raw = lz4js.decompress(data, declared)
     if (raw.length !== declared) {
@@ -365,7 +369,8 @@ function pushJoint(accumulator, nameInfo, values) {
     const lookup = indexByName(nameInfo.values)
     values = accumulator.names.map((name) => {
       const source = lookup.get(name)
-      if (source === undefined) throw new Error(`话题 ${accumulator.topic} 的关节 ${name} 在后续帧里缺失`)
+      if (source === undefined)
+        throw new Error(`话题 ${accumulator.topic} 的关节 ${name} 在后续帧里缺失`)
       return values[source]
     })
   }
@@ -375,7 +380,8 @@ function pushJoint(accumulator, nameInfo, values) {
     )
   }
   accumulator.times.push(accumulator.timestamp)
-  for (let index = 0; index < values.length; index += 1) accumulator.columns[index].push(values[index])
+  for (let index = 0; index < values.length; index += 1)
+    accumulator.columns[index].push(values[index])
   accumulator.count += 1
 }
 
@@ -385,9 +391,8 @@ function decodeJoint(accumulator, data, timestamp) {
   const nameInfo = cursor.stringArray()
   // Both variants put positions immediately after names, but std_msgs uses
   // float64 while the LimX controller message uses float32.
-  const values = accumulator.type === 'sensor_msgs/JointState'
-    ? cursor.f64Array()
-    : cursor.f32Array()
+  const values =
+    accumulator.type === 'sensor_msgs/JointState' ? cursor.f64Array() : cursor.f32Array()
   if (!values.length) throw new Error(`话题 ${accumulator.topic} 没有关节角度`)
   accumulator.timestamp = timestamp
   pushJoint(accumulator, nameInfo, [...values])
@@ -457,7 +462,9 @@ function dedupe(series) {
   }
 
   for (const [key, value] of Object.entries(columns)) {
-    series[key] = Array.isArray(value) ? value.map((column) => column.slice(0, write)) : value.slice(0, write)
+    series[key] = Array.isArray(value)
+      ? value.map((column) => column.slice(0, write))
+      : value.slice(0, write)
   }
   series.times = times.slice(0, write)
   series.count = write
@@ -482,7 +489,10 @@ export function readRosbag(bytes, { topics = [], onProgress } = {}) {
     if (!wanted.has(connection.topic)) continue
     const kind = topicKind(connection.type)
     if (!kind) {
-      warnings.push({ level: 'warn', message: `话题 ${connection.topic} 的类型 ${connection.type} 暂不支持解码` })
+      warnings.push({
+        level: 'warn',
+        message: `话题 ${connection.topic} 的类型 ${connection.type} 暂不支持解码`,
+      })
       continue
     }
     const existing = byTopic.get(connection.topic)
@@ -503,7 +513,8 @@ export function readRosbag(bytes, { topics = [], onProgress } = {}) {
       })
       continue
     }
-    const accumulator = kind === 'joint' ? makeJointAccumulator(connection) : makeImuAccumulator(connection)
+    const accumulator =
+      kind === 'joint' ? makeJointAccumulator(connection) : makeImuAccumulator(connection)
     byTopic.set(connection.topic, accumulator)
     accumulators.set(id, accumulator)
   }
@@ -530,26 +541,31 @@ export function readRosbag(bytes, { topics = [], onProgress } = {}) {
     })
   }
 
-  const complete = eachRecord(bytes, BAG_MAGIC.length, bytes.length, (header, data, recordStart) => {
-    if (onProgress && recordStart / total - lastProgress >= 0.05) {
-      lastProgress = recordStart / total
-      onProgress(Math.min(1, lastProgress))
-    }
-    if (header.op?.[0] === 0x05) {
-      readChunk(header, data)
-    } else if (header.op?.[0] === 0x02) {
-      // Unchunked bags exist in the wild; reuse the chunk path on one record.
-      const id = connIdOf(header)
-      const accumulator = accumulators.get(id)
-      if (!accumulator) return
-      const timestamp = timeOf(header.time)
-      if (timestamp === null || !Number.isFinite(timestamp)) {
-        throw new Error(`话题 ${accumulator.topic} 有缺少时间戳的消息`)
+  const complete = eachRecord(
+    bytes,
+    BAG_MAGIC.length,
+    bytes.length,
+    (header, data, recordStart) => {
+      if (onProgress && recordStart / total - lastProgress >= 0.05) {
+        lastProgress = recordStart / total
+        onProgress(Math.min(1, lastProgress))
       }
-      if (accumulator.kind === 'joint') decodeJoint(accumulator, data, timestamp)
-      else decodeImu(accumulator, data, timestamp)
-    }
-  })
+      if (header.op?.[0] === 0x05) {
+        readChunk(header, data)
+      } else if (header.op?.[0] === 0x02) {
+        // Unchunked bags exist in the wild; reuse the chunk path on one record.
+        const id = connIdOf(header)
+        const accumulator = accumulators.get(id)
+        if (!accumulator) return
+        const timestamp = timeOf(header.time)
+        if (timestamp === null || !Number.isFinite(timestamp)) {
+          throw new Error(`话题 ${accumulator.topic} 有缺少时间戳的消息`)
+        }
+        if (accumulator.kind === 'joint') decodeJoint(accumulator, data, timestamp)
+        else decodeImu(accumulator, data, timestamp)
+      }
+    },
+  )
 
   if (!complete) {
     warnings.push({

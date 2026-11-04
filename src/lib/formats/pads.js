@@ -39,8 +39,7 @@ export const pads = {
         {
           category: '走线',
           detail: '只在同层相邻线段间成对连线；弧线走线按直线段输出，圆弧板框按折线近似。',
-          reason:
-            'route 段只给端点与 CW/CCW 方向，不给圆心与半径；板框圆弧会被展平成 16 段折线。',
+          reason: 'route 段只给端点与 CW/CCW 方向，不给圆心与半径；板框圆弧会被展平成 16 段折线。',
         },
         {
           category: '设计数据',
@@ -51,8 +50,7 @@ export const pads = {
         {
           category: '封装与库',
           detail: '元件属性与 3D 模型不导出；封装名会保留。',
-          reason:
-            'PARTDECAL 名已写入 Footprint 属性，但元件 attribute 与 3D 模型没有中间字段。',
+          reason: 'PARTDECAL 名已写入 Footprint 属性，但元件 attribute 与 3D 模型没有中间字段。',
         },
         {
           category: '文字与丝印',
@@ -63,7 +61,12 @@ export const pads = {
     },
   ],
   detect(name, bytes) {
-    if (!String(name || '').toLowerCase().endsWith('.asc')) return null
+    if (
+      !String(name || '')
+        .toLowerCase()
+        .endsWith('.asc')
+    )
+      return null
     // Any ASCII text is a plausible `.asc`, so only accept the ones that carry
     // the PADS-POWERPCB banner as a PADS board.
     return isPadsAsciiText(leadingText(bytes))
@@ -71,17 +74,14 @@ export const pads = {
       : { id: 'unknown', kind: 'unknown' }
   },
   async convert(sources, warnings) {
-    const { looksLikePadsAscii, parsePadsAscii, padsToCircuitJson } = await import(
-      'pads-to-circuit-json'
-    )
+    const { looksLikePadsAscii, parsePadsAscii, padsToCircuitJson } =
+      await import('pads-to-circuit-json')
     const decoder = new TextDecoder('utf-8', { fatal: false })
     let parsed = null
 
     for (const source of sources) {
       if (source.format.kind !== 'pcb') {
-        throw new EdaConversionError(
-          `${source.name} 不是 PADS 板级导出文件，请只选择 .asc。`,
-        )
+        throw new EdaConversionError(`${source.name} 不是 PADS 板级导出文件，请只选择 .asc。`)
       }
       const text = decoder.decode(source.bytes)
       if (!looksLikePadsAscii(text)) {

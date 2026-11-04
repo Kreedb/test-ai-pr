@@ -47,7 +47,9 @@ function normalizedDec(event, max = 0xffff) {
         <span class="mono pdo-index">{{ hex(pdo.index, 4) }}</span>
         <span class="pdo-name">{{ pdo.name || '未命名' }}</span>
         <span class="badge">SM {{ pdo.syncManager === 0xff ? '—' : pdo.syncManager }}</span>
-        <span class="badge">{{ PDO_SYNC_NAMES[pdo.synchronization] || `Sync ${pdo.synchronization}` }}</span>
+        <span class="badge">{{
+          PDO_SYNC_NAMES[pdo.synchronization] || `Sync ${pdo.synchronization}`
+        }}</span>
         <span class="badge mono">flags {{ hex(pdo.flags, 4) }}</span>
         <span class="muted small">{{ pdo.entries.length }} 项 · {{ totalBits(pdo) }} bit</span>
       </summary>
@@ -81,7 +83,9 @@ function normalizedDec(event, max = 0xffff) {
           <span>同步方式 *</span>
           <select
             :value="pdo.synchronization"
-            @change="emit('update-pdo', pdoIndex, 'synchronization', parseDecValue($event.target.value))"
+            @change="
+              emit('update-pdo', pdoIndex, 'synchronization', parseDecValue($event.target.value))
+            "
           >
             <option v-for="choice in SYNC_CHOICES" :key="choice.value" :value="choice.value">
               {{ choice.name }}
@@ -124,13 +128,23 @@ function normalizedDec(event, max = 0xffff) {
                   class="table-input mono narrow"
                   :value="hex(entry.index, 4)"
                   spellcheck="false"
-                  @change="emit('update-entry', pdoIndex, entryIndex, 'index', normalizedHex($event))"
+                  @change="
+                    emit('update-entry', pdoIndex, entryIndex, 'index', normalizedHex($event))
+                  "
                 />
                 :
                 <input
                   class="table-input mono narrow"
                   :value="entry.subIndex"
-                  @change="emit('update-entry', pdoIndex, entryIndex, 'subIndex', normalizedDec($event, 0xff))"
+                  @change="
+                    emit(
+                      'update-entry',
+                      pdoIndex,
+                      entryIndex,
+                      'subIndex',
+                      normalizedDec($event, 0xff),
+                    )
+                  "
                 />
               </td>
               <td>
@@ -144,9 +158,21 @@ function normalizedDec(event, max = 0xffff) {
                 <select
                   class="table-input"
                   :value="entry.dataType"
-                  @change="emit('update-entry', pdoIndex, entryIndex, 'dataType', parseDecValue($event.target.value))"
+                  @change="
+                    emit(
+                      'update-entry',
+                      pdoIndex,
+                      entryIndex,
+                      'dataType',
+                      parseDecValue($event.target.value),
+                    )
+                  "
                 >
-                  <option v-for="choice in DATA_TYPE_CHOICES" :key="choice.value" :value="choice.value">
+                  <option
+                    v-for="choice in DATA_TYPE_CHOICES"
+                    :key="choice.value"
+                    :value="choice.value"
+                  >
                     {{ choice.name }}
                   </option>
                 </select>
@@ -155,7 +181,15 @@ function normalizedDec(event, max = 0xffff) {
                 <input
                   class="table-input mono narrow"
                   :value="entry.bitLength"
-                  @change="emit('update-entry', pdoIndex, entryIndex, 'bitLength', normalizedDec($event, 0xff))"
+                  @change="
+                    emit(
+                      'update-entry',
+                      pdoIndex,
+                      entryIndex,
+                      'bitLength',
+                      normalizedDec($event, 0xff),
+                    )
+                  "
                 />
               </td>
               <td>
@@ -163,7 +197,9 @@ function normalizedDec(event, max = 0xffff) {
                   class="table-input mono narrow"
                   :value="hex(entry.flags, 4)"
                   spellcheck="false"
-                  @change="emit('update-entry', pdoIndex, entryIndex, 'flags', normalizedHex($event))"
+                  @change="
+                    emit('update-entry', pdoIndex, entryIndex, 'flags', normalizedHex($event))
+                  "
                 />
               </td>
               <td class="row-actions">

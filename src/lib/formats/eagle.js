@@ -21,7 +21,8 @@ export const eagle = {
       items: [
         {
           category: '板框',
-          detail: '只导出 Dimension 层 wire 组成的主板框，其余闭合轮廓当作开槽；curve 圆弧按直线弦处理。',
+          detail:
+            '只导出 Dimension 层 wire 组成的主板框，其余闭合轮廓当作开槽；curve 圆弧按直线弦处理。',
           reason:
             'addBoardOutline 只读取 wire 端点，不解析 curve 属性；圆弧会静默变成直弦，不会报错或回退到元件外接矩形。',
         },
@@ -44,7 +45,8 @@ export const eagle = {
         },
         {
           category: '封装与库',
-          detail: '元件的 attribute 与 3D 数据不导出；封装 Value 由元件值回填，封装库/封装名不保留。',
+          detail:
+            '元件的 attribute 与 3D 数据不导出；封装 Value 由元件值回填，封装库/封装名不保留。',
           reason:
             'package 的 3D 数据与 element 的 attribute 不解析；封装按焊盘几何重建，Footprint 属性由型号或元件值推导，所以源库名/封装名不保留，Value 由元件值回填。',
         },
@@ -68,7 +70,8 @@ export const eagle = {
       items: [
         {
           category: '符号图形',
-          detail: '按库中线条、圆、多边形重建；引脚名不导出，名称与编号默认隐藏，样式与原图有差异。',
+          detail:
+            '按库中线条、圆、多边形重建；引脚名不导出，名称与编号默认隐藏，样式与原图有差异。',
           reason:
             '只按库中的 wire/circle/polygon 重建；EAGLE 的 pin name 没有映射到显示标签，且 KiCad 的非 chip 符号隐藏引脚名与编号。',
         },
@@ -81,7 +84,8 @@ export const eagle = {
         {
           category: '网络标签',
           detail: '只来自 EAGLE 的 label，自动显示的 N$ 网络名不额外生成标签。',
-          reason: 'EAGLE 的自动网络名 (N$…) 不是 label，转换器只导出显式 label，这些网络在 KiCad 里因此没有标签。',
+          reason:
+            'EAGLE 的自动网络名 (N$…) 不是 label，转换器只导出显式 label，这些网络在 KiCad 里因此没有标签。',
         },
         {
           category: '文字与图形',
@@ -111,9 +115,8 @@ export const eagle = {
     return null
   },
   async convert(sources, warnings) {
-    const { looksLikeEagleXml, parseEagleXml, eagleToCircuitJson } = await import(
-      'eagle-to-circuit-json'
-    )
+    const { looksLikeEagleXml, parseEagleXml, eagleToCircuitJson } =
+      await import('eagle-to-circuit-json')
     const decoder = new TextDecoder('utf-8', { fatal: false })
     let board = null
     let schematic = null
@@ -137,9 +140,7 @@ export const eagle = {
       }
       if (source.format.kind === 'pcb') {
         if (board) {
-          throw new EdaConversionError(
-            '一次只能转换一块板：检测到多个 EAGLE .brd，请分批转换。',
-          )
+          throw new EdaConversionError('一次只能转换一块板：检测到多个 EAGLE .brd，请分批转换。')
         }
         if (!parsed.board) throw new EdaConversionError(`${source.name} 里没有 <board> 节点。`)
         board = parsed.board

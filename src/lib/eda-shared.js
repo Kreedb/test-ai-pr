@@ -52,13 +52,18 @@ export function leadingText(bytes) {
 }
 
 export function isEagleXmlText(text) {
-  const trimmed = String(text || '').replace(/^﻿/, '').trimStart()
+  const trimmed = String(text || '')
+    .replace(/^﻿/, '')
+    .trimStart()
   return trimmed.startsWith('<') && /<eagle[\s>]/.test(trimmed)
 }
 
 export function isPadsAsciiText(text) {
   return /^[!*]PADS-POWERPCB-/i.test(
-    String(text || '').replace(/^﻿/, '').trimStart().slice(0, 512),
+    String(text || '')
+      .replace(/^﻿/, '')
+      .trimStart()
+      .slice(0, 512),
   )
 }
 
@@ -125,8 +130,7 @@ export async function toKicadFiles(circuitJson, summary, baseName) {
   // (0 symbols, 0 nets) on the extra token; `(power global)`/`(power local)`
   // were added in KiCad 10. Bare `(power)` also means a global power symbol in
   // 10, so drop the suffix and keep the symbol.
-  const repairSchematicText = (content) =>
-    content.replace(/^(\s*)\(power global\)$/gm, '$1(power)')
+  const repairSchematicText = (content) => content.replace(/^(\s*)\(power global\)$/gm, '$1(power)')
 
   // The schematic converter owns the sheet plan (root/sheet UUIDs). Build it
   // first so the project file can reference the same UUIDs.

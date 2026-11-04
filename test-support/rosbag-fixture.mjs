@@ -63,7 +63,10 @@ function field(name, value) {
   const key = encoder.encode(`${name}=`)
   const bytes = typeof value === 'string' ? encoder.encode(value) : value
   const out = new Out()
-  out.u32(key.length + bytes.length).push(key).push(bytes)
+  out
+    .u32(key.length + bytes.length)
+    .push(key)
+    .push(bytes)
   return out.build()
 }
 
@@ -122,7 +125,8 @@ function stringArray(values) {
 
 export function encodeJointState({ names = [], position = [], time = 0, frameId = '' } = {}) {
   const out = new Out()
-  out.push(encodeHeader({ time, frameId }))
+  out
+    .push(encodeHeader({ time, frameId }))
     .push(stringArray(names))
     .push(floatArray(position))
     .push(floatArray([]))
@@ -132,7 +136,12 @@ export function encodeJointState({ names = [], position = [], time = 0, frameId 
   return out.build()
 }
 
-export function encodeImu({ quat = [1, 0, 0, 0], euler = [0, 0, 0], time = 0, frameId = 'limx' } = {}) {
+export function encodeImu({
+  quat = [1, 0, 0, 0],
+  euler = [0, 0, 0],
+  time = 0,
+  frameId = 'limx',
+} = {}) {
   const out = new Out()
   out.push(encodeHeader({ time, frameId })).u64(0).u32(0)
   for (const value of euler) out.f64(value)
@@ -144,7 +153,8 @@ export function encodeImu({ quat = [1, 0, 0, 0], euler = [0, 0, 0], time = 0, fr
 
 export function encodeSensorJointState({ names = [], position = [], time = 0, frameId = '' } = {}) {
   const out = new Out()
-  out.push(encodeHeader({ time, frameId }))
+  out
+    .push(encodeHeader({ time, frameId }))
     .push(stringArray(names))
     .push(doubleArray(position))
     .push(doubleArray([]))
@@ -165,7 +175,12 @@ export function encodeSensorImu({ quat = [1, 0, 0, 0], time = 0, frameId = 'imu'
   return out.build()
 }
 
-export function buildRosbag({ connections, messages, compression = 'none', topLevelConnections = true }) {
+export function buildRosbag({
+  connections,
+  messages,
+  compression = 'none',
+  topLevelConnections = true,
+}) {
   const connectionRecords = connections.map((connection) => {
     const data = header({
       topic: connection.topic,
@@ -173,7 +188,10 @@ export function buildRosbag({ connections, messages, compression = 'none', topLe
       md5sum: connection.md5 || '00000000000000000000000000000000',
       message_definition: connection.definition || '',
     })
-    const fields = { op: new Uint8Array([0x07]), conn: new Uint8Array(new Uint32Array([connection.id]).buffer) }
+    const fields = {
+      op: new Uint8Array([0x07]),
+      conn: new Uint8Array(new Uint32Array([connection.id]).buffer),
+    }
     fields.topic = connection.topic
     return record(fields, data)
   })

@@ -35,10 +35,14 @@ function archive(entries, options) {
 let sampleArchive
 const sampleArchiveProject = () =>
   (sampleArchive ??= (async () => {
-    const { files } = await expandArchive('stm32-f411-4layer.zip', sample('public/samples/altium/stm32-f411-4layer.zip'), {
-      maxFileBytes: 40 * 1024 * 1024,
-      maxTotalBytes: 120 * 1024 * 1024,
-    })
+    const { files } = await expandArchive(
+      'stm32-f411-4layer.zip',
+      sample('public/samples/altium/stm32-f411-4layer.zip'),
+      {
+        maxFileBytes: 40 * 1024 * 1024,
+        maxTotalBytes: 120 * 1024 * 1024,
+      },
+    )
     return { files, outcome: await convertEda(files) }
   })())
 
@@ -94,13 +98,10 @@ test('entries over the per-file and total caps are skipped without inflating', a
     maxTotalBytes: 40,
   })
   assert.deepEqual(namesOf(files), ['small.asc'])
-  assert.deepEqual(
-    skipped.map((entry) => [entry.name, entry.reason]).sort(),
-    [
-      ['large.asc', 'too-large'],
-      ['other.asc', 'total-too-large'],
-    ],
-  )
+  assert.deepEqual(skipped.map((entry) => [entry.name, entry.reason]).sort(), [
+    ['large.asc', 'too-large'],
+    ['other.asc', 'total-too-large'],
+  ])
 })
 
 test('nested archives and unsupported compression are reported, not inflated', async () => {
@@ -119,7 +120,12 @@ test('a member that lies about its size is stopped instead of inflating unbounde
   // Patch both the local header and central directory uncompressed-size fields
   // (2000 -> 10) so the pre-check believes the member is tiny.
   for (let index = 0; index + 4 <= bytes.length; index += 1) {
-    if (bytes[index] === 0xd0 && bytes[index + 1] === 0x07 && bytes[index + 2] === 0 && bytes[index + 3] === 0) {
+    if (
+      bytes[index] === 0xd0 &&
+      bytes[index + 1] === 0x07 &&
+      bytes[index + 2] === 0 &&
+      bytes[index + 3] === 0
+    ) {
       bytes[index] = 10
       bytes[index + 1] = 0
     }
@@ -211,7 +217,8 @@ test('wrapped ASCII Board records are re-joined, real records are not', () => {
 })
 
 test('an already-normalised ASCII document is returned unchanged', () => {
-  const flat = '|RECORD=Board|UNIQUEID=1|LAYER1NAME=Top Layer|LAYER1NEXT=32|\r\n|RECORD=Net|ID=0|\r\n'
+  const flat =
+    '|RECORD=Board|UNIQUEID=1|LAYER1NAME=Top Layer|LAYER1NEXT=32|\r\n|RECORD=Net|ID=0|\r\n'
   const bytes = encode(flat)
   assert.equal(decode(normalizeAltiumAscii(bytes)), flat)
   // Text that is not an Altium board at all is not rewritten either.
@@ -239,17 +246,13 @@ test('the overshared project trace is recognised, a healthy project is not', asy
   assert.equal(hasOversharedTrace(overshared), true)
   // A trace with one net and many ports is normal fan-out, not the bug.
   assert.equal(
-    hasOversharedTrace([
-      { ...overshared[2], connected_source_net_ids: ['net-a'] },
-    ]),
+    hasOversharedTrace([{ ...overshared[2], connected_source_net_ids: ['net-a'] }]),
     false,
   )
   // Several nets through a single port is still a malformed merge: a real trace
   // never spans more than one net.
   assert.equal(
-    hasOversharedTrace([
-      { ...overshared[2], connected_source_port_ids: ['port-1'] },
-    ]),
+    hasOversharedTrace([{ ...overshared[2], connected_source_port_ids: ['port-1'] }]),
     true,
   )
 })

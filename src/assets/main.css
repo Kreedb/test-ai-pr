@@ -17,7 +17,14 @@
 
   color-scheme: dark;
   scrollbar-gutter: stable;
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+  font-family:
+    Inter,
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Helvetica,
+    Arial,
+    sans-serif;
   line-height: 1.55;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -37,8 +44,7 @@ body {
   color: var(--text);
   background:
     radial-gradient(1200px 600px at 10% -10%, rgba(91, 140, 255, 0.14), transparent 60%),
-    radial-gradient(900px 500px at 100% 0%, rgba(139, 92, 246, 0.1), transparent 55%),
-    var(--bg);
+    radial-gradient(900px 500px at 100% 0%, rgba(139, 92, 246, 0.1), transparent 55%), var(--bg);
 }
 
 a {
@@ -126,12 +132,6 @@ p {
   box-shadow: 0 6px 20px rgba(91, 140, 255, 0.35);
 }
 
-.brand p {
-  margin-top: 2px;
-  color: var(--muted);
-  font-size: 0.82rem;
-}
-
 .gh-link {
   flex: 0 0 auto;
   padding: 6px 12px;
@@ -197,7 +197,9 @@ p {
   background: var(--bg-soft);
   text-align: center;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
 }
 
 .drop-zone:hover,
@@ -263,7 +265,9 @@ p {
   font: inherit;
   font-size: 0.88rem;
   cursor: pointer;
-  transition: border-color 0.15s ease, transform 0.05s ease;
+  transition:
+    border-color 0.15s ease,
+    transform 0.05s ease;
 }
 
 .btn:hover:not(:disabled) {
@@ -745,13 +749,6 @@ section[id] {
   color: var(--muted);
 }
 
-.hero-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 6px;
-}
-
 .tool-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -768,7 +765,9 @@ section[id] {
   background: var(--panel);
   color: var(--text);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    transform 0.15s ease;
 }
 
 .tool-card:hover {
@@ -1451,10 +1450,6 @@ section[id] {
 
   .card {
     padding: 14px;
-  }
-
-  .brand p {
-    display: none;
   }
 
   .stat-value {

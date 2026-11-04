@@ -38,11 +38,7 @@ function basis() {
 }
 
 function project(point, projectBasis, width, height) {
-  const relative = [
-    point[0] - target[0],
-    point[1] - target[1],
-    point[2] - target[2],
-  ]
+  const relative = [point[0] - target[0], point[1] - target[1], point[2] - target[2]]
   const dot = (axis) => relative[0] * axis[0] + relative[1] * axis[1] + relative[2] * axis[2]
   const depth = dot(projectBasis.forward) + camera.distance
   if (depth < 0.08) return null
@@ -127,12 +123,19 @@ function draw() {
     const to = projected[index]
     if (!from || !to) return
     const name = node.name
-    const color = name.startsWith('left') || name.endsWith('_L')
-      ? '#5b8cff'
-      : name.startsWith('right') || name.endsWith('_R')
-        ? '#f5b942'
-        : '#c4b5fd'
-    bones.push({ from, to, color, depth: (from.depth + to.depth) / 2, width: name.startsWith('contact_') ? 1 : 2 })
+    const color =
+      name.startsWith('left') || name.endsWith('_L')
+        ? '#5b8cff'
+        : name.startsWith('right') || name.endsWith('_R')
+          ? '#f5b942'
+          : '#c4b5fd'
+    bones.push({
+      from,
+      to,
+      color,
+      depth: (from.depth + to.depth) / 2,
+      width: name.startsWith('contact_') ? 1 : 2,
+    })
   })
 
   bones.sort((left, right) => right.depth - left.depth)

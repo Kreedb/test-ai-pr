@@ -93,7 +93,10 @@ test('preview model covers both sides of an EAGLE project', async () => {
   )
   assert.equal(model.pcb.pads.length, result.summary.board.pads)
   for (const pad of model.pcb.pads) {
-    assert.ok(pad.layers.some((layer) => copperIds.has(layer)), `pad ${pad.id} has no copper layer`)
+    assert.ok(
+      pad.layers.some((layer) => copperIds.has(layer)),
+      `pad ${pad.id} has no copper layer`,
+    )
     assert.ok(pad.bounds, `pad ${pad.id} has no drawable bounds`)
   }
 
@@ -143,7 +146,9 @@ test('nets join the board and the schematic through the shared port ids', async 
 test('layer toggles only offer copper layers that carry geometry', async () => {
   const result = await eagleProject()
   const model = buildPreviewModel(result.circuitJson)
-  const copper = model.pcb.layers.filter((layer) => layer.group === 'copper').map((layer) => layer.id)
+  const copper = model.pcb.layers
+    .filter((layer) => layer.group === 'copper')
+    .map((layer) => layer.id)
 
   // EAGLE writes through-hole vias with the full 1-16 extent, but the sample is
   // a two-layer board: offering inner1..16 would be sixteen empty checkboxes.
@@ -204,10 +209,11 @@ test('complex STM32 samples keep their four-layer stack and sheet hierarchy', as
   assert.equal(core.files.filter((file) => file.name.endsWith('.kicad_sch')).length, 4)
   const coreModel = buildPreviewModel(core.circuitJson)
   assert.equal(coreModel.schematic.sheets.length, 3)
-  assert.deepEqual(
-    coreModel.schematic.sheets.map((sheet) => sheet.name).sort(),
-    ['00_connectors_power', '01_stm32f4_min_system', '02_other'],
-  )
+  assert.deepEqual(coreModel.schematic.sheets.map((sheet) => sheet.name).sort(), [
+    '00_connectors_power',
+    '01_stm32f4_min_system',
+    '02_other',
+  ])
   assert.equal(coreModel.pcb.components.length, core.summary.board.components)
 })
 
@@ -249,7 +255,10 @@ test('search hits carry the schematic sheet they belong to', async () => {
 
   const pins = entries.filter((entry) => entry.kind === 'pin')
   assert.ok(pins.length > 0)
-  assert.ok(pins.every((pin) => pin.sheet), 'pin hits need their sheet to focus it')
+  assert.ok(
+    pins.every((pin) => pin.sheet),
+    'pin hits need their sheet to focus it',
+  )
   assert.ok(new Set(pins.map((pin) => pin.sheet)).size > 1, 'pins span multiple sheets')
   assert.ok(entries.filter((entry) => entry.kind === 'component').every((item) => item.sheet))
 })
@@ -273,7 +282,10 @@ test('schematic text uses the size the KiCad writer draws', () => {
   // a symbol property and trace text an inline label; KiCad writes both at the
   // fixed 1.27 mm default even when standalone graphics are preserved.
   const sized = { font_size: 1.778 / 15 }
-  assert.equal(schematicTextSize({ ...sized, schematic_component_id: 'c1' }, true), SCHEMATIC_TEXT_SIZE)
+  assert.equal(
+    schematicTextSize({ ...sized, schematic_component_id: 'c1' }, true),
+    SCHEMATIC_TEXT_SIZE,
+  )
   assert.equal(schematicTextSize({ ...sized, source_trace_id: 't1' }, true), SCHEMATIC_TEXT_SIZE)
 })
 
@@ -370,7 +382,11 @@ test('preview survives a hand-built model with missing optional fields', () => {
       x: 0.5,
       y: 1,
     },
-    { type: 'pcb_trace', pcb_trace_id: 't1', route: [{ route_type: 'wire', x: 0, y: 0, width: 0.2 }] },
+    {
+      type: 'pcb_trace',
+      pcb_trace_id: 't1',
+      route: [{ route_type: 'wire', x: 0, y: 0, width: 0.2 }],
+    },
     {
       type: 'schematic_component',
       schematic_component_id: 'sc1',
@@ -380,7 +396,12 @@ test('preview survives a hand-built model with missing optional fields', () => {
     },
     // A label whose source net never made it into the model: it must still
     // render, but it has no net to index (it used to crash the net sort).
-    { type: 'schematic_net_label', schematic_net_label_id: 'l1', text: 'ORPHAN', anchor_position: { x: 0, y: 0 } },
+    {
+      type: 'schematic_net_label',
+      schematic_net_label_id: 'l1',
+      text: 'ORPHAN',
+      anchor_position: { x: 0, y: 0 },
+    },
   ]
   const model = buildPreviewModel(circuitJson)
 
@@ -391,7 +412,10 @@ test('preview survives a hand-built model with missing optional fields', () => {
   assert.equal(model.schematic.sheets.length, 1)
   assert.equal(model.schematic.sheets[0].id, 'sheet_0')
   assert.ok(model.schematic.items.every((item) => item.sheet === 'sheet_0'))
-  assert.equal(model.schematic.sheets[0].items.filter((item) => item.kind === 'component').length, 1)
+  assert.equal(
+    model.schematic.sheets[0].items.filter((item) => item.kind === 'component').length,
+    1,
+  )
   assert.equal(model.pcb.items.find((item) => item.kind === 'pad').refdes, 'R1')
   assert.ok(model.schematic.items.some((item) => item.kind === 'label' && item.text === 'ORPHAN'))
   assert.deepEqual(indexNets(model), [])
@@ -417,7 +441,9 @@ test('component-owned text is always written at the KiCad property size', async 
 
   const sch = (await altiumProject()).files.find((file) => file.name === 'stm32f411_2.kicad_sch')
   assert.ok(sch, 'expected the child schematic sheet')
-  const sizes = new Set([...sch.content.matchAll(/\(size ([\d.]+) ([\d.]+)\)/g)].map((match) => match[1]))
+  const sizes = new Set(
+    [...sch.content.matchAll(/\(size ([\d.]+) ([\d.]+)\)/g)].map((match) => match[1]),
+  )
   assert.deepEqual([...sizes], ['1.27'])
 })
 
@@ -429,7 +455,9 @@ test('schematic preview draws the value of parts without value texts', async () 
   const model = buildPreviewModel((await altiumProject()).circuitJson)
   const sheet = model.schematic.sheets[0]
   const componentTexts = (refdes) => {
-    const component = sheet.items.find((item) => item.kind === 'component' && item.refdes === refdes)
+    const component = sheet.items.find(
+      (item) => item.kind === 'component' && item.refdes === refdes,
+    )
     assert.ok(component, `expected ${refdes} on the sheet`)
     return sheet.items
       .filter((item) => item.kind === 'text' && item.componentId === component.id)
@@ -460,14 +488,13 @@ test('schematic preview draws the value of parts without value texts', async () 
 
   // An unresolved Altium formula is not a value; it must not be drawn as if it
   // were one.
-  const led = connectors.items.find(
-    (item) => item.kind === 'component' && item.refdes === 'D1',
-  )
+  const led = connectors.items.find((item) => item.kind === 'component' && item.refdes === 'D1')
   assert.ok(led, 'expected D1 on the first sheet')
   assert.equal(led.value, '')
   assert.ok(
     !connectors.items.some(
-      (item) => item.kind === 'text' && item.componentId === led.id && item.element.text.includes('='),
+      (item) =>
+        item.kind === 'text' && item.componentId === led.id && item.element.text.includes('='),
     ),
     'unresolved formula was drawn',
   )
@@ -524,7 +551,9 @@ test('Altium parts without value texts still export a filled KiCad Value', async
   assert.match(f405.content, /\(property "Value" "SMAJ5.0A"/)
   // Formula-valued fields cannot be evaluated and must stay empty instead of
   // leaking the expression into the exported schematic.
-  for (const file of (await coreBoardProject()).files.filter((entry) => entry.name.endsWith('.kicad_sch'))) {
+  for (const file of (await coreBoardProject()).files.filter((entry) =>
+    entry.name.endsWith('.kicad_sch'),
+  )) {
     assert.ok(
       !file.content.includes('(property "Value" "='),
       `${file.name} exported an unresolved Value expression`,

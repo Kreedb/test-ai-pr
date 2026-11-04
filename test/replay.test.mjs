@@ -8,7 +8,12 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 import { LUNA, OLI } from '../src/lib/replay/models.js'
-import { buildJointValues, computePose, normalizeQuat, quatToEuler } from '../src/lib/replay/pose.js'
+import {
+  buildJointValues,
+  computePose,
+  normalizeQuat,
+  quatToEuler,
+} from '../src/lib/replay/pose.js'
 import { detectProfile, mapJoints } from '../src/lib/replay/profiles.js'
 import { inspectRosbag, readRosbag } from '../src/lib/replay/rosbag.js'
 import {
@@ -82,7 +87,9 @@ test('finds connection metadata stored inside chunks (active recording)', () => 
 test('keeps complete records when an active recording has a truncated tail', () => {
   const full = buildRosbag({
     connections: [JOINT_CONNECTION],
-    messages: [{ conn: 0, time: 10, data: encodeJointState({ names: ['a'], position: [0.5], time: 10 }) }],
+    messages: [
+      { conn: 0, time: 10, data: encodeJointState({ names: ['a'], position: [0.5], time: 10 }) },
+    ],
     compression: 'lz4',
     topLevelConnections: false,
   })
@@ -101,7 +108,10 @@ test('keeps complete records when an active recording has a truncated tail', () 
   bytes.set(dangling, full.length)
 
   const info = inspectRosbag(bytes)
-  assert.deepEqual(info.topics.map((topic) => topic.name), ['/joint/state'])
+  assert.deepEqual(
+    info.topics.map((topic) => topic.name),
+    ['/joint/state'],
+  )
   const { series, warnings } = readRosbag(bytes, { topics: ['/joint/state'] })
   assert.equal(series['/joint/state'].count, 1)
   assert.ok(warnings.some((warning) => /尾部记录不完整/.test(warning.message)))
@@ -136,7 +146,10 @@ test('does not offer unsupported JointState-like types', () => {
     [{ id: 0, topic: '/joint/state', type: 'my_robot/JointState' }],
   )
   const info = inspectRosbag(bytes)
-  assert.deepEqual(info.topics.map((topic) => topic.kind), [null])
+  assert.deepEqual(
+    info.topics.map((topic) => topic.kind),
+    [null],
+  )
 })
 
 test('decodes named joint state and IMU from an lz4 chunk', () => {
@@ -145,7 +158,11 @@ test('decodes named joint state and IMU from an lz4 chunk', () => {
       {
         conn: 0,
         time: 10,
-        data: encodeJointState({ names: lunaNames, position: lunaNames.map((_, index) => index / 10), time: 10 }),
+        data: encodeJointState({
+          names: lunaNames,
+          position: lunaNames.map((_, index) => index / 10),
+          time: 10,
+        }),
       },
       { conn: 1, time: 10, data: encodeImu({ quat: [0.5, 0.5, 0.5, 0.5], time: 10 }) },
       {
@@ -195,7 +212,11 @@ test('decodes standard sensor_msgs JointState and Imu', () => {
       {
         conn: 0,
         time: 2,
-        data: encodeSensorJointState({ names: ['left_hip_pitch_joint', 'left_knee_joint'], position: [0.4, -0.25], time: 2 }),
+        data: encodeSensorJointState({
+          names: ['left_hip_pitch_joint', 'left_knee_joint'],
+          position: [0.4, -0.25],
+          time: 2,
+        }),
       },
       { conn: 1, time: 2, data: encodeSensorImu({ quat: [0.7071, 0, 0.7071, 0], time: 2 }) },
     ],
@@ -251,20 +272,14 @@ test('rejects backwards timestamps and unsupported compression', () => {
     ],
     [JOINT_CONNECTION],
   )
-  assert.throws(
-    () => readRosbag(backwards, { topics: ['/joint/state'] }),
-    /时间戳倒退/,
-  )
+  assert.throws(() => readRosbag(backwards, { topics: ['/joint/state'] }), /时间戳倒退/)
 
   const bz2 = bag(
     [{ conn: 0, time: 1, data: encodeJointState({ names: ['a'], position: [1], time: 1 }) }],
     [JOINT_CONNECTION],
     'bz2',
   )
-  assert.throws(
-    () => readRosbag(bz2, { topics: ['/joint/state'] }),
-    /暂不支持 bz2 压缩/,
-  )
+  assert.throws(() => readRosbag(bz2, { topics: ['/joint/state'] }), /暂不支持 bz2 压缩/)
 })
 
 test('rejects data without the ROS1 bag header', () => {
@@ -315,7 +330,10 @@ test('forward kinematics follows joint angles and base rotation', () => {
   assert.ok(Math.abs(yaw90.points[hipIndex][1] - neutral.points[hipIndex][0]) < 1e-6)
 
   const euler = quatToEuler(normalizeQuat([0, 1, 0, 0]))
-  assert.deepEqual(euler.map((value) => Math.round(value)), [180, 0, 0])
+  assert.deepEqual(
+    euler.map((value) => Math.round(value)),
+    [180, 0, 0],
+  )
 })
 
 test('the committed Luna demo bag parses and reaches a pose', () => {

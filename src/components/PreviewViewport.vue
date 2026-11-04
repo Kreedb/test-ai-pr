@@ -65,8 +65,8 @@ function measure() {
 // boards from being cropped by the fit.
 function fitTo(bounds, { padding = 1.12 } = {}) {
   measure()
-  const width = bounds ? bounds.width ?? bounds.maxX - bounds.minX : 0
-  const height = bounds ? bounds.height ?? bounds.maxY - bounds.minY : 0
+  const width = bounds ? (bounds.width ?? bounds.maxX - bounds.minX) : 0
+  const height = bounds ? (bounds.height ?? bounds.maxY - bounds.minY) : 0
   if (!width && !height) {
     // A single point (an unconnected pin) has nothing to frame: centre on it at
     // a readable zoom instead of leaving the scale at whatever it was.
@@ -202,7 +202,10 @@ onBeforeUnmount(() => {
   observer = null
 })
 
-watch(() => props.bounds, () => fit())
+watch(
+  () => props.bounds,
+  () => fit(),
+)
 watch(
   () => props.fitKey,
   () => fit(),

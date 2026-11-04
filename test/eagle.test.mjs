@@ -208,7 +208,9 @@ test('mirrored elements keep their layer, pad positions and nets', async () => {
   // Rebuild the absolute offset the way KiCad renders footprint-local pads.
   const tht = findBlock(mirrored, mirrored.indexOf('(pad "2"'), '(pad "2"')
   assert.ok(tht?.includes('"GND"'), 'through-hole pad should keep the GND net')
-  const footprintAt = /^\(footprint[\s\S]*?\(at ([\d.eE+-]+) ([\d.eE+-]+) ([\d.eE+-]+)\)/.exec(mirrored)
+  const footprintAt = /^\(footprint[\s\S]*?\(at ([\d.eE+-]+) ([\d.eE+-]+) ([\d.eE+-]+)\)/.exec(
+    mirrored,
+  )
   const padAt = /\(at ([\d.eE+-]+) ([\d.eE+-]+) ([\d.eE+-]+)\)/.exec(tht)
   assert.ok(footprintAt && padAt, 'footprint and pad should have a position')
   const angle = (Number(footprintAt[3]) * Math.PI) / 180

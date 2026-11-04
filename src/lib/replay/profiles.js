@@ -84,17 +84,77 @@ const TRON_ORDER = [
 // base is lifted so the 0.1 m wheels touch z=0.
 const TRON = [
   { name: 'base_link', parent: null, offset: [0, 0, 0.75], joint: null, axis: null },
-  { name: 'proximal_pitch_L_link', parent: 'base_link', offset: [-0.00044, 0.09178, 0.05474], joint: 'proximal_pitch_L', axis: [0, 0.9961947, -0.0871554] },
-  { name: 'proximal_roll_L_link', parent: 'proximal_pitch_L_link', offset: [-0.032, 0.0758, -0.00663], joint: 'proximal_roll_L', axis: [1, 0, 0] },
-  { name: 'proximal_yaw_L_link', parent: 'proximal_roll_L_link', offset: [0.032, 0, -0.1374], joint: 'proximal_yaw_L', axis: [0, 0, 1] },
-  { name: 'knee_L_link', parent: 'proximal_yaw_L_link', offset: [0.004, 0.032, -0.2126], joint: 'knee_L', axis: [0, 1, 0] },
-  { name: 'wheel_L_link', parent: 'knee_L_link', offset: [-0.004, 0.013, -0.35], joint: 'wheel_L', axis: [0, 1, 0] },
+  {
+    name: 'proximal_pitch_L_link',
+    parent: 'base_link',
+    offset: [-0.00044, 0.09178, 0.05474],
+    joint: 'proximal_pitch_L',
+    axis: [0, 0.9961947, -0.0871554],
+  },
+  {
+    name: 'proximal_roll_L_link',
+    parent: 'proximal_pitch_L_link',
+    offset: [-0.032, 0.0758, -0.00663],
+    joint: 'proximal_roll_L',
+    axis: [1, 0, 0],
+  },
+  {
+    name: 'proximal_yaw_L_link',
+    parent: 'proximal_roll_L_link',
+    offset: [0.032, 0, -0.1374],
+    joint: 'proximal_yaw_L',
+    axis: [0, 0, 1],
+  },
+  {
+    name: 'knee_L_link',
+    parent: 'proximal_yaw_L_link',
+    offset: [0.004, 0.032, -0.2126],
+    joint: 'knee_L',
+    axis: [0, 1, 0],
+  },
+  {
+    name: 'wheel_L_link',
+    parent: 'knee_L_link',
+    offset: [-0.004, 0.013, -0.35],
+    joint: 'wheel_L',
+    axis: [0, 1, 0],
+  },
   { name: 'wheel_bottom_L', parent: 'wheel_L_link', offset: [0, 0, -0.1], joint: null, axis: null },
-  { name: 'proximal_pitch_R_link', parent: 'base_link', offset: [-0.00044, -0.09178, 0.05474], joint: 'proximal_pitch_R', axis: [0, 0.9961947, 0.0871554] },
-  { name: 'proximal_roll_R_link', parent: 'proximal_pitch_R_link', offset: [-0.032, -0.0758, -0.00663], joint: 'proximal_roll_R', axis: [1, 0, 0] },
-  { name: 'proximal_yaw_R_link', parent: 'proximal_roll_R_link', offset: [0.032, 0, -0.1374], joint: 'proximal_yaw_R', axis: [0, 0, 1] },
-  { name: 'knee_R_link', parent: 'proximal_yaw_R_link', offset: [0.004, -0.032, -0.2126], joint: 'knee_R', axis: [0, 1, 0] },
-  { name: 'wheel_R_link', parent: 'knee_R_link', offset: [-0.004, -0.013, -0.35], joint: 'wheel_R', axis: [0, 1, 0] },
+  {
+    name: 'proximal_pitch_R_link',
+    parent: 'base_link',
+    offset: [-0.00044, -0.09178, 0.05474],
+    joint: 'proximal_pitch_R',
+    axis: [0, 0.9961947, 0.0871554],
+  },
+  {
+    name: 'proximal_roll_R_link',
+    parent: 'proximal_pitch_R_link',
+    offset: [-0.032, -0.0758, -0.00663],
+    joint: 'proximal_roll_R',
+    axis: [1, 0, 0],
+  },
+  {
+    name: 'proximal_yaw_R_link',
+    parent: 'proximal_roll_R_link',
+    offset: [0.032, 0, -0.1374],
+    joint: 'proximal_yaw_R',
+    axis: [0, 0, 1],
+  },
+  {
+    name: 'knee_R_link',
+    parent: 'proximal_yaw_R_link',
+    offset: [0.004, -0.032, -0.2126],
+    joint: 'knee_R',
+    axis: [0, 1, 0],
+  },
+  {
+    name: 'wheel_R_link',
+    parent: 'knee_R_link',
+    offset: [-0.004, -0.013, -0.35],
+    joint: 'wheel_R',
+    axis: [0, 1, 0],
+  },
   { name: 'wheel_bottom_R', parent: 'wheel_R_link', offset: [0, 0, -0.1], joint: null, axis: null },
 ]
 
@@ -120,19 +180,30 @@ function canonicalJoint(name) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '_')
   const tokens = normalized.split('_').filter(Boolean)
-  const side = tokens.includes('left') || tokens.includes('l')
-    ? 'left'
-    : tokens.includes('right') || tokens.includes('r')
-      ? 'right'
-      : ''
-  const part = ['hip', 'knee', 'ankle', 'shoulder', 'elbow', 'wrist', 'head', 'waist', 'torso']
-    .find((token) => tokens.includes(token))
+  const side =
+    tokens.includes('left') || tokens.includes('l')
+      ? 'left'
+      : tokens.includes('right') || tokens.includes('r')
+        ? 'right'
+        : ''
+  const part = [
+    'hip',
+    'knee',
+    'ankle',
+    'shoulder',
+    'elbow',
+    'wrist',
+    'head',
+    'waist',
+    'torso',
+  ].find((token) => tokens.includes(token))
   if (!part) return null
   if (part === 'knee') return side ? `${side}_knee_joint` : null
   if (part === 'elbow') return side ? `${side}_elbow_joint` : null
   // Remaining joints carry their rotation axis in the name; ankle defaults to
   // pitch when the axis token is omitted.
-  const axis = ['pitch', 'roll', 'yaw'].find((token) => tokens.includes(token)) ||
+  const axis =
+    ['pitch', 'roll', 'yaw'].find((token) => tokens.includes(token)) ||
     (part === 'ankle' ? 'pitch' : null)
   if (!axis) return null
   if (part === 'torso') return `waist_${axis}_joint`

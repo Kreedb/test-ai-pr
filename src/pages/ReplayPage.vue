@@ -5,7 +5,8 @@ export const route = {
   tool: {
     tag: 'BAG',
     title: '机器人包回放',
-    description: '读取 ROS1 bag 的关节与 IMU 话题（支持未完成的 .active 自动恢复），按时间轴还原机器人姿态；内置 LimX Luna / Oli / TRON2A 骨架。',
+    description:
+      '读取 ROS1 bag 的关节与 IMU 话题（支持未完成的 .active 自动恢复），按时间轴还原机器人姿态；内置 LimX Luna / Oli / TRON2A 骨架。',
     action: '打开回放',
   },
 }
@@ -18,11 +19,7 @@ import RobotSkeletonView from '@/components/RobotSkeletonView.vue'
 import { formatBytes } from '@/lib/format'
 import { buildJointValues, computePose, normalizeQuat, quatToEuler } from '@/lib/replay/pose'
 import { detectProfile, mapJoints } from '@/lib/replay/profiles'
-import {
-  MAX_BAG_BYTES,
-  inspectRosbag,
-  readRosbag,
-} from '@/lib/replay/rosbag'
+import { MAX_BAG_BYTES, inspectRosbag, readRosbag } from '@/lib/replay/rosbag'
 
 const SAMPLE = { file: 'samples/replay/luna-demo.bag', label: 'Luna 动作' }
 
@@ -128,10 +125,26 @@ const stats = computed(() => {
   const joint = jointSeries.value
   const imu = imuSeries.value
   return [
-    { label: '关节', value: `${(joint?.count ?? 0).toLocaleString()} 帧`, note: jointTopic.value || '—' },
-    { label: 'IMU', value: imu ? `${imu.count.toLocaleString()} 帧` : '未使用', note: imuTopic.value || '底座姿态固定' },
-    { label: '回放时长', value: `${duration.value.toFixed(2)} s`, note: `起点 ${startTime.value.toFixed(2)} s` },
-    { label: '骨架', value: (profile.value?.id || '—').toUpperCase(), note: profile.value?.label || '—' },
+    {
+      label: '关节',
+      value: `${(joint?.count ?? 0).toLocaleString()} 帧`,
+      note: jointTopic.value || '—',
+    },
+    {
+      label: 'IMU',
+      value: imu ? `${imu.count.toLocaleString()} 帧` : '未使用',
+      note: imuTopic.value || '底座姿态固定',
+    },
+    {
+      label: '回放时长',
+      value: `${duration.value.toFixed(2)} s`,
+      note: `起点 ${startTime.value.toFixed(2)} s`,
+    },
+    {
+      label: '骨架',
+      value: (profile.value?.id || '—').toUpperCase(),
+      note: profile.value?.label || '—',
+    },
   ]
 })
 
@@ -158,7 +171,8 @@ function pickTopic(list, preferred) {
 function medianInterval(times) {
   if (!times || times.length < 2) return 0.01
   const intervals = []
-  for (let index = 1; index < times.length; index += 1) intervals.push(times[index] - times[index - 1])
+  for (let index = 1; index < times.length; index += 1)
+    intervals.push(times[index] - times[index - 1])
   intervals.sort((left, right) => left - right)
   return intervals[Math.floor(intervals.length / 2)]
 }
@@ -185,7 +199,9 @@ async function applyTopics(bytes, jointName, imuName) {
     if (!joint) throw new Error(`话题 ${jointName} 没有可用的关节消息`)
     const imu = imuName ? decoded.series[imuName] : null
     const start = imu ? Math.max(joint.times[0], imu.times[0]) : joint.times[0]
-    const end = imu ? Math.min(joint.times[joint.times.length - 1], imu.times[imu.times.length - 1]) : joint.times[joint.times.length - 1]
+    const end = imu
+      ? Math.min(joint.times[joint.times.length - 1], imu.times[imu.times.length - 1])
+      : joint.times[joint.times.length - 1]
     if (!(end > start)) throw new Error('关节与 IMU 话题没有重叠的有效时间段')
 
     const detected = detectProfile(joint.names, joint.names.length, joint.named)
@@ -199,15 +215,22 @@ async function applyTopics(bytes, jointName, imuName) {
 
     const list = [...decoded.warnings]
     if (/\.active$/i.test(fileName.value)) {
-      list.unshift({ level: 'info', message: '已按未完成录制打开 .active 文件，自动保留尾部截断前的完整数据块。' })
+      list.unshift({
+        level: 'info',
+        message: '已按未完成录制打开 .active 文件，自动保留尾部截断前的完整数据块。',
+      })
     }
     if (!detected.skeleton) {
-      list.push({ level: 'warn', message: `没有匹配的骨架（${detected.label}），仍会显示关节数值，但不会绘制 3D 姿态。` })
+      list.push({
+        level: 'warn',
+        message: `没有匹配的骨架（${detected.label}），仍会显示关节数值，但不会绘制 3D 姿态。`,
+      })
     }
     if (joint.topic.includes('/motor/') && (detected.id === 'luna' || detected.id === 'oli')) {
       list.push({
         level: 'warn',
-        message: '当前使用电机话题：并联踝/腰的电机角度与串行关节角不同，3D 姿态只作参考，不是实机串行关节角。',
+        message:
+          '当前使用电机话题：并联踝/腰的电机角度与串行关节角不同，3D 姿态只作参考，不是实机串行关节角。',
       })
     }
     if (mapping.value.unmapped.length) {
@@ -381,7 +404,8 @@ function seek(event) {
 
 function onKeydown(event) {
   const tag = event.target?.tagName
-  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || event.target?.isContentEditable) return
+  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || event.target?.isContentEditable)
+    return
   if (event.code === 'Space') {
     event.preventDefault()
     toggle()
@@ -404,159 +428,186 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-<main class="app-main">
-  <section class="card input-card">
-    <div class="card-head">
-      <h2>导入机器人 bag</h2>
-      <span v-if="fileName" class="badge">{{ fileName }}</span>
-    </div>
-
-    <label
-      class="drop-zone"
-      :class="{ dragging }"
-      @dragover.prevent="dragging = true"
-      @dragleave.prevent="dragging = false"
-      @drop.prevent="onDrop"
-    >
-      <input type="file" accept=".bag,.active" @change="onFileChange" />
-      <span class="drop-title">拖拽 ROS1 .bag / .active 到这里，或点击选择文件</span>
-      <span class="drop-hint">
-        JointState + IMU · 未压缩或 lz4 · .active 自动恢复 · 最大 {{ formatBytes(MAX_BAG_BYTES) }} · 数据只在浏览器本地处理
-      </span>
-    </label>
-
-    <div class="actions">
-      <button type="button" class="btn" :disabled="busy" @click="loadSample">
-        示例：{{ SAMPLE.label }}
-      </button>
-      <button type="button" class="btn ghost" :disabled="busy" @click="clearAll">清空</button>
-      <span v-if="sampleName" class="muted small">示例：{{ sampleName }}</span>
-      <span v-if="busy" class="muted small">正在解析 {{ progress }}%…</span>
-    </div>
-  </section>
-
-  <div v-if="error" class="card error-card" role="alert">
-    <strong>无法回放</strong>
-    <p>{{ error }}</p>
-  </div>
-
-  <template v-if="result">
-    <section class="stats-grid" aria-label="回放概览">
-      <div v-for="stat in stats" :key="stat.label" class="card stat">
-        <span class="stat-label">{{ stat.label }}</span>
-        <span class="stat-value">{{ stat.value }}</span>
-        <span class="stat-note">{{ stat.note }}</span>
-      </div>
-    </section>
-
-    <section v-if="warnings.length" class="card warnings-card">
-      <h2>提示（{{ warnings.length }}）</h2>
-      <ul class="warning-list">
-        <li v-for="(warning, index) in warnings" :key="index" :class="`warn-${warning.level}`">
-          {{ warning.message }}
-        </li>
-      </ul>
-    </section>
-
-    <section class="card">
+  <main class="app-main">
+    <section class="card input-card">
       <div class="card-head">
-        <h2>姿态回放</h2>
-        <span v-if="atGap" class="chip warn-chip">DATA GAP</span>
+        <h2>导入机器人 bag</h2>
+        <span v-if="fileName" class="badge">{{ fileName }}</span>
       </div>
 
-      <RobotSkeletonView
-        :points="pose?.points || null"
-        :skeleton="profile?.skeleton || null"
-        :empty-message="profile?.skeleton ? '当前时刻没有关节数据' : '未识别骨架，请展开下方关节角度查看数值'"
-      />
+      <label
+        class="drop-zone"
+        :class="{ dragging }"
+        @dragover.prevent="dragging = true"
+        @dragleave.prevent="dragging = false"
+        @drop.prevent="onDrop"
+      >
+        <input type="file" accept=".bag,.active" @change="onFileChange" />
+        <span class="drop-title">拖拽 ROS1 .bag / .active 到这里，或点击选择文件</span>
+        <span class="drop-hint">
+          JointState + IMU · 未压缩或 lz4 · .active 自动恢复 · 最大
+          {{ formatBytes(MAX_BAG_BYTES) }} · 数据只在浏览器本地处理
+        </span>
+      </label>
 
-      <div class="playback-bar">
-        <button type="button" class="btn primary icon-btn" @click="toggle">
-          {{ playing ? '暂停' : '播放' }}
+      <div class="actions">
+        <button type="button" class="btn" :disabled="busy" @click="loadSample">
+          示例：{{ SAMPLE.label }}
         </button>
-        <button type="button" class="btn ghost icon-btn" title="上一帧" @click="step(-1)">‹</button>
-        <button type="button" class="btn ghost icon-btn" title="下一帧" @click="step(1)">›</button>
-        <input
-          class="playback-range"
-          type="range"
-          min="0"
-          :max="duration"
-          step="0.001"
-          :value="current"
-          aria-label="回放时间"
-          @input="seek"
-        />
-        <span class="mono time-label">{{ formatTime(current) }} / {{ formatTime(duration) }}</span>
-        <select v-model.number="speed" class="mono" aria-label="播放速度">
-          <option :value="0.25">0.25×</option>
-          <option :value="0.5">0.5×</option>
-          <option :value="1">1×</option>
-          <option :value="2">2×</option>
-        </select>
-        <label class="loop-label"><input v-model="loop" type="checkbox" /> 循环</label>
+        <button type="button" class="btn ghost" :disabled="busy" @click="clearAll">清空</button>
+        <span v-if="sampleName" class="muted small">示例：{{ sampleName }}</span>
+        <span v-if="busy" class="muted small">正在解析 {{ progress }}%…</span>
       </div>
-
-      <dl class="kv pose-kv">
-        <div><dt>底座位姿</dt><dd class="mono">RPY {{ baseEuler.map((value) => value.toFixed(1)).join('° / ') }}°</dd></div>
-        <div><dt>关节帧</dt><dd class="mono">{{ jointFrame + 1 }} / {{ jointSeries?.count ?? 0 }}</dd></div>
-        <div><dt>IMU 帧</dt><dd class="mono">{{ imuSeries ? imuFrame + 1 : '—' }}</dd></div>
-        <div><dt>时钟</dt><dd>bag 记录时间</dd></div>
-      </dl>
     </section>
 
-    <section class="card">
-      <div class="card-head">
-        <h2>话题与型号</h2>
-        <span class="badge">{{ profile?.label }}</span>
-      </div>
-      <div class="topic-grid">
-        <label>
-          <span>关节话题</span>
-          <select v-model="jointTopic" :disabled="busy" @change="reparse">
-            <option v-for="topic in jointTopics" :key="topic.name" :value="topic.name">
-              {{ topic.name }} · {{ topic.type }}
-            </option>
-          </select>
-        </label>
-        <label>
-          <span>IMU 话题</span>
-          <select v-model="imuTopic" :disabled="busy" @change="reparse">
-            <option value="">不使用（底座姿态固定）</option>
-            <option v-for="topic in imuTopics" :key="topic.name" :value="topic.name">
-              {{ topic.name }} · {{ topic.type }}
-            </option>
-          </select>
-        </label>
-      </div>
-      <p class="muted small">
-        关节按名称映射到骨架；没有名称的 bag 按机型配置的硬件下标顺序映射。
-        未接入的机型会显示关节数值，不会凭空生成模型。
-      </p>
-    </section>
+    <div v-if="error" class="card error-card" role="alert">
+      <strong>无法回放</strong>
+      <p>{{ error }}</p>
+    </div>
 
-    <section class="card">
-      <details>
-        <summary>关节角度（{{ jointRows.length }} 个，当前帧）</summary>
-        <div class="table-wrap">
-          <table class="data-table">
-            <thead>
-              <tr><th>#</th><th>录制名称</th><th>映射关节</th><th>rad</th><th>deg</th></tr>
-            </thead>
-            <tbody>
-              <tr v-for="(row, index) in jointRows" :key="index">
-                <td class="mono">{{ index }}</td>
-                <td class="mono">{{ row.name }}</td>
-                <td class="mono">{{ row.target || '—' }}</td>
-                <td class="mono">{{ row.radians.toFixed(4) }}</td>
-                <td class="mono">{{ row.degrees.toFixed(1) }}</td>
-              </tr>
-            </tbody>
-          </table>
+    <template v-if="result">
+      <section class="stats-grid" aria-label="回放概览">
+        <div v-for="stat in stats" :key="stat.label" class="card stat">
+          <span class="stat-label">{{ stat.label }}</span>
+          <span class="stat-value">{{ stat.value }}</span>
+          <span class="stat-note">{{ stat.note }}</span>
         </div>
-      </details>
-    </section>
-  </template>
-</main>
+      </section>
+
+      <section v-if="warnings.length" class="card warnings-card">
+        <h2>提示（{{ warnings.length }}）</h2>
+        <ul class="warning-list">
+          <li v-for="(warning, index) in warnings" :key="index" :class="`warn-${warning.level}`">
+            {{ warning.message }}
+          </li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>姿态回放</h2>
+          <span v-if="atGap" class="chip warn-chip">DATA GAP</span>
+        </div>
+
+        <RobotSkeletonView
+          :points="pose?.points || null"
+          :skeleton="profile?.skeleton || null"
+          :empty-message="
+            profile?.skeleton ? '当前时刻没有关节数据' : '未识别骨架，请展开下方关节角度查看数值'
+          "
+        />
+
+        <div class="playback-bar">
+          <button type="button" class="btn primary icon-btn" @click="toggle">
+            {{ playing ? '暂停' : '播放' }}
+          </button>
+          <button type="button" class="btn ghost icon-btn" title="上一帧" @click="step(-1)">
+            ‹
+          </button>
+          <button type="button" class="btn ghost icon-btn" title="下一帧" @click="step(1)">
+            ›
+          </button>
+          <input
+            class="playback-range"
+            type="range"
+            min="0"
+            :max="duration"
+            step="0.001"
+            :value="current"
+            aria-label="回放时间"
+            @input="seek"
+          />
+          <span class="mono time-label"
+            >{{ formatTime(current) }} / {{ formatTime(duration) }}</span
+          >
+          <select v-model.number="speed" class="mono" aria-label="播放速度">
+            <option :value="0.25">0.25×</option>
+            <option :value="0.5">0.5×</option>
+            <option :value="1">1×</option>
+            <option :value="2">2×</option>
+          </select>
+          <label class="loop-label"><input v-model="loop" type="checkbox" /> 循环</label>
+        </div>
+
+        <dl class="kv pose-kv">
+          <div>
+            <dt>底座位姿</dt>
+            <dd class="mono">RPY {{ baseEuler.map((value) => value.toFixed(1)).join('° / ') }}°</dd>
+          </div>
+          <div>
+            <dt>关节帧</dt>
+            <dd class="mono">{{ jointFrame + 1 }} / {{ jointSeries?.count ?? 0 }}</dd>
+          </div>
+          <div>
+            <dt>IMU 帧</dt>
+            <dd class="mono">{{ imuSeries ? imuFrame + 1 : '—' }}</dd>
+          </div>
+          <div>
+            <dt>时钟</dt>
+            <dd>bag 记录时间</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>话题与型号</h2>
+          <span class="badge">{{ profile?.label }}</span>
+        </div>
+        <div class="topic-grid">
+          <label>
+            <span>关节话题</span>
+            <select v-model="jointTopic" :disabled="busy" @change="reparse">
+              <option v-for="topic in jointTopics" :key="topic.name" :value="topic.name">
+                {{ topic.name }} · {{ topic.type }}
+              </option>
+            </select>
+          </label>
+          <label>
+            <span>IMU 话题</span>
+            <select v-model="imuTopic" :disabled="busy" @change="reparse">
+              <option value="">不使用（底座姿态固定）</option>
+              <option v-for="topic in imuTopics" :key="topic.name" :value="topic.name">
+                {{ topic.name }} · {{ topic.type }}
+              </option>
+            </select>
+          </label>
+        </div>
+        <p class="muted small">
+          关节按名称映射到骨架；没有名称的 bag 按机型配置的硬件下标顺序映射。
+          未接入的机型会显示关节数值，不会凭空生成模型。
+        </p>
+      </section>
+
+      <section class="card">
+        <details>
+          <summary>关节角度（{{ jointRows.length }} 个，当前帧）</summary>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>录制名称</th>
+                  <th>映射关节</th>
+                  <th>rad</th>
+                  <th>deg</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(row, index) in jointRows" :key="index">
+                  <td class="mono">{{ index }}</td>
+                  <td class="mono">{{ row.name }}</td>
+                  <td class="mono">{{ row.target || '—' }}</td>
+                  <td class="mono">{{ row.radians.toFixed(4) }}</td>
+                  <td class="mono">{{ row.degrees.toFixed(1) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </details>
+      </section>
+    </template>
+  </main>
 </template>
 
 <style scoped>

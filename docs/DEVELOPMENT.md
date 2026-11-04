@@ -33,6 +33,8 @@ npm run dev
 | `npm run build` | 构建到 `dist/` |
 | `npm run preview` | 本地预览生产构建 |
 | `npm test` | 运行 `node --test` 回归测试 |
+| `npm run format` | 用 Prettier 格式化代码 |
+| `npm run format:check` | 校验代码格式（CI 使用） |
 
 ## 路径别名
 
@@ -139,6 +141,7 @@ import { padsToCircuitJson } from 'pads-to-circuit-json'
 
 ```bash
 npm ci
+npm run format:check
 npm test
 npm run build
 ```

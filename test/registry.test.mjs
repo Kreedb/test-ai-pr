@@ -26,8 +26,14 @@ test('the registry has one entry per format with complete metadata', () => {
   assert.equal(new Set(ids).size, ids.length, 'format ids must be unique')
   for (const format of FORMATS) {
     assert.ok(format.label, `${format.id} needs a label`)
-    assert.ok(Array.isArray(format.extensions) && format.extensions.length, `${format.id} needs extensions`)
-    assert.ok(['supported', 'planned'].includes(format.status), `${format.id} has an unknown status`)
+    assert.ok(
+      Array.isArray(format.extensions) && format.extensions.length,
+      `${format.id} needs extensions`,
+    )
+    assert.ok(
+      ['supported', 'planned'].includes(format.status),
+      `${format.id} has an unknown status`,
+    )
     assert.ok(format.converts, `${format.id} needs a converts summary`)
     assert.ok(format.note, `${format.id} needs a note`)
     assert.equal(FORMATS_BY_ID[format.id], format)

@@ -12,7 +12,7 @@ const tools = toolRoutes.map((route) => ({ path: route.path, ...route.tool }))
 <template>
   <div class="app">
     <header class="app-header">
-      <a class="brand" href="#/">
+      <a class="brand" :href="routeHref('/')">
         <div class="brand-mark" aria-hidden="true">CB</div>
         <h1>convbin</h1>
       </a>
@@ -29,7 +29,12 @@ const tools = toolRoutes.map((route) => ({ path: route.path, ...route.tool }))
         </a>
       </nav>
 
-      <a class="gh-link" href="https://github.com/Kreedb/test-ai-pr" target="_blank" rel="noreferrer">
+      <a
+        class="gh-link"
+        href="https://github.com/Kreedb/test-ai-pr"
+        target="_blank"
+        rel="noreferrer"
+      >
         GitHub
       </a>
     </header>

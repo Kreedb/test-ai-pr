@@ -13,7 +13,12 @@ export const allegro = {
   note: '二进制格式随版本变化且未公开，暂未支持；EAGLE 5 及更早的二进制 .brd 也不支持。Allegro 用 File → Export → Specctra 导出 DSN，或提供 Gerber 再转换。',
   losses: [],
   detect(name, bytes) {
-    if (!String(name || '').toLowerCase().endsWith('.brd')) return null
+    if (
+      !String(name || '')
+        .toLowerCase()
+        .endsWith('.brd')
+    )
+      return null
     // The EAGLE format module claims XML `.brd`; anything else is Allegro.
     return isEagleXmlText(leadingText(bytes)) ? null : { id: 'allegro', kind: 'pcb' }
   },

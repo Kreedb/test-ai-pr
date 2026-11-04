@@ -247,8 +247,7 @@ function onNetNameClick(name, event) {
   }
   // Keep the current view while the net is drawn there; a net that only exists
   // on the other side still takes the user to it.
-  const here =
-    tab.value === 'pcb' ? netHasPcb(name) : netHasSchematic(name)
+  const here = tab.value === 'pcb' ? netHasPcb(name) : netHasSchematic(name)
   selectNet(name, { jumpTo: here ? tab.value : '' })
 }
 
@@ -337,7 +336,8 @@ function onKeydown(event) {
     return
   }
   if (tab.value !== 'pcb' || !pcb.value) return
-  if (event.target?.closest?.('input, textarea, select, button, a, summary, [contenteditable]')) return
+  if (event.target?.closest?.('input, textarea, select, button, a, summary, [contenteditable]'))
+    return
   // Leave Space to page scrolling unless the PCB canvas itself is on screen; the
   // card also holds the net table below the canvas.
   const rect = card.value?.querySelector('.preview-viewport')?.getBoundingClientRect()
@@ -507,7 +507,9 @@ const selectedLabel = computed(() => {
             @change="fitKey += 1"
           />
           <span class="layer-name">{{ sheet.name }}</span>
-          <span class="muted small">{{ sheet.items.filter((item) => item.kind === 'component').length }} 符号</span>
+          <span class="muted small"
+            >{{ sheet.items.filter((item) => item.kind === 'component').length }} 符号</span
+          >
         </label>
         <p class="muted small">
           原理图按层次化输出，跨图同名网络在 KiCad 中按全局标签连接，这里也会作为同一个网络高亮。
@@ -569,14 +571,18 @@ const selectedLabel = computed(() => {
       <p v-if="activeNet" class="net-summary">
         <span class="mono net-name">{{ activeNet.name }}</span>
         <span class="muted small">
-          PCB {{ activeNetPcbPads.length }} 个焊盘 · 原理图 {{ activeNetSchematicPins.length }} 个引脚
+          PCB {{ activeNetPcbPads.length }} 个焊盘 · 原理图
+          {{ activeNetSchematicPins.length }} 个引脚
         </span>
       </p>
       <p v-else class="muted small">
         在画布上点击焊盘/引脚，或在下方列表里选择网络，两个视图会同时高亮这个网络。
       </p>
 
-      <ul v-if="activeNet && (activeNetPcbPads.length || activeNetSchematicPins.length)" class="net-endpoints">
+      <ul
+        v-if="activeNet && (activeNetPcbPads.length || activeNetSchematicPins.length)"
+        class="net-endpoints"
+      >
         <li v-for="pad in activeNetPcbPads" :key="`pad-${pad.id}`">
           <button
             type="button"
@@ -641,7 +647,8 @@ const selectedLabel = computed(() => {
     </div>
 
     <p v-if="selectedLabel" class="muted small">
-      已选中 {{ selectedLabel }}<template v-if="selectedPcbItem?.net"> · 网络 {{ selectedPcbItem.net }}</template>
+      已选中 {{ selectedLabel
+      }}<template v-if="selectedPcbItem?.net"> · 网络 {{ selectedPcbItem.net }}</template>
     </p>
   </section>
 </template>

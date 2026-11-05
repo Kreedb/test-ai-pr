@@ -7,7 +7,7 @@ import { offlinePlugin } from './build/offline.js'
 
 // Project site is served from https://kreedb.github.io/test-ai-pr/,
 // so asset URLs must be prefixed with the repository name.
-const base = '/test-ai-pr/'
+const base = '/test-ai-web/'
 
 // https://vite.dev/config/
 export default defineConfig({

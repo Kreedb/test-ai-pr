@@ -116,5 +116,3 @@ export function buildJointValues(series, entries, frame) {
   }
   return values
 }
-
-export { IDENTITY }

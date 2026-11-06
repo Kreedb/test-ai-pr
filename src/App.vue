@@ -23,7 +23,7 @@ const tools = toolRoutes.map((route) => ({ path: route.path, ...route.tool }))
         </a>
       </nav>
 
-      <a class="gh-link" href="https://github.com/Kreedb/test-ai-pr" target="_blank" rel="noreferrer"> GitHub </a>
+      <a class="gh-link" href="https://github.com/Kreedb/test-ai-web" target="_blank" rel="noreferrer"> GitHub </a>
     </header>
 
     <component :is="active.component" v-if="active" />

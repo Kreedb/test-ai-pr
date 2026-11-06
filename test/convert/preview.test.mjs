@@ -24,6 +24,7 @@ import {
   pcbFlipBounds,
   pcbFlipTransform,
   pcbNetMarkers,
+  pourPath,
   pxPerMm,
   schematicTextSize,
   searchPreview,
@@ -32,6 +33,31 @@ import {
 
 const root = fileURLToPath(new URL('../..', import.meta.url))
 const read = (...parts) => new Uint8Array(readFileSync(join(root, ...parts)))
+
+test('a copper pour path contains its inner rings as holes', () => {
+  const element = {
+    brep_shape: {
+      outer_ring: {
+        vertices: [
+          { x: 0, y: 0 },
+          { x: 10, y: 0 },
+          { x: 10, y: 10 },
+          { x: 0, y: 10 },
+        ],
+      },
+      inner_rings: [
+        {
+          vertices: [
+            { x: 2, y: 2 },
+            { x: 4, y: 2 },
+            { x: 4, y: 4 },
+          ],
+        },
+      ],
+    },
+  }
+  assert.equal(pourPath(element), 'M0 0 L10 0 L10 10 L0 10 Z M2 2 L4 2 L4 4 Z')
+})
 
 // Conversions are the slow part of this suite, and every test below reads the
 // same immutable result, so each project is converted once.

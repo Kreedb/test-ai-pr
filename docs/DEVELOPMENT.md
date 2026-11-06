@@ -2,13 +2,14 @@
 
 convbin 是一个在浏览器中运行的二进制工具箱，当前包含 EtherCAT SII/ESI 与 EDA 格式转换工具，基于 Vite + Vue 3（Composition API，`<script setup>`）。所有数据只在本地处理，不会上传。
 
-线上地址：https://kreedb.github.io/test-ai-pr/
+线上地址：https://kreedb.github.io/test-ai-web/
 
 ## 工具
 
 导航页（`#/`）统一管理所有工具，后续新增的工具会继续挂在这里。
 
 - [EEPROM 解析器](parser/README.md)（`#/parser`）
+- [机器人包回放](replay/README.md)（`#/replay`）
 - [EDA 转 KiCad](convert/README.md)（`#/convert`）
 
 ## 运行要求
@@ -23,7 +24,7 @@ npm install
 npm run dev
 ```
 
-开发服务器运行在 http://localhost:5173/test-ai-pr/，带热更新。`/test-ai-pr/` 前缀来自[部署](#部署)里的 `base` 配置。
+开发服务器运行在 http://localhost:5173/test-ai-web/，带热更新。`/test-ai-web/` 前缀来自[部署](#部署)里的 `base` 配置。
 
 ## 脚本
 
@@ -56,11 +57,11 @@ import { parseSii } from 'sii-parser'
 
 ## 部署
 
-站点发布在 GitHub Pages：https://kreedb.github.io/test-ai-pr/。
+站点发布在 GitHub Pages：https://kreedb.github.io/test-ai-web/。
 
 部署由 `.github/workflows/deploy.yml` 处理：推送到 `main` 时自动运行，也可以在 Actions 页面手动触发（`workflow_dispatch`）。流程是 `npm ci`、`npm test`、`npm run build`（构建前会自动执行 `npm run format`），然后用 GitHub Pages 官方 actions 发布 `dist/`。
 
-这是项目站点，路径带仓库名前缀，所以 `vite.config.js` 设置 `base: '/test-ai-pr/'`，构建产物里的资源 URL 才能落在 `https://kreedb.github.io/test-ai-pr/` 下。如果以后换成自定义域名或用户站点仓库，把 `base` 改回 `/`。
+这是项目站点，路径带仓库名前缀，所以 `vite.config.js` 设置 `base: '/test-ai-web/'`，构建产物里的资源 URL 才能落在 `https://kreedb.github.io/test-ai-web/` 下。如果以后换成自定义域名或用户站点仓库，把 `base` 改回 `/`。
 
 导航使用 hash 路由（`#/parser`），不需要服务端重写规则。本地预览生产构建：
 
@@ -69,7 +70,7 @@ npm run build
 npm run preview
 ```
 
-然后打开 http://localhost:4173/test-ai-pr/。
+然后打开 http://localhost:4173/test-ai-web/。
 
 构建会额外生成 `dist/sw.js`：它由 `build/offline.js` 在构建时写入，把本次构建的全部资源与解析器示例预缓存，页面在线加载过一次后即可断网重开。开发服务器不注册 Service Worker（注册代码只在生产构建里执行），离线行为要用 `npm run build` + `npm run preview` 验证。
 
@@ -147,7 +148,7 @@ npm run build
 
 格式不再由独立的 CI 检查：`npm run build` 会先自动执行 `npm run format`，需要单独校验时仍可运行 `npm run format:check`。
 
-改动页面或模板后，再启动 `npm run dev` 并在浏览器里打开 `http://localhost:5173/test-ai-pr/` 做一次冒烟检查。
+改动页面或模板后，再启动 `npm run dev` 并在浏览器里打开 `http://localhost:5173/test-ai-web/` 做一次冒烟检查。
 
 ### 样式与依赖
 

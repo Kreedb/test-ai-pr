@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { alignLog, parseLogText } from '../src/lib/replay/logfile.js'
+import { alignLog, logWindow, parseLogText } from '../src/lib/replay/logfile.js'
 
 const LOG = [
   '2026-10-20 10:23:52.646 I/robotlogger(mroslaunch)(1509/1509): mros.cpp(459) clk(17.572734277) BUILDTIME: "1"',
@@ -74,4 +74,33 @@ test('reads ROS epoch prefixes and counts orphan lines', () => {
   assert.equal(entries[0].wall, 1700000000.5)
   assert.equal(warnings.length, 1)
   assert.match(warnings[0].message, /1 行没有时间戳/)
+})
+
+test('does not mix a fallback clock into the aligned timeline when both overlap the bag', () => {
+  const { entries } = parseLogText(['2026-10-20 10:23:52.646 I/robotlogger: clk(17.5) clk line', '[INFO] [1700000000.5]: wall line'].join('\n'))
+  const aligned = alignLog(entries, 0, 2e9)
+  assert.equal(aligned.basis, 'clk')
+  assert.equal(aligned.aligned, true)
+  // The epoch timestamp would sort far past every clk entry, so it is counted
+  // instead of mixing two time origins in one timeline.
+  assert.deepEqual(
+    aligned.entries.map((entry) => entry.time),
+    [17.5],
+  )
+  assert.equal(aligned.dropped, 1)
+})
+
+test('counts mixed-clock lines it cannot place instead of dropping them silently', () => {
+  const { entries } = parseLogText(['2026-10-20 10:23:52.646 I/robotlogger: clk(17.5) clk line', '[INFO] [1700000000.5]: wall line'].join('\n'))
+  const aligned = alignLog(entries, 17, 18)
+  assert.equal(aligned.basis, 'clk')
+  assert.equal(aligned.entries.length, 1)
+  assert.equal(aligned.dropped, 1)
+})
+
+test('windows long logs around the active row', () => {
+  assert.deepEqual(logWindow(500, 250), { start: 0, end: 500, count: 500 })
+  assert.deepEqual(logWindow(10000, 5000), { start: 4000, end: 6000, count: 2000 })
+  assert.deepEqual(logWindow(10000, 0), { start: 0, end: 2000, count: 2000 })
+  assert.deepEqual(logWindow(10000, 9999), { start: 8000, end: 10000, count: 2000 })
 })

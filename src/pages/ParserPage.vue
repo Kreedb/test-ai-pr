@@ -271,7 +271,18 @@ function regenerate() {
 let regenerateTimer = null
 function scheduleRegenerate() {
   clearTimeout(regenerateTimer)
-  regenerateTimer = setTimeout(regenerate, 150)
+  regenerateTimer = setTimeout(() => {
+    regenerateTimer = null
+    regenerate()
+  }, 150)
+}
+// Export buttons must not read the previous dump while a fresh edit is still
+// waiting for the debounce.
+function flushRegenerate() {
+  if (regenerateTimer === null) return
+  clearTimeout(regenerateTimer)
+  regenerateTimer = null
+  regenerate()
 }
 watch(model, scheduleRegenerate, { deep: true })
 watch(vendorName, scheduleRegenerate)
@@ -302,6 +313,7 @@ function fail(cause) {
 }
 
 async function handleFile(file) {
+  if (busy.value) return
   busy.value = true
   error.value = ''
   try {
@@ -334,6 +346,7 @@ function onFileChange(event) {
 }
 
 async function loadSample(sample) {
+  if (busy.value) return
   busy.value = true
   error.value = ''
   try {
@@ -372,16 +385,19 @@ function downloadOriginal() {
 }
 
 function downloadXml() {
+  flushRegenerate()
   if (!output.value) return
   downloadBlob(output.value.xml, `${baseName()}.xml`, 'application/xml')
 }
 
 function downloadCompiled() {
+  flushRegenerate()
   if (!check.value?.bytes) return
   downloadBlob(check.value.bytes, `${baseName()}-recompiled.bin`, 'application/octet-stream')
 }
 
 async function copyXml() {
+  flushRegenerate()
   if (!output.value) return
   try {
     await navigator.clipboard.writeText(output.value.xml)

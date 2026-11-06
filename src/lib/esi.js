@@ -252,9 +252,13 @@ function padCategoryData(data, fill = 0x00) {
 
 function buildCategory(type, data, fill) {
   const padded = padCategoryData(data, fill)
+  const words = padded.length / 2
+  if (words > 0xffff) {
+    throw new Error(`SII 分类 0x${type.toString(16).toUpperCase()} 有 ${words} 字，超过 65535 字的上限`)
+  }
   const category = new Uint8Array(4 + padded.length)
   writeU16(category, 0, type)
-  writeU16(category, 2, padded.length / 2)
+  writeU16(category, 2, words)
   category.set(padded, 4)
   return category
 }
@@ -299,7 +303,10 @@ class StringTable {
   encode() {
     const bytes = [this.entries.length]
     for (const value of this.entries) {
-      const encoded = latin1Bytes(value).slice(0, 255)
+      const encoded = latin1Bytes(value)
+      if (encoded.length > 255) {
+        throw new Error(`字符串“${value.slice(0, 32)}…”编码后 ${encoded.length} 字节，超过 SII 单条 255 字节的上限`)
+      }
       bytes.push(encoded.length)
       bytes.push(...encoded)
     }
@@ -923,13 +930,15 @@ export function generateEsiXml(result, options = {}) {
     const attributes = []
     if (minSize !== null) attributes.push(`MinSize="${minSize}"`)
     if (maxSize !== null) attributes.push(`MaxSize="${maxSize}"`)
-    if (manager.enable > 1) {
+    // Bit 0 is the enable bit; other flags have no ESI representation.
+    const enabled = (manager.enable & 0x01) !== 0
+    if (manager.enable !== (enabled ? 0x01 : 0x00)) {
       warnings.push({
         level: 'warn',
-        message: `SyncManager ${manager.index} 的 Enable 字节为 0x${manager.enable.toString(16).toUpperCase()}，ESI 只能表达启用/禁用，导出为启用。`,
+        message: `SyncManager ${manager.index} 的 Enable 字节为 0x${manager.enable.toString(16).toUpperCase()}，ESI 只能表达启用/禁用，导出为${enabled ? '启用' : '禁用'}。`,
       })
     }
-    attributes.push(`DefaultSize="${manager.length}"`, `StartAddress="${hexValue(manager.startAddress)}"`, `ControlByte="${hexValue(manager.control)}"`, `Enable="${manager.enable ? '1' : '0'}"`)
+    attributes.push(`DefaultSize="${manager.length}"`, `StartAddress="${hexValue(manager.startAddress)}"`, `ControlByte="${hexValue(manager.control)}"`, `Enable="${enabled ? '1' : '0'}"`)
     push(4, `<Sm ${attributes.join(' ')}>${name}</Sm>`)
   }
 

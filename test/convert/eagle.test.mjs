@@ -60,6 +60,13 @@ test('detects EAGLE XML instead of treating .brd as Allegro', () => {
   assert.equal(looksLikeEagleXml('<html></html>'), false)
 })
 
+test('rejects a truncated EAGLE XML instead of exporting a partial design', async () => {
+  const text = Buffer.from(sample('SOT23-3.brd')).toString('utf8')
+  const cut = text.slice(0, Math.floor(text.length * 0.7))
+  assert.throws(() => parseEagleXml(cut), /EAGLE XML 格式不完整/)
+  await assert.rejects(() => convertEda([{ name: 'truncated.brd', bytes: new Uint8Array(Buffer.from(cut)) }]), /EAGLE XML|格式不完整/)
+})
+
 test('converts an EAGLE project into a KiCad project', async () => {
   const result = await eagleProject()
 
@@ -183,6 +190,7 @@ test('mirrored elements keep their layer, pad positions and nets', async () => {
   const result = await convertEda([{ name: 'mirror.brd', bytes }])
   assert.equal(result.summary.board?.components, 2)
   assert.equal(result.summary.board?.pads, 4)
+  assert.match(result.files.find((file) => file.name.endsWith('.kicad_pcb')).content, /\.Paste"/)
   assert.equal(result.summary.board?.vias, 1)
 
   const pcb = result.files[0].content
@@ -216,4 +224,33 @@ test('mirrored elements keep their layer, pad positions and nets', async () => {
   // KiCad stores pad angles as absolute board angles, so the mirrored part's
   // footprint rotation is part of the pad angle.
   assert.equal(((Number(padAt[3]) % 360) + 360) % 360, 90, 'pad angle should include the component rotation')
+})
+
+test('EAGLE cream="no" keeps an SMD pad out of the solder paste layer', async () => {
+  // EAGLE enables cream for SMD pads by default, so a pad without `cream="no"`
+  // must still reach the paste layer while the disabled one must not.
+  const boardXml = `<?xml version="1.0" encoding="utf-8"?>
+<eagle version="7.3.0"><drawing><board>
+<plain>
+<wire x1="0" y1="0" x2="20" y2="0" width="0" layer="20"/>
+<wire x1="20" y1="0" x2="20" y2="20" width="0" layer="20"/>
+<wire x1="20" y1="20" x2="0" y2="20" width="0" layer="20"/>
+<wire x1="0" y1="20" x2="0" y2="0" width="0" layer="20"/>
+</plain>
+<libraries><library name="lib"><packages><package name="PKG">
+<smd name="1" x="0" y="0" dx="1" dy="0.5" layer="1"/>
+<smd name="2" x="2" y="0" dx="1" dy="0.5" layer="1" cream="no"/>
+</package></packages></library></libraries>
+<elements><element name="U1" library="lib" package="PKG" value="X" x="5" y="5"/></elements>
+</board></drawing></eagle>`
+
+  const result = await convertEda([{ name: 'cream.brd', bytes: new Uint8Array(Buffer.from(boardXml)) }])
+  const pcb = result.files.find((file) => file.name.endsWith('.kicad_pcb')).content
+  const footprint = footprintFor(pcb, 'U1')
+  assert.ok(footprint, 'expected a footprint for U1')
+
+  const enabled = findBlock(footprint, footprint.indexOf('(pad "1"'), '(pad "1"')
+  const disabled = findBlock(footprint, footprint.indexOf('(pad "2"'), '(pad "2"')
+  assert.ok(enabled?.includes('.Paste'), 'default SMD pad should have a paste layer')
+  assert.ok(!disabled?.includes('.Paste'), 'cream="no" pad should not have a paste layer')
 })

@@ -21,7 +21,7 @@ const VALUE_FROM_DISPLAY_TYPES = new Set(['simple_chip', 'simple_connector', 'si
 // An Altium field can contain a formula (`='LED-'+Color`) that the converter
 // cannot evaluate. Exporting the literal expression is worse than leaving the
 // Value empty, so only resolved text is copied.
-const isUnresolvedExpression = (value) => String(value).trim().startsWith('=')
+export const isUnresolvedExpression = (value) => String(value).trim().startsWith('=')
 
 export function fillSchematicValues(circuitJson) {
   for (const element of circuitJson) {
@@ -109,7 +109,20 @@ export function baseNameOf(sources) {
   return stem || 'converted'
 }
 
+// SMD pads imply a stencil opening unless the source marks the pad as
+// cream-disabled. The KiCad writer only checks that a paste record exists for
+// the pad, so mirror the pad geometry instead of recomputing it.
+function addSolderPaste(circuitJson) {
+  const existing = new Set(circuitJson.filter((element) => element.type === 'pcb_solder_paste').map((element) => element.pcb_smtpad_id))
+  for (const pad of circuitJson) {
+    if (pad.type !== 'pcb_smtpad' || pad.is_paste_disabled || existing.has(pad.pcb_smtpad_id)) continue
+    const { type, pcb_smtpad_id, pcb_port_id, port_hints, ...geometry } = pad
+    circuitJson.push({ type: 'pcb_solder_paste', pcb_solder_paste_id: `${pcb_smtpad_id}_paste`, pcb_smtpad_id, ...geometry })
+  }
+}
+
 export async function toKicadFiles(circuitJson, summary, baseName) {
+  addSolderPaste(circuitJson)
   const kicad = await import('circuit-json-to-kicad')
   const files = []
   const add = (name, content) => {

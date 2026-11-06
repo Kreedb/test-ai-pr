@@ -1,5 +1,7 @@
 <script setup>
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+
+import { logWindow } from '@/lib/replay/logfile'
 
 const props = defineProps({
   rows: { type: Array, default: () => [] },
@@ -9,6 +11,8 @@ const props = defineProps({
 })
 
 const view = ref(null)
+const range = computed(() => logWindow(props.rows.length, props.active))
+const visibleRows = computed(() => props.rows.slice(range.value.start, range.value.end))
 
 function formatTime(seconds) {
   const sign = seconds < 0 ? '-' : ''
@@ -24,7 +28,7 @@ function relative(row) {
 
 function center() {
   const element = view.value
-  const row = element?.children[props.active]
+  const row = element?.children[props.active - range.value.start]
   if (!element || !row) return
   const viewRect = element.getBoundingClientRect()
   const rowRect = row.getBoundingClientRect()
@@ -36,8 +40,14 @@ onMounted(center)
 </script>
 
 <template>
+  <p class="log-range muted small">显示第 {{ range.start + 1 }}–{{ range.end }} 条，共 {{ rows.length.toLocaleString() }} 条</p>
   <ul ref="view" class="log-view" aria-label="按回放时间定位的日志">
-    <li v-for="(row, index) in rows" :key="index" v-memo="[row, index === active]" :class="[`log-${row.level ? row.level.toLowerCase() : 'info'}`, { 'log-current': index === active }]">
+    <li
+      v-for="(row, index) in visibleRows"
+      :key="range.start + index"
+      v-memo="[row, range.start + index === active]"
+      :class="[`log-${row.level ? row.level.toLowerCase() : 'info'}`, { 'log-current': range.start + index === active }]"
+    >
       <span class="log-time mono">{{ relative(row) }}</span>
       <span class="log-text mono">{{ row.text }}</span>
     </li>

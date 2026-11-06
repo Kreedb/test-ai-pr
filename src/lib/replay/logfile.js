@@ -6,6 +6,7 @@
 // keep both and let `alignLog` pick the basis that overlaps the bag.
 
 export const MAX_LOG_BYTES = 256 * 1024 * 1024
+export const MAX_RENDER_ROWS = 2000
 
 const MAX_ENTRIES = 500000
 const CLK = /\bclk\(([0-9]+(?:\.[0-9]+)?)\)/
@@ -105,19 +106,25 @@ function overlaps(range, start, end) {
 
 /**
  * Pick the clock that lines up with the bag's `[start, end]` record time.
- * Returns entries sorted by that clock plus `{ basis, aligned }`.
+ * A mixed log (some `clk` lines, some wall-clock lines) keeps a clock it does
+ * not use as a fallback when that clock also overlaps the bag. Entries with
+ * neither clock are counted in `dropped` so the page can warn instead of
+ * losing them silently.
+ * Returns entries sorted by the chosen clock plus `{ basis, aligned, dropped }`.
  */
 export function alignLog(entries, start, end) {
-  if (!entries.length) return { entries: [], basis: '', aligned: false }
+  if (!entries.length) return { entries: [], basis: '', aligned: false, dropped: 0 }
 
   const clk = rangeOf(entries, 'clk')
   const wall = rangeOf(entries, 'wall')
   const wallLocal = rangeOf(entries, 'wallLocal')
   let basis = null
   let key = null
+  let fallback = null
   let aligned = false
   if (overlaps(clk, start, end)) {
     basis = key = 'clk'
+    fallback = overlaps(wall, start, end) ? 'wall' : overlaps(wallLocal, start, end) ? 'wallLocal' : null
     aligned = true
   } else if (overlaps(wall, start, end)) {
     basis = key = 'wall'
@@ -133,10 +140,29 @@ export function alignLog(entries, start, end) {
     basis = key === 'clk' ? 'clk' : 'wall'
   }
 
-  const alignedEntries = entries
-    .filter((entry) => entry[key] !== null)
-    .map((entry) => ({ time: entry[key], level: entry.level, text: entry.text }))
-    .sort((left, right) => left.time - right.time)
+  const alignedEntries = []
+  let dropped = 0
+  for (const entry of entries) {
+    const time = entry[key] ?? (fallback ? entry[fallback] : null)
+    if (time === null) {
+      dropped += 1
+      continue
+    }
+    alignedEntries.push({ time, level: entry.level, text: entry.text })
+  }
+  alignedEntries.sort((left, right) => left.time - right.time)
 
-  return { entries: alignedEntries, basis, aligned }
+  return { entries: alignedEntries, basis, aligned, dropped }
+}
+
+/**
+ * Row range to render for a long log. The timeline keeps every parsed entry but
+ * mounts only a window around the active row, so a 500k-line log does not build
+ * half a million DOM nodes before playback starts.
+ */
+export function logWindow(total, active, size = MAX_RENDER_ROWS) {
+  const count = Math.min(Math.max(0, size), Math.max(0, total))
+  const focus = total > 0 ? Math.min(Math.max(0, active), total - 1) : 0
+  const start = Math.max(0, Math.min(total - count, focus - Math.floor(count / 2)))
+  return { start, end: start + count, count }
 }

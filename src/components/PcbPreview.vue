@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 
-import { copperLayerLabel, pcbFlipTransform, pcbNetMarkers } from '@/lib/preview'
+import { pcbFlipTransform, pcbNetMarkers, polygonPath, pourPath } from '@/lib/preview'
 
 // Read-only PCB canvas drawn from the preview model. Coordinates are
 // millimetres with Y up; PreviewViewport flips the world group, so everything
@@ -48,12 +48,6 @@ function classesOf(item) {
   }
 }
 
-function polygonPath(points, closed = true) {
-  if (!points?.length) return ''
-  const commands = points.map((point) => `${point.x} ${point.y}`)
-  return `${closed ? 'M' : 'M'}${commands.join(' L')}${closed ? ' Z' : ''}`
-}
-
 // Trace routes are lists of points on possibly different layers (a layer change
 // inside a route is a via). Split them so each polyline is single-layer.
 function tracePolylines(element) {
@@ -78,13 +72,6 @@ function tracePolylines(element) {
     }
   }
   return lines
-}
-
-function pourPath(element) {
-  if (element.points?.length) return polygonPath(element.points)
-  const outer = element.brep_shape?.outer_ring?.vertices
-  if (!outer?.length) return ''
-  return polygonPath(outer)
 }
 
 const rendered = computed(() =>

@@ -5,7 +5,7 @@ import vue from '@vitejs/plugin-vue'
 
 import { offlinePlugin } from './build/offline.js'
 
-// Project site is served from https://kreedb.github.io/test-ai-pr/,
+// Project site is served from https://kreedb.github.io/test-ai-web/,
 // so asset URLs must be prefixed with the repository name.
 const base = '/test-ai-web/'
 

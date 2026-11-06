@@ -60,6 +60,13 @@ test('detects EAGLE XML instead of treating .brd as Allegro', () => {
   assert.equal(looksLikeEagleXml('<html></html>'), false)
 })
 
+test('rejects a truncated EAGLE XML instead of exporting a partial design', async () => {
+  const text = Buffer.from(sample('SOT23-3.brd')).toString('utf8')
+  const cut = text.slice(0, Math.floor(text.length * 0.7))
+  assert.throws(() => parseEagleXml(cut), /EAGLE XML 格式不完整/)
+  await assert.rejects(() => convertEda([{ name: 'truncated.brd', bytes: new Uint8Array(Buffer.from(cut)) }]), /EAGLE XML|格式不完整/)
+})
+
 test('converts an EAGLE project into a KiCad project', async () => {
   const result = await eagleProject()
 
@@ -183,6 +190,7 @@ test('mirrored elements keep their layer, pad positions and nets', async () => {
   const result = await convertEda([{ name: 'mirror.brd', bytes }])
   assert.equal(result.summary.board?.components, 2)
   assert.equal(result.summary.board?.pads, 4)
+  assert.match(result.files.find((file) => file.name.endsWith('.kicad_pcb')).content, /\.Paste"/)
   assert.equal(result.summary.board?.vias, 1)
 
   const pcb = result.files[0].content

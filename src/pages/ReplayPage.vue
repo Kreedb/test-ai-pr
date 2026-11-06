@@ -61,7 +61,7 @@ const imuTopics = computed(() => topics.value.filter((topic) => topic.kind === '
 const absoluteTime = computed(() => startTime.value + current.value)
 
 const logAligned = computed(() => {
-  if (!logEntries.value.length || !result.value) return { entries: [], basis: '', aligned: false }
+  if (!logEntries.value.length || !result.value) return { entries: [], basis: '', aligned: false, dropped: 0 }
   return alignLog(logEntries.value, startTime.value, startTime.value + duration.value)
 })
 
@@ -225,9 +225,23 @@ async function applyTopics(bytes, jointName, imuName) {
     })
     const joint = decoded.series[jointName]
     if (!joint) throw new Error(`话题 ${jointName} 没有可用的关节消息`)
-    const imu = imuName ? decoded.series[imuName] : null
-    const start = imu ? Math.max(joint.times[0], imu.times[0]) : joint.times[0]
-    const end = imu ? Math.min(joint.times[joint.times.length - 1], imu.times[imu.times.length - 1]) : joint.times[joint.times.length - 1]
+    let imu = imuName ? decoded.series[imuName] : null
+    let start = joint.times[0]
+    let end = joint.times[joint.times.length - 1]
+    let imuFallback = false
+    if (imu) {
+      const imuStart = Math.max(start, imu.times[0])
+      const imuEnd = Math.min(end, imu.times[imu.times.length - 1])
+      if (imuEnd > imuStart) {
+        start = imuStart
+        end = imuEnd
+      } else {
+        // The IMU is optional; a mismatched clock should not hide the joints.
+        imu = null
+        imuFallback = true
+        imuTopic.value = ''
+      }
+    }
     if (!(end > start)) throw new Error('关节与 IMU 话题没有重叠的有效时间段')
 
     const detected = detectProfile(joint.names, joint.names.length, joint.named)
@@ -240,6 +254,12 @@ async function applyTopics(bytes, jointName, imuName) {
     resetPlayback()
 
     const list = [...decoded.warnings]
+    if (imuFallback) {
+      list.push({
+        level: 'warn',
+        message: `IMU 话题 ${imuName} 与关节时间没有重叠，已改为仅用关节回放。`,
+      })
+    }
     if (/\.active$/i.test(fileName.value)) {
       list.unshift({
         level: 'info',
@@ -302,6 +322,7 @@ async function loadBytes(bytes, name, sample) {
 }
 
 async function handleFile(file) {
+  if (busy.value) return
   if (!/\.(bag|active)$/i.test(file.name)) {
     fail(new Error('仅支持 ROS1 .bag / .active 文件'))
     return
@@ -327,6 +348,7 @@ async function handleFile(file) {
 }
 
 async function handleLogs(files) {
+  if (logBusy.value) return
   const total = files.reduce((sum, file) => sum + file.size, 0)
   if (total > MAX_LOG_BYTES) {
     logError.value = `日志合计超过 ${formatBytes(MAX_LOG_BYTES)} 上限`
@@ -353,6 +375,7 @@ async function handleLogs(files) {
 }
 
 async function handleFiles(files) {
+  if (busy.value || logBusy.value) return
   const list = [...files]
   const bags = list.filter((file) => fileKind(file.name) === 'bag')
   const logs = list.filter((file) => fileKind(file.name) === 'log')
@@ -381,6 +404,7 @@ function onFileChange(event) {
 }
 
 async function loadSample() {
+  if (busy.value) return
   busy.value = true
   error.value = ''
   try {
@@ -474,8 +498,10 @@ function seek(event) {
 }
 
 function onKeydown(event) {
-  const tag = event.target?.tagName
-  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || event.target?.isContentEditable) return
+  if (event.repeat) return
+  // Do not steal Space/arrows from a focused control (sample button, link,
+  // details summary, editable field).
+  if (event.target?.closest?.('input, textarea, select, button, a, summary, [contenteditable]')) return
   if (event.code === 'Space') {
     event.preventDefault()
     toggle()
@@ -507,7 +533,7 @@ onBeforeUnmount(() => {
       </div>
 
       <label class="drop-zone" :class="{ dragging }" @dragover.prevent="dragging = true" @dragleave.prevent="dragging = false" @drop.prevent="onDrop">
-        <input type="file" multiple accept=".bag,.active,.log,.txt" @change="onFileChange" />
+        <input type="file" multiple accept=".bag,.active,.log,.txt" :disabled="busy || logBusy" @change="onFileChange" />
         <span class="drop-title">拖拽 ROS1 .bag / .active 与 .log 文本日志，或点击选择文件</span>
         <span class="drop-hint">
           JointState + IMU · 未压缩或 lz4 · .active 自动恢复 · 日志按 clk / 时间戳对齐 · bag 最大
@@ -661,6 +687,7 @@ onBeforeUnmount(() => {
           <template v-if="result">
             · 按 {{ logBasis }} 对齐
             <span v-if="!logAligned.aligned" class="warn-warn">· 日志时间与 bag 记录时间不重叠，无法匹配</span>
+            <span v-if="logAligned.dropped" class="warn-warn">· 另有 {{ logAligned.dropped.toLocaleString() }} 条日志使用其他时钟，无法对齐</span>
           </template>
           <template v-else> · 导入 bag 后按播放时间显示</template>
         </p>

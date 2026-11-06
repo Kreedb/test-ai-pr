@@ -149,6 +149,7 @@ test('nets, traces and vias keep their layer and net', async () => {
   const result = await padsProject()
   const pcb = result.files[0].content
 
+  assert.match(pcb, /\.Paste"/)
   const via = findBlock(pcb, 0, '(via')
   assert.ok(via, 'expected one routed via')
   assert.ok(via.includes('0.635'), `via drill should come from the VIA definition: ${via}`)
@@ -204,6 +205,47 @@ test('upstream fixtures convert without throwing', () => {
     thermal.map((via) => via.hole_diameter),
     [0.508, 0.508],
   )
+})
+
+test('negative copper pieces become holes in the pour', () => {
+  const pours = padsToCircuitJson(parsePadsAscii(upstream('copper-cutouts.asc'))).filter((element) => element.type === 'pcb_copper_pour')
+  assert.equal(pours.length, 2)
+  for (const pour of pours) {
+    assert.equal(pour.shape, 'brep')
+    assert.equal(pour.brep_shape.inner_rings.length, 2)
+  }
+})
+
+test('warns when a negative copper piece cannot join a pour', () => {
+  const source = `!PADS-POWERPCB-V9.5-MILS! x
+*PCB*
+MAXIMUMLAYER 2
+*PARTDECAL*
+*REMARK* PIECETYPE CORNERS WIDTHHGHT LINESTYLE LEVEL
+CUT_DECAL I 0 0 1 0 0 0 0
+COPCUT 5 2 0 1
+-10 -10
+10 -10
+10 10
+-10 10
+-10 -10
+*PARTTYPE*
+CUT_TYPE CUT_DECAL I UND 0 0 0 0 Y
+*PART*
+U1 CUT_TYPE 100 100 0 U N 0 -1 0 -1 0
+*LINES*
+BOARD_OUTLINE BOARD 0 0 1 0
+CLOSED 5 4 0 0
+0 0
+200 0
+200 200
+0 200
+0 0
+*END*
+`
+  const warnings = []
+  padsToCircuitJson(parsePadsAscii(source), warnings)
+  assert.ok(warnings.some((warning) => /负片铜形状无法并入/.test(warning.message)))
 })
 
 test('route points from different nets never get joined', () => {

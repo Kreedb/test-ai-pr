@@ -37,8 +37,7 @@
     "lz4js": "^0.2.0",
     "pads-to-circuit-json": "^0.1.0",
     "sii-parser": "^0.1.0",
-    "vue": "^3.5.44",
-    "zod": "^3.25.76"
+    "vue": "^3.5.44"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.10",

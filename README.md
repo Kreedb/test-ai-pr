@@ -2,7 +2,7 @@
 
 一个在浏览器中运行的二进制工具箱，当前包含 EtherCAT SII/ESI、EDA 格式转换与机器人 bag 回放工具，基于 Vite + Vue 3。所有数据只在本地处理，不会上传。
 
-线上地址：https://kreedb.github.io/test-ai-pr/
+线上地址：https://kreedb.github.io/test-ai-web/
 
 ## 工具
 
@@ -19,7 +19,7 @@ npm install
 npm run dev
 ```
 
-开发服务器运行在 http://localhost:5173/test-ai-pr/。常用命令：
+开发服务器运行在 http://localhost:5173/test-ai-web/。常用命令：
 
 | 命令 | 说明 |
 | --- | --- |

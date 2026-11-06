@@ -33,6 +33,25 @@ test('the Limx pair round-trips through the editor byte for byte', () => {
   assert.equal(verifyEsiXml(generated.xml, bytes).identical, true)
 })
 
+test('a SyncManager enable byte uses bit 0 and keeps it disabled', () => {
+  const bytes = sample('limx-tron2.bin')
+  const model = createEditorModel(parseSii(bytes))
+  assert.equal(model.syncManagers[2].enable & 0x01, 1)
+  model.syncManagers[2].enable = 0x02
+
+  const generated = generateEsiXml(editorResult(model, bytes), editorOptions(model, 'Limx'))
+  assert.match(generated.xml, /Enable="0"/)
+  assert.ok(generated.warnings.some((warning) => /Enable.*0x2/i.test(warning.message)))
+
+  const recompiled = generateSiiFromEsi(generated.xml)
+  assert.equal(parseSii(recompiled.bytes).syncManagers[2].enable & 0x01, 0)
+})
+
+test('a 256-byte name is rejected instead of being sliced', () => {
+  const xml = sampleText('limx-tron2.xml').replace(/<Name LcId="1033">Limx EtherCAT CiA402<\/Name>/, `<Name LcId="1033">${'x'.repeat(256)}</Name>`)
+  assert.throws(() => generateSiiFromEsi(xml), /255 字节/)
+})
+
 test('the Sync1 cycle factor survives export and import', () => {
   const bytes = sample('limx-tron2.bin')
   for (const factor of [0, 1, 4]) {

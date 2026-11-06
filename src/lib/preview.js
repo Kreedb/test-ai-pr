@@ -8,6 +8,8 @@
 // Everything here is framework-free so `node --test` can check the indexing
 // without a DOM.
 
+import { isUnresolvedExpression } from './eda-shared.js'
+
 const TOP = 'top'
 const BOTTOM = 'bottom'
 const INNER = /^(?:inner|in)(\d+)(?:\.cu)?$/i
@@ -27,6 +29,21 @@ export const SCHEMATIC_MM_PER_UNIT = 15
 // on the schematic, which left 1.27 mm text five pixels tall at the old cap.
 export const MAX_PX_PER_MM = 240
 export const MIN_PX_PER_MM = 0.02
+
+export function polygonPath(points, closed = true) {
+  if (!points?.length) return ''
+  return `M${points.map((point) => `${point.x} ${point.y}`).join(' L')}${closed ? ' Z' : ''}`
+}
+
+/** SVG path for a filled copper shape, including the holes inside it. */
+export function pourPath(element) {
+  if (element.points?.length) return polygonPath(element.points)
+  const shape = element.brep_shape
+  const outer = shape?.outer_ring?.vertices
+  if (!outer?.length) return ''
+  const rings = [outer, ...(shape.inner_rings || []).map((ring) => ring.vertices).filter((vertices) => vertices?.length)]
+  return rings.map((points) => polygonPath(points)).join(' ')
+}
 
 /**
  * The viewport's allowed `scale` range, in model units per pixel, for a model
@@ -365,7 +382,7 @@ class ProjectIndex {
 // device name in the preview that the exported `.kicad_sch` leaves blank.
 function writerValueOf(component) {
   const displayValue = component.display_value
-  const resolvedValue = displayValue && !String(displayValue).trim().startsWith('=') ? displayValue : ''
+  const resolvedValue = displayValue && !isUnresolvedExpression(displayValue) ? displayValue : ''
   switch (component.ftype) {
     case 'simple_resistor':
       return component.display_resistance || 'R'
@@ -385,8 +402,6 @@ function writerValueOf(component) {
       return resolvedValue
   }
 }
-
-const resolvedSymbolValue = (value) => (value && !String(value).trim().startsWith('=') ? value : '')
 
 function pcbElementBounds(element) {
   switch (element.type) {
@@ -454,8 +469,7 @@ function pcbElementBounds(element) {
     case 'pcb_courtyard_outline':
       return boundsOf(element.outline)
     case 'pcb_silkscreen_text':
-    case 'pcb_fabrication_note_text':
-    case 'pcb_fabrication_note_rect': {
+    case 'pcb_fabrication_note_text': {
       // Text is drawn from its anchor towards +X with the glyph height along Y;
       // treating the whole string as a square would inflate the board bounds and
       // make the initial fit zoom out for no reason.
@@ -714,7 +728,7 @@ function buildSchematic(index) {
       sheet: sheetOf(component),
       componentId: component.schematic_component_id,
       refdes: index.nameOf(component.source_component_id),
-      value: resolvedSymbolValue(component.symbol_display_value) || index.valueOf(component.source_component_id),
+      value: (component.symbol_display_value && !isUnresolvedExpression(component.symbol_display_value) ? component.symbol_display_value : '') || index.valueOf(component.source_component_id),
     })
     const ports = []
     for (const port of portsByComponent.get(component.schematic_component_id) || []) {

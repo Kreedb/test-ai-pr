@@ -151,6 +151,7 @@ async function collectEntries(documents, { useAfter, taken }) {
 }
 
 async function addFiles(fileList) {
+  if (busy.value) return
   const files = Array.from(fileList || [])
   if (!files.length) return
   busy.value = true
@@ -197,6 +198,7 @@ async function addFiles(fileList) {
 }
 
 function removeEntry(index) {
+  if (busy.value) return
   const [removed] = entries.value.splice(index, 1)
   for (const archive of archives.value) {
     archive.files = archive.files.filter((name) => name !== removed.name)
@@ -207,6 +209,7 @@ function removeEntry(index) {
 }
 
 async function loadSample(sample) {
+  if (busy.value) return
   busy.value = true
   error.value = ''
   errorDetail.value = ''
@@ -237,6 +240,7 @@ async function loadSample(sample) {
 }
 
 async function runConversion() {
+  if (busy.value) return
   busy.value = true
   error.value = ''
   errorDetail.value = ''
@@ -284,7 +288,7 @@ function clearAll() {
         <span v-if="entries.length" class="badge">{{ entries.length }} 个文件</span>
       </div>
 
-      <ConvertDropZone v-model:dragging="dragging" :max-input-bytes="MAX_INPUT_BYTES" :max-total-bytes="MAX_TOTAL_BYTES" @files="addFiles" />
+      <ConvertDropZone v-model:dragging="dragging" :disabled="busy" :max-input-bytes="MAX_INPUT_BYTES" :max-total-bytes="MAX_TOTAL_BYTES" @files="addFiles" />
 
       <ul v-if="entries.length" class="file-list">
         <li v-for="(entry, index) in entries" :key="entry.name" class="file-row">
@@ -294,7 +298,7 @@ function clearAll() {
           </div>
           <span class="chip">{{ formatLabel(formatOf(entry).id) }}</span>
           <span class="muted small nowrap">{{ formatBytes(entry.bytes.length) }}</span>
-          <button type="button" class="btn ghost small" @click="removeEntry(index)">移除</button>
+          <button type="button" class="btn ghost small" :disabled="busy" @click="removeEntry(index)">移除</button>
         </li>
       </ul>
 

@@ -13,7 +13,9 @@ import lz4js from 'lz4js'
 
 export const BAG_MAGIC = '#ROSBAG V2.0\n'
 export const MAX_BAG_BYTES = 2048 * 1024 * 1024
-export const MAX_CHUNK_BYTES = MAX_BAG_BYTES
+// A single ROS chunk is far smaller than a whole bag; capping it separately keeps
+// a tiny hostile frame from requesting the full upload budget.
+export const MAX_CHUNK_BYTES = 64 * 1024 * 1024
 
 const textDecoder = new TextDecoder()
 
@@ -350,6 +352,9 @@ function makeJointAccumulator(connection) {
 }
 
 function pushJoint(accumulator, nameInfo, values) {
+  if (nameInfo.values.length && nameInfo.values.length !== values.length) {
+    throw new Error(`话题 ${accumulator.topic} 的关节名称数 ${nameInfo.values.length} 与角度数 ${values.length} 不一致`)
+  }
   if (!accumulator.names) {
     accumulator.named = nameInfo.values.length > 0
     accumulator.names = nameInfo.values.length ? nameInfo.values : values.map((_, index) => `q_${index}`)
@@ -367,6 +372,9 @@ function pushJoint(accumulator, nameInfo, values) {
   }
   if (values.length !== accumulator.names.length) {
     throw new Error(`话题 ${accumulator.topic} 的关节数从 ${accumulator.names.length} 变成 ${values.length}，无法对齐`)
+  }
+  if (values.some((value) => !Number.isFinite(value))) {
+    throw new Error(`话题 ${accumulator.topic} 有缺失或非数值的关节角度`)
   }
   accumulator.times.push(accumulator.timestamp)
   for (let index = 0; index < values.length; index += 1) accumulator.columns[index].push(values[index])

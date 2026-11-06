@@ -106,10 +106,11 @@ function overlaps(range, start, end) {
 
 /**
  * Pick the clock that lines up with the bag's `[start, end]` record time.
- * A mixed log (some `clk` lines, some wall-clock lines) keeps a clock it does
- * not use as a fallback when that clock also overlaps the bag. Entries with
- * neither clock are counted in `dropped` so the page can warn instead of
- * losing them silently.
+ * A mixed log (some `clk` lines, some wall-clock lines) cannot merge the two
+ * origins in one timeline: `clk` is controller uptime, while the wall clocks
+ * are epoch seconds, so a fallback time would sort and display at a completely
+ * different point. Entries without the chosen clock are counted in `dropped`
+ * so the page can warn instead of losing them silently.
  * Returns entries sorted by the chosen clock plus `{ basis, aligned, dropped }`.
  */
 export function alignLog(entries, start, end) {
@@ -120,11 +121,9 @@ export function alignLog(entries, start, end) {
   const wallLocal = rangeOf(entries, 'wallLocal')
   let basis = null
   let key = null
-  let fallback = null
   let aligned = false
   if (overlaps(clk, start, end)) {
     basis = key = 'clk'
-    fallback = overlaps(wall, start, end) ? 'wall' : overlaps(wallLocal, start, end) ? 'wallLocal' : null
     aligned = true
   } else if (overlaps(wall, start, end)) {
     basis = key = 'wall'
@@ -143,7 +142,7 @@ export function alignLog(entries, start, end) {
   const alignedEntries = []
   let dropped = 0
   for (const entry of entries) {
-    const time = entry[key] ?? (fallback ? entry[fallback] : null)
+    const time = entry[key]
     if (time === null) {
       dropped += 1
       continue

@@ -543,7 +543,7 @@ onBeforeUnmount(() => {
 
       <div class="actions">
         <button type="button" class="btn" :disabled="busy" @click="loadSample">示例：{{ SAMPLE.label }}</button>
-        <button type="button" class="btn ghost" :disabled="busy" @click="clearAll">清空</button>
+        <button type="button" class="btn ghost" :disabled="busy || logBusy" @click="clearAll">清空</button>
         <span v-if="sampleName" class="muted small">示例：{{ sampleName }}</span>
         <span v-if="busy" class="muted small">正在解析 {{ progress }}%…</span>
         <span v-if="logBusy" class="muted small">正在解析日志…</span>

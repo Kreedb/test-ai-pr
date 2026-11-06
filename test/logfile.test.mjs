@@ -76,13 +76,18 @@ test('reads ROS epoch prefixes and counts orphan lines', () => {
   assert.match(warnings[0].message, /1 行没有时间戳/)
 })
 
-test('keeps the other clock as a fallback when both overlap the bag', () => {
+test('does not mix a fallback clock into the aligned timeline when both overlap the bag', () => {
   const { entries } = parseLogText(['2026-10-20 10:23:52.646 I/robotlogger: clk(17.5) clk line', '[INFO] [1700000000.5]: wall line'].join('\n'))
   const aligned = alignLog(entries, 0, 2e9)
   assert.equal(aligned.basis, 'clk')
   assert.equal(aligned.aligned, true)
-  assert.equal(aligned.entries.length, 2)
-  assert.equal(aligned.dropped, 0)
+  // The epoch timestamp would sort far past every clk entry, so it is counted
+  // instead of mixing two time origins in one timeline.
+  assert.deepEqual(
+    aligned.entries.map((entry) => entry.time),
+    [17.5],
+  )
+  assert.equal(aligned.dropped, 1)
 })
 
 test('counts mixed-clock lines it cannot place instead of dropping them silently', () => {

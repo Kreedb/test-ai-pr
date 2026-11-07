@@ -1,0 +1,101 @@
+<?xml version="1.0"?>
+<robot name="tron2a">
+  <!-- LimX TRON2A kinematic skeleton; Apache-2.0 limxdynamics/tron2-robot-description -->
+  <link name="world"/>
+  <link name="base_link"/>
+  <link name="proximal_pitch_L_link"/>
+  <link name="proximal_roll_L_link"/>
+  <link name="proximal_yaw_L_link"/>
+  <link name="knee_L_link"/>
+  <link name="wheel_L_link"/>
+  <link name="wheel_bottom_L"/>
+  <link name="proximal_pitch_R_link"/>
+  <link name="proximal_roll_R_link"/>
+  <link name="proximal_yaw_R_link"/>
+  <link name="knee_R_link"/>
+  <link name="wheel_R_link"/>
+  <link name="wheel_bottom_R"/>
+  <joint name="fixed_base_link" type="fixed">
+    <parent link="world"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 0.75" rpy="0 0 0"/>
+  </joint>
+  <joint name="proximal_pitch_L" type="revolute">
+    <parent link="base_link"/>
+    <child link="proximal_pitch_L_link"/>
+    <origin xyz="-0.00044 0.09178 0.05474" rpy="0 0 0"/>
+    <axis xyz="0 0.996195 -0.087155"/>
+    <limit lower="-3.1416" upper="3.1416" effort="1" velocity="1"/>
+  </joint>
+  <joint name="proximal_roll_L" type="revolute">
+    <parent link="proximal_pitch_L_link"/>
+    <child link="proximal_roll_L_link"/>
+    <origin xyz="-0.032 0.0758 -0.00663" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="-3.1416" upper="3.1416" effort="1" velocity="1"/>
+  </joint>
+  <joint name="proximal_yaw_L" type="revolute">
+    <parent link="proximal_roll_L_link"/>
+    <child link="proximal_yaw_L_link"/>
+    <origin xyz="0.032 0 -0.1374" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.1416" upper="3.1416" effort="1" velocity="1"/>
+  </joint>
+  <joint name="knee_L" type="revolute">
+    <parent link="proximal_yaw_L_link"/>
+    <child link="knee_L_link"/>
+    <origin xyz="0.004 0.032 -0.2126" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-3.1416" upper="3.1416" effort="1" velocity="1"/>
+  </joint>
+  <joint name="wheel_L" type="continuous">
+    <parent link="knee_L_link"/>
+    <child link="wheel_L_link"/>
+    <origin xyz="-0.004 0.013 -0.35" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+  <joint name="fixed_wheel_bottom_L" type="fixed">
+    <parent link="wheel_L_link"/>
+    <child link="wheel_bottom_L"/>
+    <origin xyz="0 0 -0.1" rpy="0 0 0"/>
+  </joint>
+  <joint name="proximal_pitch_R" type="revolute">
+    <parent link="base_link"/>
+    <child link="proximal_pitch_R_link"/>
+    <origin xyz="-0.00044 -0.09178 0.05474" rpy="0 0 0"/>
+    <axis xyz="0 0.996195 0.087155"/>
+    <limit lower="-3.1416" upper="3.1416" effort="1" velocity="1"/>
+  </joint>
+  <joint name="proximal_roll_R" type="revolute">
+    <parent link="proximal_pitch_R_link"/>
+    <child link="proximal_roll_R_link"/>
+    <origin xyz="-0.032 -0.0758 -0.00663" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="-3.1416" upper="3.1416" effort="1" velocity="1"/>
+  </joint>
+  <joint name="proximal_yaw_R" type="revolute">
+    <parent link="proximal_roll_R_link"/>
+    <child link="proximal_yaw_R_link"/>
+    <origin xyz="0.032 0 -0.1374" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.1416" upper="3.1416" effort="1" velocity="1"/>
+  </joint>
+  <joint name="knee_R" type="revolute">
+    <parent link="proximal_yaw_R_link"/>
+    <child link="knee_R_link"/>
+    <origin xyz="0.004 -0.032 -0.2126" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-3.1416" upper="3.1416" effort="1" velocity="1"/>
+  </joint>
+  <joint name="wheel_R" type="continuous">
+    <parent link="knee_R_link"/>
+    <child link="wheel_R_link"/>
+    <origin xyz="-0.004 -0.013 -0.35" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+  <joint name="fixed_wheel_bottom_R" type="fixed">
+    <parent link="wheel_R_link"/>
+    <child link="wheel_bottom_R"/>
+    <origin xyz="0 0 -0.1" rpy="0 0 0"/>
+  </joint>
+</robot>

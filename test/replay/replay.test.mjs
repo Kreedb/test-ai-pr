@@ -7,16 +7,25 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
-import { LUNA, OLI } from '../../src/lib/replay/models.js'
+import { DOMParser } from '@xmldom/xmldom'
+
 import { buildJointValues, computePose, normalizeQuat, quatToEuler } from '../../src/lib/replay/pose.js'
-import { detectProfile, mapJoints } from '../../src/lib/replay/profiles.js'
+import { attachSkeleton, detectProfile, mapJoints } from '../../src/lib/replay/profiles.js'
 import { inspectRosbag, readRosbag } from '../../src/lib/replay/rosbag.js'
+import { parseUrdf } from '../../src/lib/replay/urdf.js'
 import { buildRosbag, encodeImu, encodeJointState, encodeSensorImu, encodeSensorJointState, record } from './rosbag-fixture.mjs'
 
 const root = fileURLToPath(new URL('../..', import.meta.url))
-const lunaNames = LUNA.filter((node) => node.joint && node.axis).map((node) => node.joint)
-const oliNames = OLI.filter((node) => node.joint && node.axis).map((node) => node.joint)
-const tronNames = ['proximal_pitch_L', 'proximal_roll_L', 'proximal_yaw_L', 'knee_L', 'wheel_L', 'proximal_pitch_R', 'proximal_roll_R', 'proximal_yaw_R', 'knee_R', 'wheel_R']
+function skeletonOf(name) {
+  return parseUrdf(readFileSync(join(root, `public/robots/${name}.urdf`), 'utf8'), { parseXml: DOMParser })
+}
+const luna = skeletonOf('luna')
+const oli = skeletonOf('oli')
+const tron = skeletonOf('tron2a')
+const lunaSkeleton = luna.skeleton
+const lunaNames = [...luna.joints]
+const oliNames = [...oli.joints]
+const tronNames = [...tron.joints]
 
 function bag(messages, connections, compression = 'lz4') {
   return buildRosbag({ connections, messages, compression })
@@ -255,7 +264,7 @@ test('detects Luna, Oli and TRON profiles by name or index count', () => {
   const urdfNames = tronNames.map((name) => `${name}_Joint`)
   const urdfProfile = detectProfile(urdfNames, urdfNames.length, true)
   assert.equal(urdfProfile.id, 'tron2a')
-  assert.equal(mapJoints(urdfProfile, { names: urdfNames, named: true }).entries.length, 10)
+  assert.equal(mapJoints(attachSkeleton(urdfProfile, tron.skeleton), { names: urdfNames, named: true }).entries.length, 10)
   assert.equal(detectProfile(lunaNames, lunaNames.length, false).id, 'luna')
   assert.equal(detectProfile([], 10, false).id, 'tron2a')
   assert.equal(detectProfile([], 27, false).id, 'luna')
@@ -265,7 +274,7 @@ test('maps standard URDF-style names onto the generic skeleton', () => {
   const names = ['left_hip_pitch', 'right_knee', 'waist_yaw', 'head_yaw']
   const profile = detectProfile(names, names.length, true)
   assert.equal(profile.id, 'generic')
-  const { entries, unmapped } = mapJoints(profile, {
+  const { entries, unmapped } = mapJoints(attachSkeleton(profile, lunaSkeleton), {
     names,
     named: true,
     columns: names.map(() => new Float32Array(1)),
@@ -279,15 +288,15 @@ test('maps standard URDF-style names onto the generic skeleton', () => {
 
 test('forward kinematics follows joint angles and base rotation', () => {
   const zeros = new Map()
-  const neutral = computePose(LUNA, zeros, [1, 0, 0, 0])
-  assert.deepEqual(neutral.points[0], [0, 0, 1])
+  const neutral = computePose(lunaSkeleton, zeros, [1, 0, 0, 0])
+  assert.deepEqual(neutral.points[0], [0, 0, lunaSkeleton[0].offset[2]])
 
-  const hipIndex = LUNA.findIndex((node) => node.name === 'left_hip_pitch_link')
-  const kneeIndex = LUNA.findIndex((node) => node.name === 'left_hip_roll_link')
-  const bent = computePose(LUNA, new Map([['left_hip_pitch_joint', 0.5]]), [1, 0, 0, 0])
+  const hipIndex = lunaSkeleton.findIndex((node) => node.name === 'left_hip_pitch_link')
+  const kneeIndex = lunaSkeleton.findIndex((node) => node.name === 'left_hip_roll_link')
+  const bent = computePose(lunaSkeleton, new Map([['left_hip_pitch_joint', 0.5]]), [1, 0, 0, 0])
   assert.notDeepEqual(bent.points[kneeIndex], neutral.points[kneeIndex])
 
-  const yaw90 = computePose(LUNA, zeros, normalizeQuat([Math.SQRT1_2, 0, 0, Math.SQRT1_2]))
+  const yaw90 = computePose(lunaSkeleton, zeros, normalizeQuat([Math.SQRT1_2, 0, 0, Math.SQRT1_2]))
   assert.ok(Math.abs(yaw90.points[hipIndex][0] + neutral.points[hipIndex][1]) < 1e-6)
   assert.ok(Math.abs(yaw90.points[hipIndex][1] - neutral.points[hipIndex][0]) < 1e-6)
 
@@ -306,9 +315,9 @@ test('the committed Luna demo bag parses and reaches a pose', () => {
   const joint = series['/joint/state']
   const profile = detectProfile(joint.names, joint.names.length, joint.named)
   assert.equal(profile.id, 'luna')
-  const { entries } = mapJoints(profile, joint)
+  const { entries } = mapJoints(attachSkeleton(profile, lunaSkeleton), joint)
   assert.equal(entries.length, 27)
-  const pose = computePose(profile.skeleton, buildJointValues(joint, entries, 0), [1, 0, 0, 0])
-  assert.equal(pose.points.length, profile.skeleton.length)
+  const pose = computePose(lunaSkeleton, buildJointValues(joint, entries, 0), [1, 0, 0, 0])
+  assert.equal(pose.points.length, lunaSkeleton.length)
   assert.ok(pose.points.every((point) => point.every(Number.isFinite)))
 })

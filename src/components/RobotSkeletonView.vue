@@ -4,6 +4,8 @@ import { onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 const props = defineProps({
   points: { type: Array, default: null },
   skeleton: { type: Array, default: null },
+  transforms: { type: Array, default: null },
+  meshes: { type: Array, default: null },
   emptyMessage: { type: String, default: '没有可显示的姿态数据' },
 })
 
@@ -73,6 +75,71 @@ function drawGrid(context, projectBasis, width, height) {
   line(context, origin, project([0, 0, 0.35], projectBasis, width, height), '#5b8cff', 1.6)
 }
 
+function drawMeshes(context, projectBasis, width, height) {
+  if (!props.meshes?.length || !props.transforms?.length || !props.skeleton?.length) return
+  const indices = new Map(props.skeleton.map((node, index) => [node.name, index]))
+  const triangles = []
+  for (const mesh of props.meshes) {
+    const index = indices.get(mesh.node)
+    const matrix = index === undefined ? null : props.transforms[index]
+    if (!matrix || !mesh.triangles?.length) continue
+    const [sx, sy, sz] = mesh.scale || [1, 1, 1]
+    const [rx, ry, rz] = mesh.rpy || [0, 0, 0]
+    const [tx, ty, tz] = mesh.xyz || [0, 0, 0]
+    const cr = Math.cos(rx)
+    const sr = Math.sin(rx)
+    const cp = Math.cos(ry)
+    const sp = Math.sin(ry)
+    const cy = Math.cos(rz)
+    const sy2 = Math.sin(rz)
+    const local = (x, y, z) => {
+      const px = x * sx
+      const py = y * sy
+      const pz = z * sz
+      const y1 = py * cr - pz * sr
+      const z1 = py * sr + pz * cr
+      const x2 = px * cp + z1 * sp
+      const z2 = -px * sp + z1 * cp
+      return [x2 * cy - y1 * sy2 + tx, x2 * sy2 + y1 * cy + ty, z2 + tz]
+    }
+    for (let vertex = 0; vertex + 8 < mesh.triangles.length; vertex += 9) {
+      const a = local(mesh.triangles[vertex], mesh.triangles[vertex + 1], mesh.triangles[vertex + 2])
+      const b = local(mesh.triangles[vertex + 3], mesh.triangles[vertex + 4], mesh.triangles[vertex + 5])
+      const c = local(mesh.triangles[vertex + 6], mesh.triangles[vertex + 7], mesh.triangles[vertex + 8])
+      const pa = project(world(matrix, a), projectBasis, width, height)
+      const pb = project(world(matrix, b), projectBasis, width, height)
+      const pc = project(world(matrix, c), projectBasis, width, height)
+      if (!pa || !pb || !pc) continue
+      // A cheap normal gives the flat preview some depth.
+      const e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]
+      const e2 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]]
+      const normal = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]]
+      const length = Math.hypot(normal[0], normal[1], normal[2]) || 1
+      const light = 0.32 + 0.68 * Math.max(0.15, Math.abs(normal[2]) / length)
+      triangles.push({ pa, pb, pc, depth: (pa.depth + pb.depth + pc.depth) / 3, light })
+    }
+  }
+  triangles.sort((left, right) => right.depth - left.depth)
+  for (const triangle of triangles) {
+    const value = Math.round(170 * triangle.light)
+    context.fillStyle = `rgba(${value}, ${Math.round(value * 1.12)}, ${Math.round(value * 1.4)}, 0.74)`
+    context.beginPath()
+    context.moveTo(triangle.pa.x, triangle.pa.y)
+    context.lineTo(triangle.pb.x, triangle.pb.y)
+    context.lineTo(triangle.pc.x, triangle.pc.y)
+    context.closePath()
+    context.fill()
+  }
+}
+
+function world(matrix, point) {
+  return [
+    matrix[0] * point[0] + matrix[4] * point[1] + matrix[8] * point[2] + matrix[12],
+    matrix[1] * point[0] + matrix[5] * point[1] + matrix[9] * point[2] + matrix[13],
+    matrix[2] * point[0] + matrix[6] * point[1] + matrix[10] * point[2] + matrix[14],
+  ]
+}
+
 function draw() {
   const element = host.value
   const canvasElement = canvas.value
@@ -104,6 +171,7 @@ function draw() {
   }
 
   const projected = props.points.map((point) => project(point, projectBasis, cssWidth, cssHeight))
+  drawMeshes(context, projectBasis, cssWidth, cssHeight)
   const bones = []
   props.skeleton.forEach((node, index) => {
     if (node.parent === null) return
@@ -183,7 +251,7 @@ onBeforeUnmount(() => {
 })
 
 watch(
-  () => [props.points, props.skeleton],
+  () => [props.points, props.skeleton, props.transforms, props.meshes],
   () => draw(),
 )
 </script>

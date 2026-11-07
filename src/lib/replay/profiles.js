@@ -1,7 +1,6 @@
-// Robot profiles map recorded joint columns to a kinematic skeleton. Adding a
-// vendor means adding one profile here; the page and 3D view stay generic.
-
-import { LUNA, OLI } from './models.js'
+// Robot profiles map recorded joint columns to a kinematic skeleton. The
+// skeleton itself lives in a URDF under `public/robots`, so adding or editing a
+// vendor model does not mean editing JavaScript.
 
 const LUNA_ORDER = [
   'left_hip_pitch_joint',
@@ -69,94 +68,23 @@ const OLI_ORDER = [
 
 const TRON_ORDER = ['proximal_pitch_L', 'proximal_roll_L', 'proximal_yaw_L', 'knee_L', 'wheel_L', 'proximal_pitch_R', 'proximal_roll_R', 'proximal_yaw_R', 'knee_R', 'wheel_R']
 
-// WF_TRON2A joint origins/axes from tron2-robot-description (Apache-2.0). The
-// base is lifted so the 0.1 m wheels touch z=0.
-const TRON = [
-  { name: 'base_link', parent: null, offset: [0, 0, 0.75], joint: null, axis: null },
-  {
-    name: 'proximal_pitch_L_link',
-    parent: 'base_link',
-    offset: [-0.00044, 0.09178, 0.05474],
-    joint: 'proximal_pitch_L',
-    axis: [0, 0.9961947, -0.0871554],
-  },
-  {
-    name: 'proximal_roll_L_link',
-    parent: 'proximal_pitch_L_link',
-    offset: [-0.032, 0.0758, -0.00663],
-    joint: 'proximal_roll_L',
-    axis: [1, 0, 0],
-  },
-  {
-    name: 'proximal_yaw_L_link',
-    parent: 'proximal_roll_L_link',
-    offset: [0.032, 0, -0.1374],
-    joint: 'proximal_yaw_L',
-    axis: [0, 0, 1],
-  },
-  {
-    name: 'knee_L_link',
-    parent: 'proximal_yaw_L_link',
-    offset: [0.004, 0.032, -0.2126],
-    joint: 'knee_L',
-    axis: [0, 1, 0],
-  },
-  {
-    name: 'wheel_L_link',
-    parent: 'knee_L_link',
-    offset: [-0.004, 0.013, -0.35],
-    joint: 'wheel_L',
-    axis: [0, 1, 0],
-  },
-  { name: 'wheel_bottom_L', parent: 'wheel_L_link', offset: [0, 0, -0.1], joint: null, axis: null },
-  {
-    name: 'proximal_pitch_R_link',
-    parent: 'base_link',
-    offset: [-0.00044, -0.09178, 0.05474],
-    joint: 'proximal_pitch_R',
-    axis: [0, 0.9961947, 0.0871554],
-  },
-  {
-    name: 'proximal_roll_R_link',
-    parent: 'proximal_pitch_R_link',
-    offset: [-0.032, -0.0758, -0.00663],
-    joint: 'proximal_roll_R',
-    axis: [1, 0, 0],
-  },
-  {
-    name: 'proximal_yaw_R_link',
-    parent: 'proximal_roll_R_link',
-    offset: [0.032, 0, -0.1374],
-    joint: 'proximal_yaw_R',
-    axis: [0, 0, 1],
-  },
-  {
-    name: 'knee_R_link',
-    parent: 'proximal_yaw_R_link',
-    offset: [0.004, -0.032, -0.2126],
-    joint: 'knee_R',
-    axis: [0, 1, 0],
-  },
-  {
-    name: 'wheel_R_link',
-    parent: 'knee_R_link',
-    offset: [-0.004, -0.013, -0.35],
-    joint: 'wheel_R',
-    axis: [0, 1, 0],
-  },
-  { name: 'wheel_bottom_R', parent: 'wheel_R_link', offset: [0, 0, -0.1], joint: null, axis: null },
-]
+const LUNA_MESH_BASE = 'https://raw.githubusercontent.com/limxdynamics/luna-description/main/HU_L04_description/'
 
-function makeProfile(id, label, skeleton, order) {
-  const joints = new Set(skeleton.filter((node) => node.joint && node.axis).map((node) => node.joint))
-  return { id, label, skeleton, order, joints, aliases: null }
+function makeProfile(id, label, urdf, order, extra = {}) {
+  return { id, label, urdf, skeleton: null, order, joints: new Set(order), aliases: null, ...extra }
 }
 
-const LUNA_PROFILE = makeProfile('luna', 'LimX Luna（HU_L04，27 关节）', LUNA, LUNA_ORDER)
-const OLI_PROFILE = makeProfile('oli', 'LimX Oli（HU_D04，31 关节）', OLI, OLI_ORDER)
-const TRON_PROFILE = makeProfile('tron2a', 'LimX TRON2A（10 关节）', TRON, TRON_ORDER)
+const LUNA_PROFILE = makeProfile('luna', 'LimX Luna（HU_L04，27 关节）', 'robots/luna.urdf', LUNA_ORDER, { meshBase: LUNA_MESH_BASE })
+const OLI_PROFILE = makeProfile('oli', 'LimX Oli（HU_D04，31 关节）', 'robots/oli.urdf', OLI_ORDER)
+const TRON_PROFILE = makeProfile('tron2a', 'LimX TRON2A（10 关节）', 'robots/tron2a.urdf', TRON_ORDER)
 // URDF exports spell the TRON joints with a `_Joint` suffix; bag configs drop it.
 TRON_PROFILE.aliases = (name) => name.replace(/_Joint$/i, '')
+
+/** Attach a parsed URDF skeleton to a detected profile. */
+export function attachSkeleton(profile, skeleton) {
+  const joints = new Set(skeleton.filter((node) => node.joint && node.axis).map((node) => node.joint))
+  return { ...profile, skeleton, joints, order: profile.order || [...joints] }
+}
 
 // Common URDF-style names from other humanoids can be mapped onto the Luna
 // skeleton when the part and axis are spelled out. Vendor-specific profiles
@@ -184,11 +112,13 @@ function canonicalJoint(name) {
 }
 
 const GENERIC_PROFILE = {
-  ...makeProfile('generic', '通用人形骨架（按标准关节名推断）', LUNA, LUNA_ORDER),
+  ...makeProfile('generic', '通用人形骨架（按标准关节名推断）', 'robots/luna.urdf', LUNA_ORDER, { meshBase: LUNA_MESH_BASE }),
   aliases: canonicalJoint,
 }
 
 export const ROBOT_PROFILES = [LUNA_PROFILE, OLI_PROFILE, TRON_PROFILE]
+/** Manual picker options, including the generic fallback skeleton. */
+export const ALL_PROFILES = [LUNA_PROFILE, OLI_PROFILE, TRON_PROFILE, GENERIC_PROFILE]
 
 function profileJoint(profile, name) {
   if (profile.joints.has(name)) return name

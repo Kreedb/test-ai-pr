@@ -5,7 +5,7 @@ export const route = {
   tool: {
     tag: 'BAG',
     title: '机器人包回放',
-    description: '读取 ROS1 bag 的关节与 IMU 话题（支持未完成的 .active 自动恢复），按时间轴还原机器人姿态；可同时导入文本日志并按时间对照。内置 LimX Luna / Oli / TRON2A 骨架。',
+    description: '读取 ROS1 bag 与 ROS2 MCAP / SQLite bag 的关节与 IMU 话题（支持未完成的 .active 自动恢复），按时间轴还原机器人姿态；可同时导入文本日志、上传或选择预置 URDF，并用波形图定位异常点。',
     action: '打开回放',
   },
 }
@@ -16,13 +16,24 @@ import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 
 import LogTimeline from '@/components/LogTimeline.vue'
 import RobotSkeletonView from '@/components/RobotSkeletonView.vue'
+import SignalChart from '@/components/SignalChart.vue'
+import { expandArchive, isZipArchive } from '@/lib/archive'
 import { formatBytes } from '@/lib/format'
+import { BAG_FORMATS, FORMAT_LABELS, inspectBag, readBag, sniffBagFormat } from '@/lib/replay/bag'
 import { MAX_LOG_BYTES, alignLog, parseLogText } from '@/lib/replay/logfile'
 import { buildJointValues, computePose, normalizeQuat, quatToEuler } from '@/lib/replay/pose'
-import { detectProfile, mapJoints } from '@/lib/replay/profiles'
-import { MAX_BAG_BYTES, inspectRosbag, readRosbag } from '@/lib/replay/rosbag'
+import { ALL_PROFILES, attachSkeleton, detectProfile, mapJoints } from '@/lib/replay/profiles'
+import { MAX_BAG_BYTES } from '@/lib/replay/rosbag'
+import { parseStl, parseUrdf } from '@/lib/replay/urdf'
 
 const SAMPLE = { file: 'samples/replay/luna-demo.bag', label: 'Luna 动作' }
+const MESH_TRIANGLES = 4000
+const MESH_MAX_BYTES = 96 * 1024 * 1024
+// Known `package://` sources. Uploaded STL files still win; this is the
+// best-effort fallback the issue asked for (luna-description STL on demand).
+const MESH_PACKAGES = {
+  HU_L04_description: 'https://raw.githubusercontent.com/limxdynamics/luna-description/main/HU_L04_description/',
+}
 
 const fileName = ref('')
 const sampleName = ref('')
@@ -37,7 +48,18 @@ const result = shallowRef(null)
 const profile = shallowRef(null)
 const mapping = shallowRef({ entries: [], unmapped: [] })
 const warnings = shallowRef([])
-const bagBytes = shallowRef(null)
+const bagFiles = shallowRef([])
+const formatMode = ref('auto')
+const bagFormat = ref('')
+const profileChoice = ref('auto')
+const customUrdf = shallowRef(null)
+const meshEnabled = ref(false)
+const meshSources = shallowRef(new Map())
+const meshes = shallowRef([])
+const meshStatus = ref('')
+const meshErrors = shallowRef([])
+const urdfWarning = ref('')
+const urdfMeshSource = shallowRef({ defs: [], meshBase: '' })
 const logName = ref('')
 const logEntries = shallowRef([])
 const logWarnings = shallowRef([])
@@ -50,9 +72,12 @@ const playing = ref(false)
 const speed = ref(1)
 const loop = ref(false)
 const jointGap = ref(0.1)
+const stage = ref(null)
+const isFullscreen = ref(false)
 
 let frameHandle = 0
 let lastFrame = 0
+let meshToken = 0
 
 const jointSeries = computed(() => result.value?.series?.[jointTopic.value] || null)
 const imuSeries = computed(() => result.value?.series?.[imuTopic.value] || null)
@@ -81,6 +106,36 @@ const logIndex = computed(() => {
 })
 
 const logBasis = computed(() => (logAligned.value.basis === 'clk' ? 'clk 单调时钟' : '墙钟时间'))
+
+const parseLabel = computed(() => {
+  const selected = topics.value.filter((topic) => topic.name === jointTopic.value || topic.name === imuTopic.value)
+  if (!selected.length) return ''
+  if (selected.some((topic) => topic.modified)) return '检测到魔改字段，已按消息定义解析'
+  if (selected.some((topic) => topic.family === 'limx')) return 'LimX 自定义消息，已按消息定义解析'
+  if (selected.every((topic) => topic.standard)) return '通用解析（标准 ROS 消息）'
+  return '通用解析'
+})
+
+const modelWarnings = computed(() => {
+  const list = []
+  if (!result.value) return list
+  if (urdfWarning.value) list.push({ level: 'warn', message: urdfWarning.value })
+  if (!profile.value?.skeleton) {
+    list.push({ level: 'warn', message: '没有可用的骨架，仍会显示关节数值与波形，但不会绘制 3D 姿态。' })
+  }
+  if (mapping.value.unmapped.length) {
+    list.push({
+      level: 'warn',
+      message: `${mapping.value.unmapped.length} 个关节名未映射到骨架：${mapping.value.unmapped.slice(0, 6).join('、')}${mapping.value.unmapped.length > 6 ? ' 等' : ''}`,
+    })
+  }
+  if (jointTopic.value.includes('/motor/') && (profile.value?.id === 'luna' || profile.value?.id === 'oli')) {
+    list.push({ level: 'warn', message: '当前使用电机话题：并联踝/腰的电机角度与串行关节角不同，3D 姿态只作参考，不是实机串行关节角。' })
+  }
+  return list
+})
+
+const allWarnings = computed(() => [...warnings.value, ...modelWarnings.value, ...meshErrors.value])
 
 function indexAt(times, time) {
   if (!times?.length) return -1
@@ -149,6 +204,11 @@ const stats = computed(() => {
   const imu = imuSeries.value
   return [
     {
+      label: '格式',
+      value: FORMAT_LABELS[bagFormat.value] || '—',
+      note: parseLabel.value || '选择文件后自动识别',
+    },
+    {
       label: '关节',
       value: `${(joint?.count ?? 0).toLocaleString()} 帧`,
       note: jointTopic.value || '—',
@@ -171,6 +231,41 @@ const stats = computed(() => {
   ]
 })
 
+function colorOf(name) {
+  if (String(name).startsWith('left') || String(name).endsWith('_L')) return '#5b8cff'
+  if (String(name).startsWith('right') || String(name).endsWith('_R')) return '#f5b942'
+  return '#c4b5fd'
+}
+
+const waveRows = computed(() => {
+  const rows = []
+  const joint = jointSeries.value
+  if (joint) {
+    joint.names.forEach((name, column) => {
+      rows.push({ label: name, values: joint.columns[column], times: joint.times, color: colorOf(name) })
+    })
+  }
+  const imu = imuSeries.value
+  if (imu) {
+    const euler = [new Float64Array(imu.count), new Float64Array(imu.count), new Float64Array(imu.count)]
+    for (let index = 0; index < imu.count; index += 1) {
+      const [roll, pitch, yaw] = quatToEuler([imu.quat[0][index], imu.quat[1][index], imu.quat[2][index], imu.quat[3][index]])
+      euler[0][index] = roll
+      euler[1][index] = pitch
+      euler[2][index] = yaw
+    }
+    const labels = ['roll', 'pitch', 'yaw']
+    labels.forEach((label, axis) => rows.push({ label: `IMU ${label}°`, values: euler[axis], times: imu.times, color: '#3ddc97' }))
+    const add = (values, label, unit) => {
+      const names = ['x', 'y', 'z']
+      for (let axis = 0; axis < 3; axis += 1) rows.push({ label: `${label}.${names[axis]}${unit}`, values: values[axis], times: imu.times, color: '#7dd3fc' })
+    }
+    if (imu.hasAcc) add(imu.acc, 'acc', ' m/s²')
+    if (imu.hasGyro) add(imu.gyro, 'gyro', ' rad/s')
+  }
+  return rows
+})
+
 function messageOf(cause) {
   return cause instanceof Error ? cause.message : String(cause)
 }
@@ -181,12 +276,6 @@ function formatTime(seconds) {
   const minutes = Math.floor(value / 60)
   const rest = value - minutes * 60
   return `${sign}${minutes}:${rest.toFixed(2).padStart(5, '0')}`
-}
-
-function fileKind(name) {
-  if (/\.(bag|active)$/i.test(name)) return 'bag'
-  if (/\.(log|txt)$/i.test(name)) return 'log'
-  return ''
 }
 
 function pickTopic(list, preferred) {
@@ -211,13 +300,127 @@ function resetPlayback() {
   lastFrame = 0
 }
 
-async function applyTopics(bytes, jointName, imuName) {
+async function presetText(meta) {
+  const response = await fetch(`${import.meta.env.BASE_URL}${meta.urdf}`)
+  if (!response.ok) throw new Error(`预置 URDF 加载失败（HTTP ${response.status}）`)
+  return response.text()
+}
+
+function chosenProfile(series) {
+  if (profileChoice.value === 'custom') {
+    return customUrdf.value ? { id: 'custom', label: `自定义 URDF · ${customUrdf.value.name}`, urdf: '', order: null, joints: new Set(), aliases: null } : null
+  }
+  if (profileChoice.value !== 'auto') return ALL_PROFILES.find((item) => item.id === profileChoice.value) || null
+  return detectProfile(series.names, series.names.length, series.named)
+}
+
+async function mountModel(series) {
+  const meta = chosenProfile(series)
+  urdfWarning.value = ''
+  urdfMeshSource.value = { defs: [], meshBase: '' }
+  meshes.value = []
+  meshErrors.value = []
+  if (!meta || meta.id === 'index' || (!meta.urdf && meta.id !== 'custom')) {
+    profile.value = null
+    mapping.value = { entries: [], unmapped: [] }
+    return
+  }
+
+  let parsed
+  try {
+    parsed = parseUrdf(meta.id === 'custom' ? customUrdf.value.text : await presetText(meta))
+  } catch (cause) {
+    profile.value = null
+    mapping.value = { entries: [], unmapped: [] }
+    urdfWarning.value = `URDF 解析失败：${messageOf(cause)}`
+    return
+  }
+
+  const attached = attachSkeleton(meta.id === 'custom' ? { ...meta, order: parsed.order } : meta, parsed.skeleton)
+  profile.value = attached
+  mapping.value = mapJoints(attached, series)
+  urdfMeshSource.value = { defs: parsed.meshes, meshBase: meta.meshBase || '' }
+  await loadMeshes()
+}
+
+function meshBytes(name) {
+  const sources = meshSources.value
+  const path = name.replace(/^package:\/\/[^/]+\//, '')
+  return sources.get(name) || sources.get(path) || sources.get(path.split('/').pop()) || null
+}
+
+async function loadMeshes() {
+  const token = ++meshToken
+  const { defs, meshBase } = urdfMeshSource.value
+  meshErrors.value = []
+  if (!meshEnabled.value || !defs.length) {
+    meshes.value = []
+    meshStatus.value = defs.length ? '未显示 3D 网格' : ''
+    return
+  }
+
+  meshStatus.value = '加载 3D 网格…'
+  const loaded = []
+  let failures = 0
+  let total = 0
+  try {
+    for (let index = 0; index < defs.length; index += 1) {
+      if (token !== meshToken) return
+      meshStatus.value = `加载 3D 网格 ${index + 1}/${defs.length}…`
+      const definition = defs[index]
+      let bytes = meshBytes(definition.filename)
+      const packageMatch = /^package:\/\/([^/]+)\//.exec(definition.filename)
+      const remoteBase = meshBase || (packageMatch ? MESH_PACKAGES[packageMatch[1]] : '')
+      if (!bytes && remoteBase && packageMatch) {
+        try {
+          const response = await fetch(remoteBase + definition.filename.replace(/^package:\/\/[^/]+\//, ''))
+          if (response.ok) bytes = new Uint8Array(await response.arrayBuffer())
+        } catch {
+          bytes = null
+        }
+      }
+      if (!bytes) {
+        failures += 1
+        continue
+      }
+      total += bytes.length
+      if (total > MESH_MAX_BYTES) {
+        failures += 1
+        continue
+      }
+      loaded.push({ definition, bytes })
+    }
+
+    const geometries = []
+    const totalBytes = loaded.reduce((sum, item) => sum + item.bytes.length, 0) || 1
+    for (const item of loaded) {
+      const budget = Math.max(24, Math.round((MESH_TRIANGLES * item.bytes.length) / totalBytes))
+      const { triangles } = parseStl(item.bytes, { maxTriangles: budget })
+      geometries.push({
+        node: item.definition.link,
+        triangles,
+        xyz: item.definition.xyz,
+        rpy: item.definition.rpy,
+        scale: item.definition.scale,
+      })
+    }
+    if (token !== meshToken) return
+    meshes.value = geometries
+    meshStatus.value = `已加载 ${geometries.length} 个网格${failures ? `，${failures} 个无法获取` : ''}`
+    if (failures) meshErrors.value = [{ level: 'warn', message: `${failures} 个 URDF 网格无法加载（.dae/.obj 暂不支持，或文件不在本机）。` }]
+  } finally {
+    if (token === meshToken) meshStatus.value ||= '未加载网格'
+  }
+}
+
+async function applyTopics(files, jointName, imuName) {
   busy.value = true
   error.value = ''
   progress.value = 0
   try {
     await new Promise((resolve) => requestAnimationFrame(resolve))
-    const decoded = readRosbag(bytes, {
+    const decoded = readBag(files, {
+      format: formatMode.value,
       topics: [jointName, imuName].filter(Boolean),
       onProgress: (value) => {
         progress.value = Math.round(value * 100)
@@ -244,10 +447,8 @@ async function applyTopics(bytes, jointName, imuName) {
     }
     if (!(end > start)) throw new Error('关节与 IMU 话题没有重叠的有效时间段')
 
-    const detected = detectProfile(joint.names, joint.names.length, joint.named)
     result.value = decoded
-    profile.value = detected
-    mapping.value = mapJoints(detected, joint)
+    bagFormat.value = decoded.format
     startTime.value = start
     duration.value = end - start
     jointGap.value = Math.max(0.1, 10 * medianInterval(joint.times))
@@ -255,36 +456,13 @@ async function applyTopics(bytes, jointName, imuName) {
 
     const list = [...decoded.warnings]
     if (imuFallback) {
-      list.push({
-        level: 'warn',
-        message: `IMU 话题 ${imuName} 与关节时间没有重叠，已改为仅用关节回放。`,
-      })
+      list.push({ level: 'warn', message: `IMU 话题 ${imuName} 与关节时间没有重叠，已改为仅用关节回放。` })
     }
-    if (/\.active$/i.test(fileName.value)) {
-      list.unshift({
-        level: 'info',
-        message: '已按未完成录制打开 .active 文件，自动保留尾部截断前的完整数据块。',
-      })
-    }
-    if (!detected.skeleton) {
-      list.push({
-        level: 'warn',
-        message: `没有匹配的骨架（${detected.label}），仍会显示关节数值，但不会绘制 3D 姿态。`,
-      })
-    }
-    if (joint.topic.includes('/motor/') && (detected.id === 'luna' || detected.id === 'oli')) {
-      list.push({
-        level: 'warn',
-        message: '当前使用电机话题：并联踝/腰的电机角度与串行关节角不同，3D 姿态只作参考，不是实机串行关节角。',
-      })
-    }
-    if (mapping.value.unmapped.length) {
-      list.push({
-        level: 'warn',
-        message: `${mapping.value.unmapped.length} 个关节名未映射到骨架：${mapping.value.unmapped.slice(0, 6).join('、')}${mapping.value.unmapped.length > 6 ? ' 等' : ''}`,
-      })
+    if (files.some((file) => /\.active$/i.test(file.name))) {
+      list.unshift({ level: 'info', message: '已按未完成录制打开 .active 文件，自动保留尾部截断前的完整数据块。' })
     }
     warnings.value = list
+    await mountModel(joint)
   } catch (cause) {
     fail(cause)
   } finally {
@@ -293,53 +471,63 @@ async function applyTopics(bytes, jointName, imuName) {
   }
 }
 
-async function loadBytes(bytes, name, sample) {
+async function loadBagFiles(files, sample = '') {
   busy.value = true
   error.value = ''
   try {
-    if (!bytes.length) throw new Error(`${name} 是空文件`)
-    if (bytes.length > MAX_BAG_BYTES) {
-      throw new Error(`${name} 超过 ${formatBytes(MAX_BAG_BYTES)} 上限`)
+    if (!files.length) throw new Error('没有 bag 文件')
+    for (const file of files) {
+      if (!file.bytes.length) throw new Error(`${file.name} 是空文件`)
+      if (file.bytes.length > MAX_BAG_BYTES) throw new Error(`${file.name} 超过 ${formatBytes(MAX_BAG_BYTES)} 上限`)
     }
-    const info = inspectRosbag(bytes)
+    const info = inspectBag(files, formatMode.value)
     topics.value = info.topics
     const joints = info.topics.filter((topic) => topic.kind === 'joint')
-    if (!joints.length) {
-      throw new Error('bag 里没有 JointState 话题；至少需要一个关节状态话题才能回放姿态')
-    }
+    if (!joints.length) throw new Error('bag 里没有可解析的关节话题；至少需要一个 JointState 话题才能回放姿态')
     const imus = info.topics.filter((topic) => topic.kind === 'imu')
     const joint = pickTopic(joints, ['/joint/state', '/motor/state'])
     const imu = pickTopic(imus, ['/ImuData', '/imu/data', '/imu'])
-    bagBytes.value = bytes
-    fileName.value = name
+    bagFormat.value = info.format
+    bagFiles.value = files
+    fileName.value = files.map((file) => file.name).join(' + ')
     sampleName.value = sample
     jointTopic.value = joint.name
     imuTopic.value = imu?.name || ''
-    await applyTopics(bytes, jointTopic.value, imuTopic.value)
+    await applyTopics(files, jointTopic.value, imuTopic.value)
   } catch (cause) {
     fail(cause)
+  } finally {
+    busy.value = false
   }
 }
 
-async function handleFile(file) {
+function addMeshSources(entries) {
+  const next = new Map(meshSources.value)
+  for (const entry of entries) {
+    next.set(entry.name, entry.bytes)
+    if (entry.path) next.set(entry.path, entry.bytes)
+    next.set(entry.name.split('/').filter(Boolean).pop(), entry.bytes)
+  }
+  meshSources.value = next
+}
+
+async function useUrdf(urdf, meshEntries) {
+  addMeshSources(meshEntries)
+  customUrdf.value = { name: urdf.name, text: new TextDecoder().decode(urdf.bytes) }
+  profileChoice.value = 'custom'
+  meshEnabled.value = meshEntries.length > 0
+  if (result.value && jointSeries.value) await mountModel(jointSeries.value)
+}
+
+async function loadSample() {
   if (busy.value) return
-  if (!/\.(bag|active)$/i.test(file.name)) {
-    fail(new Error('仅支持 ROS1 .bag / .active 文件'))
-    return
-  }
-  if (file.size === 0) {
-    fail(new Error('文件为空'))
-    return
-  }
-  if (file.size > MAX_BAG_BYTES) {
-    fail(new Error(`文件超过 ${formatBytes(MAX_BAG_BYTES)} 上限`))
-    return
-  }
   busy.value = true
   error.value = ''
   try {
-    const bytes = new Uint8Array(await file.arrayBuffer())
-    await loadBytes(bytes, file.name, '')
+    const response = await fetch(`${import.meta.env.BASE_URL}${SAMPLE.file}`)
+    if (!response.ok) throw new Error(`示例 bag 加载失败（HTTP ${response.status}）`)
+    const bytes = new Uint8Array(await response.arrayBuffer())
+    await loadBagFiles([{ name: SAMPLE.file.split('/').pop(), bytes }], SAMPLE.label)
   } catch (cause) {
     fail(cause)
   } finally {
@@ -360,9 +548,7 @@ async function handleLogs(files) {
     const texts = []
     for (const file of files) texts.push(await file.text())
     const parsed = parseLogText(texts.join('\n'))
-    if (!parsed.entries.length) {
-      throw new Error('日志里没有带时间戳的行（支持 clk(...)、[epoch] 或 YYYY-MM-DD HH:MM:SS.mmm）')
-    }
+    if (!parsed.entries.length) throw new Error('日志里没有带时间戳的行（支持 clk(...)、[epoch] 或 YYYY-MM-DD HH:MM:SS.mmm）')
     logEntries.value = parsed.entries
     logWarnings.value = parsed.warnings
     logError.value = ''
@@ -374,21 +560,65 @@ async function handleLogs(files) {
   }
 }
 
-async function handleFiles(files) {
+async function expandInputFiles(input) {
+  const entries = []
+  for (const file of [...input]) {
+    if (file.size > MAX_BAG_BYTES) throw new Error(`${file.name} 超过 ${formatBytes(MAX_BAG_BYTES)} 上限`)
+    const bytes = new Uint8Array(await file.arrayBuffer())
+    if (isZipArchive(file.name, bytes)) {
+      const { files } = await expandArchive(file.name, bytes, { maxFileBytes: MAX_BAG_BYTES, maxTotalBytes: MAX_BAG_BYTES, maxEntries: 512 })
+      for (const entry of files) entries.push({ name: entry.path, path: entry.path, bytes: entry.bytes })
+    } else {
+      entries.push({ name: file.name, bytes })
+    }
+  }
+  return entries
+}
+
+async function handleFiles(input) {
   if (busy.value || logBusy.value) return
-  const list = [...files]
-  const bags = list.filter((file) => fileKind(file.name) === 'bag')
-  const logs = list.filter((file) => fileKind(file.name) === 'log')
-  if (!bags.length && !logs.length) {
-    fail(new Error('仅支持 ROS1 .bag / .active 和文本 .log / .txt 文件'))
-    return
+  busy.value = true
+  error.value = ''
+  try {
+    const entries = await expandInputFiles(input)
+    const bags = []
+    const logs = []
+    const meshEntries = []
+    const unsupported = []
+    let urdf = null
+    for (const entry of entries) {
+      if (entry.bytes.length > MAX_BAG_BYTES) throw new Error(`${entry.name} 超过 ${formatBytes(MAX_BAG_BYTES)} 上限`)
+      if (sniffBagFormat(entry.bytes)) bags.push(entry)
+      else if (/\.(log|txt)$/i.test(entry.name)) logs.push({ name: entry.name, size: entry.bytes.length, text: async () => new TextDecoder().decode(entry.bytes) })
+      else if (/\.urdf$/i.test(entry.name)) urdf = entry
+      else if (/\.xacro$/i.test(entry.name)) throw new Error('暂不支持 .xacro，请先展开为 .urdf')
+      else if (/\.stl$/i.test(entry.name)) meshEntries.push(entry)
+      else if (/\.(dae|obj)$/i.test(entry.name)) meshEntries.push(entry)
+      else unsupported.push(entry.name)
+    }
+    if (!bags.length && !logs.length && !urdf && !meshEntries.length) {
+      throw new Error(`仅支持 ROS1 .bag/.active、ROS2 .mcap/.db3、.zip、文本 .log/.txt 与 URDF/STL。${unsupported.length ? `不支持：${unsupported.slice(0, 3).join('、')}` : ''}`)
+    }
+    if (meshEntries.some((item) => /\.(dae|obj)$/i.test(item.name))) {
+      meshErrors.value = [{ level: 'warn', message: '.dae / .obj 网格暂不支持，请使用 STL。' }]
+    }
+    if (urdf)
+      await useUrdf(
+        urdf,
+        meshEntries.filter((item) => /\.stl$/i.test(item.name)),
+      )
+    else if (meshEntries.length && customUrdf.value) {
+      addMeshSources(meshEntries.filter((item) => /\.stl$/i.test(item.name)))
+      meshEnabled.value = true
+      if (result.value) await loadMeshes()
+    }
+    if (logs.length) await handleLogs(logs)
+    if (bags.length) await loadBagFiles(bags)
+  } catch (cause) {
+    fail(cause)
+  } finally {
+    busy.value = false
   }
-  if (bags.length > 1) {
-    fail(new Error('一次只能加载一个 bag 文件'))
-    return
-  }
-  if (bags[0]) await handleFile(bags[0])
-  if (logs.length) await handleLogs(logs)
 }
 
 function onDrop(event) {
@@ -403,15 +633,26 @@ function onFileChange(event) {
   event.target.value = ''
 }
 
-async function loadSample() {
-  if (busy.value) return
+async function reloadFormat() {
+  if (!bagFiles.value.length || busy.value) return
+  await loadBagFiles(bagFiles.value, sampleName.value)
+}
+
+async function reparse() {
+  if (!bagFiles.value.length || !jointTopic.value) return
+  await applyTopics(bagFiles.value, jointTopic.value, imuTopic.value || '')
+}
+
+async function changeProfile() {
+  if (profileChoice.value === 'custom' && !customUrdf.value) {
+    error.value = '请先上传 .urdf 文件（可同时选择同目录的 STL，或上传包含网格的 zip）'
+    profileChoice.value = 'auto'
+    return
+  }
+  if (!result.value || !jointSeries.value || busy.value) return
   busy.value = true
-  error.value = ''
   try {
-    const response = await fetch(`${import.meta.env.BASE_URL}${SAMPLE.file}`)
-    if (!response.ok) throw new Error(`示例 bag 加载失败（HTTP ${response.status}）`)
-    const bytes = new Uint8Array(await response.arrayBuffer())
-    await loadBytes(bytes, SAMPLE.file.split('/').pop(), SAMPLE.label)
+    await mountModel(jointSeries.value)
   } catch (cause) {
     fail(cause)
   } finally {
@@ -419,9 +660,11 @@ async function loadSample() {
   }
 }
 
-async function reparse() {
-  if (!bagBytes.value || !jointTopic.value) return
-  await applyTopics(bagBytes.value, jointTopic.value, imuTopic.value || '')
+async function toggleMeshes() {
+  if (!urdfMeshSource.value.defs.length && meshEnabled.value) {
+    meshStatus.value = '当前 URDF 没有引用网格'
+  }
+  await loadMeshes()
 }
 
 function fail(cause) {
@@ -434,13 +677,24 @@ function fail(cause) {
   topics.value = []
   fileName.value = ''
   sampleName.value = ''
-  bagBytes.value = null
+  bagFiles.value = []
+  bagFormat.value = ''
+  urdfMeshSource.value = { defs: [], meshBase: '' }
+  meshes.value = []
+  meshErrors.value = []
+  meshStatus.value = ''
+  urdfWarning.value = ''
 }
 
 function clearAll() {
   pause()
   fail('')
   error.value = ''
+  formatMode.value = 'auto'
+  profileChoice.value = 'auto'
+  customUrdf.value = null
+  meshSources.value = new Map()
+  meshEnabled.value = false
   logName.value = ''
   logEntries.value = []
   logWarnings.value = []
@@ -497,6 +751,20 @@ function seek(event) {
   current.value = Math.max(0, Math.min(duration.value, Number(event.target.value)))
 }
 
+function seekWave(seconds) {
+  pause()
+  current.value = Math.max(0, Math.min(duration.value, seconds))
+}
+
+async function toggleFullscreen() {
+  if (document.fullscreenElement) await document.exitFullscreen()
+  else await stage.value?.requestFullscreen?.()
+}
+
+function onFullscreenChange() {
+  isFullscreen.value = document.fullscreenElement === stage.value
+}
+
 function onKeydown(event) {
   if (event.repeat) return
   // Do not steal Space/arrows from a focused control (sample button, link,
@@ -516,9 +784,13 @@ function onKeydown(event) {
   }
 }
 
-onMounted(() => window.addEventListener('keydown', onKeydown))
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown)
+  document.addEventListener('fullscreenchange', onFullscreenChange)
+})
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
+  document.removeEventListener('fullscreenchange', onFullscreenChange)
   pause()
 })
 </script>
@@ -527,21 +799,28 @@ onBeforeUnmount(() => {
   <main class="app-main">
     <section class="card input-card">
       <div class="card-head">
-        <h2>导入机器人 bag 与日志</h2>
+        <h2>导入机器人 bag、日志与 URDF</h2>
         <span v-if="fileName" class="badge">{{ fileName }}</span>
         <span v-if="logName" class="badge">{{ logName }}</span>
       </div>
 
       <label class="drop-zone" :class="{ dragging }" @dragover.prevent="dragging = true" @dragleave.prevent="dragging = false" @drop.prevent="onDrop">
-        <input type="file" multiple accept=".bag,.active,.log,.txt" :disabled="busy || logBusy" @change="onFileChange" />
-        <span class="drop-title">拖拽 ROS1 .bag / .active 与 .log 文本日志，或点击选择文件</span>
+        <input type="file" multiple accept=".bag,.active,.mcap,.db3,.zip,.log,.txt,.urdf,.stl,.dae,.obj" :disabled="busy || logBusy" @change="onFileChange" />
+        <span class="drop-title">拖拽 ROS1 bag、ROS2 MCAP / .db3、.zip、.log 或 .urdf，或点击选择文件</span>
         <span class="drop-hint">
-          JointState + IMU · 未压缩或 lz4 · .active 自动恢复 · 日志按 clk / 时间戳对齐 · bag 最大
+          JointState + IMU · ROS1 未压缩或 lz4 · ROS2 MCAP（lz4 / 未压缩）与 sqlite3 · 自动识别 LimX 自定义消息 · .active 自动恢复 · 日志按 clk / 时间戳对齐 · bag 最大
           {{ formatBytes(MAX_BAG_BYTES) }} · 日志最大 {{ formatBytes(MAX_LOG_BYTES) }} · 数据只在浏览器本地处理
         </span>
       </label>
 
       <div class="actions">
+        <label class="format-select">
+          <span>bag 格式</span>
+          <select v-model="formatMode" :disabled="busy" @change="reloadFormat">
+            <option v-for="item in BAG_FORMATS" :key="item.id" :value="item.id">{{ item.label }}</option>
+          </select>
+        </label>
+        <span v-if="bagFormat" class="badge">{{ FORMAT_LABELS[bagFormat] }}</span>
         <button type="button" class="btn" :disabled="busy" @click="loadSample">示例：{{ SAMPLE.label }}</button>
         <button type="button" class="btn ghost" :disabled="busy || logBusy" @click="clearAll">清空</button>
         <span v-if="sampleName" class="muted small">示例：{{ sampleName }}</span>
@@ -564,10 +843,10 @@ onBeforeUnmount(() => {
         </div>
       </section>
 
-      <section v-if="warnings.length" class="card warnings-card">
-        <h2>提示（{{ warnings.length }}）</h2>
+      <section v-if="allWarnings.length" class="card warnings-card">
+        <h2>提示（{{ allWarnings.length }}）</h2>
         <ul class="warning-list">
-          <li v-for="(warning, index) in warnings" :key="index" :class="`warn-${warning.level}`">
+          <li v-for="(warning, index) in allWarnings" :key="index" :class="`warn-${warning.level}`">
             {{ warning.message }}
           </li>
         </ul>
@@ -575,8 +854,8 @@ onBeforeUnmount(() => {
 
       <section class="card">
         <div class="card-head">
-          <h2>话题与型号</h2>
-          <span class="badge">{{ profile?.label }}</span>
+          <h2>话题、型号与 URDF</h2>
+          <span class="badge">{{ profile?.label || '未识别骨架' }}</span>
         </div>
         <div class="topic-grid">
           <label>
@@ -592,8 +871,28 @@ onBeforeUnmount(() => {
               <option v-for="topic in imuTopics" :key="topic.name" :value="topic.name">{{ topic.name }} · {{ topic.type }}</option>
             </select>
           </label>
+          <label>
+            <span>骨架 / URDF</span>
+            <select v-model="profileChoice" :disabled="busy" @change="changeProfile">
+              <option value="auto">自动识别（按关节名）</option>
+              <option v-for="item in ALL_PROFILES" :key="item.id" :value="item.id">{{ item.label }}</option>
+              <option value="custom">自定义 URDF</option>
+            </select>
+          </label>
         </div>
-        <p class="muted small">关节按名称映射到骨架；没有名称的 bag 按机型配置的硬件下标顺序映射。 未接入的机型会显示关节数值，不会凭空生成模型。</p>
+        <div class="urdf-row">
+          <label class="btn ghost file-btn">
+            上传 URDF / STL / ZIP
+            <input type="file" multiple accept=".urdf,.stl,.zip,.dae,.obj" :disabled="busy" @change="onFileChange" />
+          </label>
+          <label class="loop-label"><input v-model="meshEnabled" type="checkbox" :disabled="busy" @change="toggleMeshes" /> 加载 3D 模型</label>
+          <span v-if="customUrdf" class="muted small">{{ customUrdf.name }}</span>
+          <span v-if="meshStatus" class="muted small">{{ meshStatus }}</span>
+        </div>
+        <p class="muted small">
+          预置骨架从 <code>public/robots/*.urdf</code> 加载，不再写死在源码里。Luna 的 URDF 引用了 limxdynamics/luna-description 的 STL，勾选“加载 3D
+          模型”后会按需下载并抽稀显示。关节按名称映射到骨架；没有名称的 bag 按机型配置的硬件下标顺序映射。
+        </p>
       </section>
 
       <section class="card">
@@ -624,83 +923,100 @@ onBeforeUnmount(() => {
         </details>
       </section>
 
-      <section class="card">
-        <div class="card-head">
-          <h2>姿态回放</h2>
-          <span v-if="atGap" class="chip warn-chip">DATA GAP</span>
-        </div>
-
-        <dl class="kv pose-kv">
-          <div>
-            <dt>底座位姿</dt>
-            <dd class="mono">RPY {{ baseEuler.map((value) => value.toFixed(1)).join('° / ') }}°</dd>
+      <div ref="stage" class="replay-stage">
+        <section class="card pose-card">
+          <div class="card-head">
+            <h2>姿态回放</h2>
+            <span v-if="atGap" class="chip warn-chip">DATA GAP</span>
+            <button type="button" class="btn ghost icon-btn fullscreen-btn" @click="toggleFullscreen">
+              {{ isFullscreen ? '退出全屏' : '全屏' }}
+            </button>
           </div>
-          <div>
-            <dt>关节帧</dt>
-            <dd class="mono">{{ jointFrame + 1 }} / {{ jointSeries?.count ?? 0 }}</dd>
-          </div>
-          <div>
-            <dt>IMU 帧</dt>
-            <dd class="mono">{{ imuSeries ? imuFrame + 1 : '—' }}</dd>
-          </div>
-          <div>
-            <dt>时钟</dt>
-            <dd class="mono">{{ absoluteTime.toFixed(3) }} s</dd>
-          </div>
-        </dl>
 
-        <RobotSkeletonView
-          :points="pose?.points || null"
-          :skeleton="profile?.skeleton || null"
-          :empty-message="profile?.skeleton ? '当前时刻没有关节数据' : '未识别骨架，请展开上方关节角度查看数值'"
-        />
+          <dl class="kv pose-kv">
+            <div>
+              <dt>底座位姿</dt>
+              <dd class="mono">RPY {{ baseEuler.map((value) => value.toFixed(1)).join('° / ') }}°</dd>
+            </div>
+            <div>
+              <dt>关节帧</dt>
+              <dd class="mono">{{ jointFrame + 1 }} / {{ jointSeries?.count ?? 0 }}</dd>
+            </div>
+            <div>
+              <dt>IMU 帧</dt>
+              <dd class="mono">{{ imuSeries ? imuFrame + 1 : '—' }}</dd>
+            </div>
+            <div>
+              <dt>时钟</dt>
+              <dd class="mono">{{ absoluteTime.toFixed(3) }} s</dd>
+            </div>
+          </dl>
 
-        <div class="playback-bar">
-          <button type="button" class="btn primary icon-btn" @click="toggle">
-            {{ playing ? '暂停' : '播放' }}
-          </button>
-          <button type="button" class="btn ghost icon-btn" title="上一帧" @click="step(-1)">‹</button>
-          <button type="button" class="btn ghost icon-btn" title="下一帧" @click="step(1)">›</button>
-          <input class="playback-range" type="range" min="0" :max="duration" step="0.001" :value="current" aria-label="回放时间" @input="seek" />
-          <span class="mono time-label">{{ formatTime(current) }} / {{ formatTime(duration) }}</span>
-          <select v-model.number="speed" class="mono" aria-label="播放速度">
-            <option :value="0.25">0.25×</option>
-            <option :value="0.5">0.5×</option>
-            <option :value="1">1×</option>
-            <option :value="2">2×</option>
-          </select>
-          <label class="loop-label"><input v-model="loop" type="checkbox" /> 循环</label>
-        </div>
-      </section>
-    </template>
+          <div class="pose-view">
+            <RobotSkeletonView
+              :points="pose?.points || null"
+              :skeleton="profile?.skeleton || null"
+              :transforms="pose?.transforms || null"
+              :meshes="meshes"
+              :empty-message="profile?.skeleton ? '当前时刻没有关节数据' : '未识别骨架，可上传 URDF 或展开上方关节角度查看数值'"
+            />
+          </div>
 
-    <section v-if="logName || logError" class="card log-card">
-      <div class="card-head">
-        <h2>日志时间线</h2>
-        <span v-if="logName" class="badge">{{ logName }}</span>
+          <div class="playback-bar">
+            <button type="button" class="btn primary icon-btn" @click="toggle">
+              {{ playing ? '暂停' : '播放' }}
+            </button>
+            <button type="button" class="btn ghost icon-btn" title="上一帧" @click="step(-1)">‹</button>
+            <button type="button" class="btn ghost icon-btn" title="下一帧" @click="step(1)">›</button>
+            <input class="playback-range" type="range" min="0" :max="duration" step="0.001" :value="current" aria-label="回放时间" @input="seek" />
+            <span class="mono time-label">{{ formatTime(current) }} / {{ formatTime(duration) }}</span>
+            <select v-model.number="speed" class="mono" aria-label="播放速度">
+              <option :value="0.25">0.25×</option>
+              <option :value="0.5">0.5×</option>
+              <option :value="1">1×</option>
+              <option :value="2">2×</option>
+            </select>
+            <label class="loop-label"><input v-model="loop" type="checkbox" /> 循环</label>
+          </div>
+        </section>
+
+        <section v-if="logName || logError || isFullscreen" class="card log-card">
+          <div class="card-head">
+            <h2>日志时间线</h2>
+            <span v-if="logName" class="badge">{{ logName }}</span>
+          </div>
+
+          <p v-if="logError" class="warn-warn">{{ logError }}</p>
+          <template v-else-if="logEntries.length">
+            <p class="muted small">
+              {{ logEntries.length.toLocaleString() }} 条带时间戳的日志
+              <template v-if="result">
+                · 按 {{ logBasis }} 对齐
+                <span v-if="!logAligned.aligned" class="warn-warn">· 日志时间与 bag 记录时间不重叠，无法匹配</span>
+                <span v-if="logAligned.dropped" class="warn-warn">· 另有 {{ logAligned.dropped.toLocaleString() }} 条日志使用其他时钟，无法对齐</span>
+              </template>
+            </p>
+
+            <LogTimeline v-if="result && logRows.length" :rows="logRows" :active="logIndex" :aligned="logAligned.aligned" :start-time="startTime" />
+
+            <ul v-if="logWarnings.length" class="warning-list">
+              <li v-for="(warning, index) in logWarnings" :key="index" :class="`warn-${warning.level}`">
+                {{ warning.message }}
+              </li>
+            </ul>
+          </template>
+          <p v-else-if="isFullscreen" class="muted small">未导入日志。把 .log/.txt 拖进来后会按时间戳显示在这里。</p>
+        </section>
       </div>
 
-      <p v-if="logError" class="warn-warn">{{ logError }}</p>
-      <template v-else>
-        <p class="muted small">
-          {{ logEntries.length.toLocaleString() }} 条带时间戳的日志
-          <template v-if="result">
-            · 按 {{ logBasis }} 对齐
-            <span v-if="!logAligned.aligned" class="warn-warn">· 日志时间与 bag 记录时间不重叠，无法匹配</span>
-            <span v-if="logAligned.dropped" class="warn-warn">· 另有 {{ logAligned.dropped.toLocaleString() }} 条日志使用其他时钟，无法对齐</span>
-          </template>
-          <template v-else> · 导入 bag 后按播放时间显示</template>
-        </p>
-
-        <LogTimeline v-if="result && logRows.length" :rows="logRows" :active="logIndex" :aligned="logAligned.aligned" :start-time="startTime" />
-
-        <ul v-if="logWarnings.length" class="warning-list">
-          <li v-for="(warning, index) in logWarnings" :key="index" :class="`warn-${warning.level}`">
-            {{ warning.message }}
-          </li>
-        </ul>
-      </template>
-    </section>
+      <section class="card">
+        <div class="card-head">
+          <h2>关节与 IMU 波形</h2>
+          <span class="muted small">拖动图表可定位时间点</span>
+        </div>
+        <SignalChart :rows="waveRows" :start-time="startTime" :duration="duration" :current="current" empty-message="没有可绘制的关节或 IMU 数据" @seek="seekWave" />
+      </section>
+    </template>
   </main>
 </template>
 
@@ -744,12 +1060,13 @@ onBeforeUnmount(() => {
 
 .topic-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 12px;
   margin-bottom: 10px;
 }
 
-.topic-grid label {
+.topic-grid label,
+.format-select {
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -757,7 +1074,8 @@ onBeforeUnmount(() => {
   font-size: 0.82rem;
 }
 
-.topic-grid select {
+.topic-grid select,
+.format-select select {
   width: 100%;
   min-width: 0;
   padding: 8px 10px;
@@ -767,6 +1085,88 @@ onBeforeUnmount(() => {
   color: var(--text);
   font-family: var(--mono);
   font-size: 0.8rem;
+}
+
+.format-select {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.format-select select {
+  width: auto;
+}
+
+.urdf-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.file-btn {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.file-btn input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.pose-view {
+  min-height: 0;
+}
+
+.fullscreen-btn {
+  margin-left: auto;
+}
+
+.replay-stage:fullscreen {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  overflow: auto;
+  background: var(--bg, #0b0d12);
+}
+
+.replay-stage:fullscreen .pose-card {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.replay-stage:fullscreen .pose-view {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 240px;
+}
+
+.replay-stage:fullscreen .pose-kv {
+  margin: 8px 0;
+  flex: 0 0 auto;
+}
+
+.replay-stage:fullscreen .playback-bar {
+  flex: 0 0 auto;
+}
+
+.replay-stage:fullscreen :deep(.skeleton-view) {
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.replay-stage:fullscreen .log-card {
+  flex: 0 0 auto;
+  max-height: 34vh;
+  overflow: auto;
 }
 
 .warn-chip {

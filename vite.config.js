@@ -19,6 +19,10 @@ export default defineConfig({
       // Parser samples stay available offline; EDA samples are large and cached on use.
       'samples/akd-eeprom.bin',
       'samples/limx-tron2.bin',
+      // Preset replay skeletons are small enough to precache.
+      'robots/luna.urdf',
+      'robots/oli.urdf',
+      'robots/tron2a.urdf',
     ]),
   ],
   resolve: {

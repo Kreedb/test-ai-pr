@@ -44,6 +44,26 @@ function quatMatrix(quat) {
   ]
 }
 
+function rpyMatrix(rpy) {
+  if (!rpy) return IDENTITY
+  const [roll, pitch, yaw] = rpy
+  if (!roll && !pitch && !yaw) return IDENTITY
+  const cr = Math.cos(roll)
+  const sr = Math.sin(roll)
+  const cp = Math.cos(pitch)
+  const sp = Math.sin(pitch)
+  const cy = Math.cos(yaw)
+  const sy = Math.sin(yaw)
+  // R = Rz(yaw) * Ry(pitch) * Rx(roll), written column-major.
+  // prettier-ignore
+  return [
+    cy * cp, sy * cp, -sp, 0,
+    cy * sp * sr - sy * cr, sy * sp * sr + cy * cr, cp * sr, 0,
+    cy * sp * cr + sy * sr, sy * sp * cr - cy * sr, cp * cr, 0,
+    0, 0, 0, 1,
+  ]
+}
+
 function axisAngle(axis, angle) {
   const length = Math.hypot(axis[0], axis[1], axis[2])
   if (!Number.isFinite(length) || length < 1e-9) return IDENTITY
@@ -77,9 +97,11 @@ export function computePose(skeleton, jointValues, baseQuat) {
     let matrix
     if (parentIndex === undefined || parentIndex === null) {
       // Rotate around the model origin, then place the base at its rest height.
-      matrix = multiply(translation(node.offset), quatMatrix(baseQuat))
+      matrix = multiply(translation(node.offset), rpyMatrix(node.rpy))
+      matrix = multiply(matrix, quatMatrix(baseQuat))
     } else {
       matrix = multiply(transforms[parentIndex], translation(node.offset))
+      matrix = multiply(matrix, rpyMatrix(node.rpy))
       const angle = node.joint ? jointValues.get(node.joint) : undefined
       if (node.joint && node.axis && Number.isFinite(angle)) {
         matrix = multiply(matrix, axisAngle(node.axis, angle))

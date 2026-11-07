@@ -6,10 +6,13 @@
 //
 // JointState and IMU messages are turned into columns instead of one object per
 // message: a 300k-frame Luna bag would otherwise hold millions of decoded
-// strings. Message types are matched by name because no ROS environment is
-// available in the browser.
+// strings. Payloads are decoded from the embedded message definition, so both
+// standard ROS types and LimX's custom controller messages use the same reader.
 
 import lz4js from 'lz4js'
+
+import { decodeImuMessage, decodeJointMessage, messageKind, messageProfile } from './rosmsg.js'
+import { finalizeSeries, makeImuAccumulator, makeJointAccumulator, pushImu, pushJoint } from './series.js'
 
 export const BAG_MAGIC = '#ROSBAG V2.0\n'
 export const MAX_BAG_BYTES = 2048 * 1024 * 1024
@@ -170,12 +173,18 @@ export function inspectRosbag(bytes) {
 
   const topics = [...connections.values()]
     .filter((connection) => connection.topic)
-    .map((connection) => ({
-      name: connection.topic,
-      type: connection.type,
-      md5: connection.md5,
-      kind: topicKind(connection.type),
-    }))
+    .map((connection) => {
+      const profile = messageProfile(connection.type, connection.definition)
+      return {
+        name: connection.topic,
+        type: connection.type,
+        md5: connection.md5,
+        kind: profile.kind,
+        family: profile.family,
+        modified: profile.modified,
+        standard: profile.standard,
+      }
+    })
     .sort((left, right) => left.name.localeCompare(right.name))
 
   const result = { version: BAG_MAGIC.trim().split(' ').pop(), topics, connections }
@@ -183,286 +192,21 @@ export function inspectRosbag(bytes) {
   return result
 }
 
-export function topicKind(type = '') {
-  if (type === 'controller_msgs/JointState' || type === 'sensor_msgs/JointState') return 'joint'
-  if (type === 'controller_msgs/IMUData' || type === 'sensor_msgs/Imu') return 'imu'
-  return null
-}
-
-class Cursor {
-  constructor(bytes) {
-    this.bytes = bytes
-    this.view = viewOf(bytes)
-    this.offset = 0
-  }
-
-  u32() {
-    const value = this.view.getUint32(this.offset, true)
-    this.offset += 4
-    return value
-  }
-
-  u64() {
-    const value = this.view.getBigUint64(this.offset, true)
-    this.offset += 8
-    return Number(value)
-  }
-
-  f32() {
-    const value = this.view.getFloat32(this.offset, true)
-    this.offset += 4
-    return value
-  }
-
-  f64() {
-    const value = this.view.getFloat64(this.offset, true)
-    this.offset += 8
-    return value
-  }
-
-  ensure(count) {
-    if (count < 0 || this.offset + count > this.bytes.length) {
-      throw new Error('bag 消息字段越界，文件可能被截断')
-    }
-  }
-
-  string() {
-    const length = this.u32()
-    this.ensure(length)
-    const value = text(this.bytes.subarray(this.offset, this.offset + length))
-    this.offset += length
-    return value
-  }
-
-  stringArray() {
-    const count = this.u32()
-    // Every string has at least its 4-byte length prefix.
-    this.ensure(count * 4)
-    const values = []
-    const raw = []
-    for (let index = 0; index < count; index += 1) {
-      const length = this.u32()
-      this.ensure(length)
-      const slice = this.bytes.subarray(this.offset, this.offset + length)
-      raw.push(slice)
-      values.push(text(slice))
-      this.offset += length
-    }
-    return { values, raw }
-  }
-
-  f32Array() {
-    const count = this.u32()
-    this.ensure(count * 4)
-    const values = new Float32Array(count)
-    for (let index = 0; index < count; index += 1) values[index] = this.f32()
-    return values
-  }
-
-  f64Array() {
-    const count = this.u32()
-    this.ensure(count * 8)
-    const values = new Float64Array(count)
-    for (let index = 0; index < count; index += 1) values[index] = this.f64()
-    return values
-  }
-
-  skip(count) {
-    this.ensure(count)
-    this.offset += count
-  }
-}
-
-function readHeader(cursor) {
-  const seq = cursor.u32()
-  const seconds = cursor.u32()
-  const nanoseconds = cursor.u32()
-  const frameId = cursor.string()
-  return { seq, time: seconds + nanoseconds / 1e9, frameId }
-}
-
-const CHUNK = 8192
-
-class Column {
-  constructor(Type = Float32Array) {
-    this.Type = Type
-    this.chunks = []
-    this.current = null
-    this.filled = 0
-    this.length = 0
-  }
-
-  push(value) {
-    if (!this.current || this.filled === CHUNK) {
-      this.current = new this.Type(CHUNK)
-      this.chunks.push(this.current)
-      this.filled = 0
-    }
-    this.current[this.filled++] = value
-    this.length += 1
-  }
-
-  toArray() {
-    const values = new this.Type(this.length)
-    let offset = 0
-    for (const chunk of this.chunks) {
-      values.set(chunk.subarray(0, Math.min(chunk.length, this.length - offset)), offset)
-      offset += chunk.length
-    }
-    return values
-  }
-}
-
-function sameRawNames(left, right) {
-  if (!left || !right || left.length !== right.length) return false
-  for (let index = 0; index < left.length; index += 1) {
-    const a = left[index]
-    const b = right[index]
-    if (a.length !== b.length) return false
-    for (let byte = 0; byte < a.length; byte += 1) {
-      if (a[byte] !== b[byte]) return false
-    }
-  }
-  return true
-}
-
-function indexByName(names) {
-  const map = new Map()
-  for (let index = 0; index < names.length; index += 1) map.set(names[index], index)
-  for (let index = 0; index < names.length; index += 1) {
-    if (map.get(names[index]) !== index) {
-      throw new Error(`话题里的关节名称 ${names[index]} 重复，无法确定角度顺序`)
-    }
-  }
-  return map
-}
-
-function makeJointAccumulator(connection) {
-  return {
-    kind: 'joint',
-    topic: connection.topic,
-    type: connection.type,
-    times: new Column(Float64Array),
-    names: null,
-    rawNames: null,
-    columns: null,
-    named: false,
-    count: 0,
-  }
-}
-
-function pushJoint(accumulator, nameInfo, values) {
-  if (nameInfo.values.length && nameInfo.values.length !== values.length) {
-    throw new Error(`话题 ${accumulator.topic} 的关节名称数 ${nameInfo.values.length} 与角度数 ${values.length} 不一致`)
-  }
-  if (!accumulator.names) {
-    accumulator.named = nameInfo.values.length > 0
-    accumulator.names = nameInfo.values.length ? nameInfo.values : values.map((_, index) => `q_${index}`)
-    accumulator.rawNames = nameInfo.values.length ? nameInfo.raw.map((raw) => raw.slice()) : null
-    accumulator.columns = accumulator.names.map(() => new Column())
-  } else if (accumulator.rawNames && !sameRawNames(accumulator.rawNames, nameInfo.raw)) {
-    // A later frame may list the same joints in a different order; reorder once
-    // by name instead of trusting the column position.
-    const lookup = indexByName(nameInfo.values)
-    values = accumulator.names.map((name) => {
-      const source = lookup.get(name)
-      if (source === undefined) throw new Error(`话题 ${accumulator.topic} 的关节 ${name} 在后续帧里缺失`)
-      return values[source]
-    })
-  }
-  if (values.length !== accumulator.names.length) {
-    throw new Error(`话题 ${accumulator.topic} 的关节数从 ${accumulator.names.length} 变成 ${values.length}，无法对齐`)
-  }
-  if (values.some((value) => !Number.isFinite(value))) {
-    throw new Error(`话题 ${accumulator.topic} 有缺失或非数值的关节角度`)
-  }
-  accumulator.times.push(accumulator.timestamp)
-  for (let index = 0; index < values.length; index += 1) accumulator.columns[index].push(values[index])
-  accumulator.count += 1
+export function topicKind(type = '', definition = '') {
+  return messageKind(type, definition)
 }
 
 function decodeJoint(accumulator, data, timestamp) {
-  const cursor = new Cursor(data)
-  readHeader(cursor)
-  const nameInfo = cursor.stringArray()
-  // Both variants put positions immediately after names, but std_msgs uses
-  // float64 while the LimX controller message uses float32.
-  const values = accumulator.type === 'sensor_msgs/JointState' ? cursor.f64Array() : cursor.f32Array()
-  if (!values.length) throw new Error(`话题 ${accumulator.topic} 没有关节角度`)
-  accumulator.timestamp = timestamp
-  pushJoint(accumulator, nameInfo, [...values])
-}
-
-function makeImuAccumulator(connection) {
-  return {
-    kind: 'imu',
-    topic: connection.topic,
-    type: connection.type,
-    times: new Column(Float64Array),
-    quat: [0, 1, 2, 3].map(() => new Column()),
-    count: 0,
-  }
+  const { names, values } = decodeJointMessage(data, {
+    ros2: false,
+    definition: accumulator.definition,
+    type: accumulator.type,
+  })
+  pushJoint(accumulator, names, values, timestamp)
 }
 
 function decodeImu(accumulator, data, timestamp) {
-  const cursor = new Cursor(data)
-  readHeader(cursor)
-  let quat
-  if (accumulator.type === 'sensor_msgs/Imu') {
-    const x = cursor.f64()
-    const y = cursor.f64()
-    const z = cursor.f64()
-    const w = cursor.f64()
-    quat = [w, x, y, z]
-  } else {
-    cursor.u64() // imustamp
-    cursor.u32() // status
-    cursor.skip(3 * 8) // euler is not needed for the base orientation
-    quat = [cursor.f64(), cursor.f64(), cursor.f64(), cursor.f64()]
-  }
-  accumulator.times.push(timestamp)
-  for (let index = 0; index < 4; index += 1) accumulator.quat[index].push(quat[index])
-  accumulator.count += 1
-}
-
-function dedupe(series) {
-  const times = series.times.toArray()
-  const columns = {}
-  for (const [key, value] of Object.entries(series)) {
-    if (value instanceof Column) columns[key] = value.toArray()
-  }
-  for (const [key, value] of Object.entries(series)) {
-    if (Array.isArray(value) && value[0] instanceof Column) {
-      columns[key] = value.map((column) => column.toArray())
-    }
-  }
-
-  const length = times.length
-  let write = 0
-  let duplicates = 0
-  for (let read = 0; read < length; read += 1) {
-    if (read + 1 < length && times[read + 1] === times[read]) {
-      duplicates += 1
-      continue
-    }
-    times[write] = times[read]
-    for (const value of Object.values(columns)) {
-      if (Array.isArray(value)) {
-        for (const column of value) column[write] = column[read]
-      } else {
-        value[write] = value[read]
-      }
-    }
-    write += 1
-  }
-
-  for (const [key, value] of Object.entries(columns)) {
-    series[key] = Array.isArray(value) ? value.map((column) => column.slice(0, write)) : value.slice(0, write)
-  }
-  series.times = times.slice(0, write)
-  series.count = write
-  series.duplicates = duplicates
-  return series
+  pushImu(accumulator, decodeImuMessage(data, { ros2: false, definition: accumulator.definition, type: accumulator.type }), timestamp)
 }
 
 /**
@@ -480,7 +224,7 @@ export function readRosbag(bytes, { topics = [], onProgress } = {}) {
 
   for (const [id, connection] of connections) {
     if (!wanted.has(connection.topic)) continue
-    const kind = topicKind(connection.type)
+    const kind = topicKind(connection.type, connection.definition)
     if (!kind) {
       warnings.push({
         level: 'warn',
@@ -506,7 +250,10 @@ export function readRosbag(bytes, { topics = [], onProgress } = {}) {
       })
       continue
     }
-    const accumulator = kind === 'joint' ? makeJointAccumulator(connection) : makeImuAccumulator(connection)
+    const accumulator =
+      kind === 'joint'
+        ? makeJointAccumulator({ topic: connection.topic, type: connection.type, definition: connection.definition })
+        : makeImuAccumulator({ topic: connection.topic, type: connection.type, definition: connection.definition })
     byTopic.set(connection.topic, accumulator)
     accumulators.set(id, accumulator)
   }
@@ -561,25 +308,9 @@ export function readRosbag(bytes, { topics = [], onProgress } = {}) {
     })
   }
 
-  const series = {}
-  const seen = new Set()
-  for (const accumulator of accumulators.values()) {
-    if (seen.has(accumulator) || !accumulator.count) continue
-    seen.add(accumulator)
-    const ordered = dedupe(accumulator)
-    series[ordered.topic] = ordered
-    if (ordered.duplicates) {
-      warnings.push({
-        level: 'info',
-        message: `话题 ${ordered.topic} 有 ${ordered.duplicates} 个重复时间戳，回放时保留同刻最后一条记录。`,
-      })
-    }
-    for (let index = 1; index < ordered.times.length; index += 1) {
-      if (ordered.times[index] < ordered.times[index - 1]) {
-        throw new Error(`话题 ${ordered.topic} 的时间戳倒退，无法可靠回放`)
-      }
-    }
-  }
+  const finalized = finalizeSeries(accumulators)
+  const series = finalized.series
+  warnings.push(...finalized.warnings)
 
   const summaries = Object.values(series).map((item) => ({
     name: item.topic,

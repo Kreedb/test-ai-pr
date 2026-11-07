@@ -26,6 +26,7 @@ let programs = null
 let grid = null
 let meshBuffers = []
 let uploadedMeshes = null
+let contextLost = false
 
 function resize() {
   const element = host.value
@@ -222,6 +223,23 @@ void main() {
   buildGrid()
 }
 
+function onContextLost(event) {
+  event.preventDefault()
+  contextLost = true
+  gl = null
+  programs = null
+  grid = null
+  meshBuffers = []
+  draw()
+}
+
+function onContextRestored() {
+  contextLost = false
+  uploadedMeshes = null
+  initGL()
+  draw()
+}
+
 function buildGrid() {
   const vertices = []
   const push = (from, to, color) => vertices.push(from[0], from[1], from[2], ...color, to[0], to[1], to[2], ...color)
@@ -367,7 +385,12 @@ function draw() {
   context.fillStyle = 'rgba(153, 163, 179, 0.75)'
   context.font = '11px ui-monospace, SFMono-Regular, Menlo, monospace'
   context.textAlign = 'left'
-  context.fillText(props.meshes?.length && !gl ? '当前浏览器不支持 WebGL，无法显示 3D 网格' : '拖动旋转 · 滚轮缩放 · 双击复位', 12, 18)
+  let hint = '拖动旋转 · 滚轮缩放 · 双击复位'
+  if (props.meshes?.length) {
+    if (contextLost) hint = '3D 网格上下文丢失，恢复后将自动重绘'
+    else if (!gl) hint = '当前浏览器不支持 WebGL，无法显示 3D 网格'
+  }
+  context.fillText(hint, 12, 18)
 }
 
 function onPointerDown(event) {
@@ -401,6 +424,8 @@ function resetCamera() {
 }
 
 onMounted(() => {
+  glCanvas.value?.addEventListener('webglcontextlost', onContextLost)
+  glCanvas.value?.addEventListener('webglcontextrestored', onContextRestored)
   initGL()
   observer = new ResizeObserver(resize)
   observer.observe(host.value)
@@ -409,6 +434,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   observer?.disconnect()
+  glCanvas.value?.removeEventListener('webglcontextlost', onContextLost)
+  glCanvas.value?.removeEventListener('webglcontextrestored', onContextRestored)
   if (gl)
     for (const item of meshBuffers) {
       gl.deleteBuffer(item.buffer)

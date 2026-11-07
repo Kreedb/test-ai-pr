@@ -92,10 +92,15 @@ src/lib/formats/           # 每种来源一个模块：元数据、有损说明
 src/lib/formats/index.js   # 显式格式注册表：支持矩阵、有损表与样例按钮的唯一来源
 src/lib/archive.js         # zip 压缩包展开与成员筛选（大小/数量/嵌套限制）
 src/lib/preview.js         # 只读预览模型：PCB/原理图几何、图层、网络索引与搜索（无 Vue 依赖）
-src/lib/replay/rosbag.js   # ROS1 bag v2 读取与 JointState / IMU 解码（无 Vue 依赖）
+src/lib/replay/rosbag.js   # ROS1 bag v2 读取（无 Vue 依赖）
+src/lib/replay/mcap.js     # ROS2 MCAP 读取（无 Vue 依赖）
+src/lib/replay/sqlite.js   # ROS2 sqlite3 (.db3) 只读解析（无 Vue 依赖）
+src/lib/replay/bag.js      # ROS1 / ROS2 格式识别与统一读取入口
+src/lib/replay/rosmsg.js   # 按消息定义解析 ROS1 / ROS2 消息（含 CDR）
 src/lib/replay/profiles.js # 机型骨架、关节名映射与按机型识别
 src/lib/replay/pose.js     # 骨架正运动学与四元数工具（无 Vue 依赖）
-src/lib/replay/models.js   # LimX Luna / Oli 的关节偏移与转轴
+src/lib/replay/urdf.js     # URDF 解析与 STL 读取
+public/robots/             # 预置机型 URDF（Luna / Oli / TRON2A）
 src/lib/route-path.js      # hash 路径归一化与路由匹配（无 Vue 依赖，供路由与链接共用）
 src/routes.js              # 按 src/pages/*Page.vue 自动收集路由、导航与首页工具卡片
 src/router.js              # 极简 hash 路由（GitHub Pages 子路径下无需重写规则）
@@ -122,7 +127,7 @@ import { padsToCircuitJson } from 'pads-to-circuit-json'
 
 - 新增 EDA 来源：在 `src/lib/formats/` 下新建 `<id>.js`，导出元数据、`losses`、`detect`、`convert`，然后在 `src/lib/formats/index.js` 的显式导入列表里加一行。支持矩阵、有损表、样例按钮和格式标签都从注册表派生，不需要改页面。
 - 新增页面：在 `src/pages/` 下新建 `NamePage.vue`，在普通 `<script>` 块里导出 `route`（`label`、`order`，需要首页卡片时再加 `tool`）。路径由文件名自动生成，导航、路由出口和首页工具列表都从页面自身派生。
-- 新增机器人型号：在 `src/lib/replay/models.js` 放关节偏移/转轴，在 `src/lib/replay/profiles.js` 注册机型、关节顺序与名称映射。消息字段不同的厂商还需要扩展 `src/lib/replay/rosbag.js` 的解码器。
+- 新增机器人型号：在 `public/robots/` 放一个 URDF，在 `src/lib/replay/profiles.js` 注册机型、关节顺序与名称映射。消息字段不同的厂商优先使用 bag 内嵌的消息定义；没有定义时在 `src/lib/replay/rosmsg.js` 补内置布局。
 - 新增测试：按所属页面放到 `test/<page>/` 下（`parser`、`replay`、`convert`），跨页面的全功能测试放 `test/` 根目录；公共辅助函数也放在对应页面目录，但 `node --test` 会执行 `test/` 下的每个 `.js`/`.mjs`，所以辅助文件不能有顶层副作用。
 - 新增可独立发布的解析器：在 `lib/<package-name>/` 下建立独立包（`package.json`、`src/index.js`、`README.md`），用包名在主项目里引用。`lib/` 不允许反向依赖 `src/`，由 `test/lib.test.mjs` 守护。
 

@@ -7,7 +7,7 @@
 ## 工具
 
 - **EEPROM 解析器**（`#/parser`）：解析 SII EEPROM 转储，编辑字段并导出 ESI XML，内置逐字节往返校验。
-- **机器人回放**（`#/replay`）：读取 ROS1 bag 的关节与 IMU 话题，按时间轴还原机器人姿态；内置 LimX Luna / Oli / TRON2A 骨架。
+- **机器人回放**（`#/replay`）：读取 ROS1 bag 与 ROS2 MCAP / SQLite bag 的关节与 IMU 话题，按时间轴还原机器人姿态，并提供同步日志、URDF、3D 模型与波形图。
 - **EDA 转 KiCad**（`#/convert`）：把 Altium、Specctra、EAGLE XML、PADS ASCII 工程转换成 `.kicad_pcb` / `.kicad_sch` / `.kicad_pro`，带只读设计预览。
 
 ## 快速开始
@@ -21,12 +21,12 @@ npm run dev
 
 开发服务器运行在 http://localhost:5173/test-ai-web/。常用命令：
 
-| 命令 | 说明 |
-| --- | --- |
-| `npm run dev` | 启动带 HMR 的开发服务器 |
-| `npm run build` | 构建到 `dist/`（构建前自动格式化） |
-| `npm run preview` | 本地预览生产构建 |
-| `npm test` | 运行 `node --test` 回归测试 |
+| 命令              | 说明                               |
+| ----------------- | ---------------------------------- |
+| `npm run dev`     | 启动带 HMR 的开发服务器            |
+| `npm run build`   | 构建到 `dist/`（构建前自动格式化） |
+| `npm run preview` | 本地预览生产构建                   |
+| `npm test`        | 运行 `node --test` 回归测试        |
 
 ## 文档
 
@@ -41,11 +41,11 @@ npm run dev
 
 `lib/` 下的解析器可以单独安装、单独调用，不依赖主项目：
 
-| 包 | 说明 |
-| --- | --- |
-| [`sii-parser`](lib/sii-parser/README.md) | EtherCAT SII EEPROM 解析器 |
+| 包                                                             | 说明                                 |
+| -------------------------------------------------------------- | ------------------------------------ |
+| [`sii-parser`](lib/sii-parser/README.md)                       | EtherCAT SII EEPROM 解析器           |
 | [`eagle-to-circuit-json`](lib/eagle-to-circuit-json/README.md) | EAGLE XML 板图/原理图 → Circuit JSON |
-| [`pads-to-circuit-json`](lib/pads-to-circuit-json/README.md) | PADS Layout ASCII → Circuit JSON |
+| [`pads-to-circuit-json`](lib/pads-to-circuit-json/README.md)   | PADS Layout ASCII → Circuit JSON     |
 
 ## License
 

@@ -53,11 +53,12 @@ EAGLE XML 与 PADS Layout ASCII 的字段映射是本仓库自己的代码（`li
 
 ## 机器人骨架数据
 
-`src/lib/replay/models.js` 与 `src/lib/replay/profiles.js` 里的 Luna / Oli / TRON2A 关节偏移与转轴取自 LimX Dynamics 的
+`public/robots/` 下的 Luna / Oli / TRON2A URDF 里的关节偏移与转轴取自 LimX Dynamics 的
 [luna-description](https://github.com/limxdynamics/luna-description)、
 [humanoid-description](https://github.com/limxdynamics/humanoid-description) 与
 [tron2-robot-description](https://github.com/limxdynamics/tron2-robot-description) 模型（Apache-2.0）。
-仓库只保留运动学链的数值，不包含 STL 网格、碰撞体或上游代码；回放工具本身是本仓库的实现。
+仓库只保留运动学链的 URDF，不包含 STL 网格、碰撞体或上游代码；预置 Luna 的 URDF 会按需从上游下载 STL，
+回放工具本身是本仓库的实现。
 
 ## 商标
 

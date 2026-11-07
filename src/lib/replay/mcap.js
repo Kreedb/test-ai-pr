@@ -253,11 +253,6 @@ export function readMcap(bytes, { topics = [], onProgress } = {}) {
 
   const finalized = finalizeSeries(accumulators)
   warnings.push(...finalized.warnings)
-  for (const name of topics) {
-    if (!finalized.series[name] && !warnings.some((warning) => warning.message.includes(name))) {
-      warnings.push({ level: 'warn', message: `话题 ${name} 没有可用消息` })
-    }
-  }
 
   const summaries = Object.values(finalized.series).map((item) => ({
     name: item.topic,

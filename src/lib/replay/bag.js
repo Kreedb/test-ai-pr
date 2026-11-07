@@ -86,6 +86,13 @@ export function readBag(files, { format = 'auto', topics = [], onProgress } = {}
   )
   const series = mergeSeries(results.map((result) => result.series))
   const warnings = results.flatMap((result) => result.warnings)
+  // Each split file carries only some of the requested topics, so absence is
+  // decided against the merged series, once per topic.
+  for (const name of topics) {
+    if (!series[name] && !warnings.some((warning) => warning.message.includes(name))) {
+      warnings.push({ level: 'warn', message: `话题 ${name} 没有可用消息` })
+    }
+  }
   const summaries = Object.values(series).map((item) => ({
     name: item.topic,
     type: item.type,

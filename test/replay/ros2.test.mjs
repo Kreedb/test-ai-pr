@@ -71,6 +71,33 @@ test('reads a ROS2 sqlite3 bag', () => {
   assert.equal(decoded.series['/imu/data'].count, 1)
 })
 
+test('merges split MCAP files without warning about topics in the other file', () => {
+  const channels = [
+    { id: 0, topic: '/joint/state', type: 'sensor_msgs/msg/JointState', definition: JOINT_DEFINITION },
+    { id: 1, topic: '/imu/data', type: 'sensor_msgs/msg/Imu', definition: IMU_DEFINITION },
+  ]
+  const jointOnly = buildMcap({
+    channels,
+    messages: [{ channel: 0, logTime: 1_700_000_000_000_000_000n, data: encodeCdrJointState({ names: ['a', 'b'], position: [0.5, -0.5] }) }],
+  })
+  const imuOnly = buildMcap({
+    channels,
+    messages: [{ channel: 1, logTime: 1_700_000_001_000_000_000n, data: encodeCdrImu({ quat: [1, 0, 0, 0] }) }],
+  })
+  const files = [
+    { name: 'split_0.mcap', bytes: jointOnly },
+    { name: 'split_1.mcap', bytes: imuOnly },
+  ]
+  const decoded = readBag(files, { topics: ['/joint/state', '/imu/data'] })
+  assert.equal(decoded.series['/joint/state'].count, 1)
+  assert.equal(decoded.series['/imu/data'].count, 1)
+  assert.deepEqual(decoded.warnings, [])
+
+  const missing = readBag(files, { topics: ['/joint/state', '/imu/data', '/odom'] })
+  assert.equal(missing.warnings.filter((warning) => /没有可用消息/.test(warning.message)).length, 1)
+  assert.match(missing.warnings.find((warning) => /没有可用消息/.test(warning.message)).message, /\/odom/)
+})
+
 test('manual format selection rejects a mismatched file', () => {
   assert.throws(() => inspectBag([{ name: 'demo.mcap', bytes: mcapBytes('none') }], 'sqlite'), /不一致/)
   assert.throws(() => readBag([{ name: 'demo.db3', bytes: sqliteBytes }], { format: 'ros1', topics: [] }), /不一致/)

@@ -84,6 +84,14 @@ export function parseUrdf(source, { parseXml } = {}) {
     else byChild.set(joint.child, joint)
   }
 
+  // Named materials are defined once under <robot> and referenced by <visual>.
+  const materialColors = new Map()
+  for (const material of [...robot.getElementsByTagName('material')]) {
+    if (material.parentNode !== robot) continue
+    const rgba = numbers(firstChild(material, 'color')?.getAttribute('rgba'), 4)
+    if (rgba) materialColors.set(material.getAttribute('name'), rgba)
+  }
+
   const meshes = []
   for (const link of links) {
     for (const visual of [...link.getElementsByTagName('visual')]) {
@@ -92,7 +100,9 @@ export function parseUrdf(source, { parseXml } = {}) {
       if (!mesh) continue
       const origin = originOf(visual)
       const scale = numbers(mesh.getAttribute('scale'), 3) || [1, 1, 1]
-      meshes.push({ link: link.getAttribute('name'), filename: mesh.getAttribute('filename') || '', xyz: origin.xyz, rpy: origin.rpy, scale })
+      const material = firstChild(visual, 'material')
+      const color = (material && numbers(firstChild(material, 'color')?.getAttribute('rgba'), 4)) || materialColors.get(material?.getAttribute('name')) || null
+      meshes.push({ link: link.getAttribute('name'), filename: mesh.getAttribute('filename') || '', xyz: origin.xyz, rpy: origin.rpy, scale, color })
     }
   }
 
@@ -176,4 +186,55 @@ export function parseStl(bytes, { maxTriangles = Infinity } = {}) {
     }
   }
   return { triangles, total, binary }
+}
+
+/**
+ * Per-vertex normals for triangle soup. STL duplicates every vertex, so weld
+ * by rounded position before averaging; otherwise every face stays flat and a
+ * dense mesh renders as noise.
+ */
+export function smoothNormals(triangles) {
+  const faces = Math.floor(triangles.length / 9)
+  const sums = new Map()
+  const key = (offset) => `${Math.round(triangles[offset] * 1e4)},${Math.round(triangles[offset + 1] * 1e4)},${Math.round(triangles[offset + 2] * 1e4)}`
+  for (let face = 0; face < faces; face += 1) {
+    const offset = face * 9
+    const ax = triangles[offset]
+    const ay = triangles[offset + 1]
+    const az = triangles[offset + 2]
+    const e1x = triangles[offset + 3] - ax
+    const e1y = triangles[offset + 4] - ay
+    const e1z = triangles[offset + 5] - az
+    const e2x = triangles[offset + 6] - ax
+    const e2y = triangles[offset + 7] - ay
+    const e2z = triangles[offset + 8] - az
+    // Unnormalized cross product: area weighting falls out for free.
+    const nx = e1y * e2z - e1z * e2y
+    const ny = e1z * e2x - e1x * e2z
+    const nz = e1x * e2y - e1y * e2x
+    for (let vertex = 0; vertex < 9; vertex += 3) {
+      const id = key(offset + vertex)
+      const sum = sums.get(id)
+      if (sum) {
+        sum[0] += nx
+        sum[1] += ny
+        sum[2] += nz
+      } else sums.set(id, [nx, ny, nz])
+    }
+  }
+
+  const normals = new Float32Array(triangles.length)
+  for (let face = 0; face < faces; face += 1) {
+    const offset = face * 9
+    for (let vertex = 0; vertex < 9; vertex += 3) {
+      const sum = sums.get(key(offset + vertex))
+      const length = sum ? Math.hypot(sum[0], sum[1], sum[2]) : 0
+      if (length > 0) {
+        normals[offset + vertex] = sum[0] / length
+        normals[offset + vertex + 1] = sum[1] / length
+        normals[offset + vertex + 2] = sum[2] / length
+      }
+    }
+  }
+  return normals
 }

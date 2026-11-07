@@ -9,21 +9,33 @@ const props = defineProps({
   emptyMessage: { type: String, default: '没有可显示的姿态数据' },
 })
 
+const MESH_COLOR = [0.78, 0.81, 0.86]
+const NEAR = 0.2
+const FAR = 20
+
 const host = ref(null)
 const canvas = ref(null)
+const glCanvas = ref(null)
 const camera = reactive({ yaw: 0.72, pitch: 0.26, distance: 3.3 })
 const target = [0, 0, 0.92]
 
 let observer = null
 let drag = null
+let gl = null
+let programs = null
+let grid = null
+let meshBuffers = []
+let uploadedMeshes = null
 
 function resize() {
   const element = host.value
-  const context = canvas.value
-  if (!element || !context) return
+  if (!element) return
   const ratio = window.devicePixelRatio || 1
-  context.width = Math.max(1, Math.round(element.clientWidth * ratio))
-  context.height = Math.max(1, Math.round(element.clientHeight * ratio))
+  for (const surface of [canvas.value, glCanvas.value]) {
+    if (!surface) continue
+    surface.width = Math.max(1, Math.round(element.clientWidth * ratio))
+    surface.height = Math.max(1, Math.round(element.clientHeight * ratio))
+  }
   draw()
 }
 
@@ -43,7 +55,7 @@ function project(point, projectBasis, width, height) {
   const relative = [point[0] - target[0], point[1] - target[1], point[2] - target[2]]
   const dot = (axis) => relative[0] * axis[0] + relative[1] * axis[1] + relative[2] * axis[2]
   const depth = dot(projectBasis.forward) + camera.distance
-  if (depth < 0.08) return null
+  if (depth < NEAR) return null
   const focal = Math.min(width, height) * 0.9
   return {
     x: width / 2 + (dot(projectBasis.right) * focal) / depth,
@@ -62,106 +74,255 @@ function line(context, from, to, color, width = 1) {
   context.stroke()
 }
 
-function drawGrid(context, projectBasis, width, height) {
+function dot(left, right) {
+  return left[0] * right[0] + left[1] * right[1] + left[2] * right[2]
+}
+
+/** Column-major 4x4 multiply, same layout as `pose.js`. */
+function multiply(left, right) {
+  const out = new Array(16)
+  for (let column = 0; column < 4; column += 1) {
+    for (let row = 0; row < 4; row += 1) {
+      out[column * 4 + row] = left[row] * right[column * 4] + left[4 + row] * right[column * 4 + 1] + left[8 + row] * right[column * 4 + 2] + left[12 + row] * right[column * 4 + 3]
+    }
+  }
+  return out
+}
+
+/** World -> clip matrix matching the 2D `project` used for bones. */
+function viewProjection(width, height) {
+  const view = basis()
+  const focal = Math.min(width, height) * 0.9
+  const viewMatrix = [
+    view.right[0],
+    view.up[0],
+    view.forward[0],
+    0,
+    view.right[1],
+    view.up[1],
+    view.forward[1],
+    0,
+    view.right[2],
+    view.up[2],
+    view.forward[2],
+    0,
+    -dot(view.right, target),
+    -dot(view.up, target),
+    camera.distance - dot(view.forward, target),
+    1,
+  ]
+  const a = (FAR + NEAR) / (FAR - NEAR)
+  const b = (-2 * FAR * NEAR) / (FAR - NEAR)
+  // prettier-ignore
+  const projection = [
+    (2 * focal) / width, 0, 0, 0,
+    0, (2 * focal) / height, 0, 0,
+    0, 0, a, 1,
+    0, 0, b, 0,
+  ]
+  return multiply(projection, viewMatrix)
+}
+
+/** Mesh visual origin (T * RPY * scale), column-major. */
+function meshModel(mesh) {
+  const [sx, sy, sz] = mesh.scale || [1, 1, 1]
+  const [rx, ry, rz] = mesh.rpy || [0, 0, 0]
+  const [tx, ty, tz] = mesh.xyz || [0, 0, 0]
+  const cr = Math.cos(rx)
+  const sr = Math.sin(rx)
+  const cp = Math.cos(ry)
+  const sp = Math.sin(ry)
+  const cy = Math.cos(rz)
+  const sy2 = Math.sin(rz)
+  const m00 = cy * cp
+  const m01 = cy * sp * sr - sy2 * cr
+  const m02 = cy * sp * cr + sy2 * sr
+  const m10 = sy2 * cp
+  const m11 = sy2 * sp * sr + cy * cr
+  const m12 = sy2 * sp * cr - cy * sr
+  const m20 = -sp
+  const m21 = cp * sr
+  const m22 = cp * cr
+  return [m00 * sx, m10 * sx, m20 * sx, 0, m01 * sy, m11 * sy, m21 * sy, 0, m02 * sz, m12 * sz, m22 * sz, 0, tx, ty, tz, 1]
+}
+
+function compile(type, source) {
+  const shader = gl.createShader(type)
+  gl.shaderSource(shader, source)
+  gl.compileShader(shader)
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(shader) || '着色器编译失败')
+  return shader
+}
+
+function createProgram(vertexSource, fragmentSource, attributeNames, uniformNames) {
+  const program = gl.createProgram()
+  gl.attachShader(program, compile(gl.VERTEX_SHADER, vertexSource))
+  gl.attachShader(program, compile(gl.FRAGMENT_SHADER, fragmentSource))
+  gl.linkProgram(program)
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program) || '着色器链接失败')
+  const attributes = {}
+  for (const name of attributeNames) attributes[name] = gl.getAttribLocation(program, name)
+  const uniforms = {}
+  for (const name of uniformNames) uniforms[name] = gl.getUniformLocation(program, name)
+  return { program, attributes, uniforms }
+}
+
+function initGL() {
+  const surface = glCanvas.value
+  if (!surface) return
+  gl = surface.getContext('webgl', { antialias: true, alpha: true }) || surface.getContext('experimental-webgl', { antialias: true, alpha: true })
+  if (!gl) return
+  const meshFragment = `precision highp float;
+uniform vec3 u_color;
+varying highp vec3 v_normal;
+void main() {
+  float light = 0.55 + 0.45 * abs(dot(normalize(v_normal), normalize(vec3(0.35, 0.3, 0.9))));
+  gl_FragColor = vec4(u_color * light, 1.0);
+}`
+  try {
+    programs = {
+      mesh: createProgram(
+        `attribute vec3 a_position;
+attribute vec3 a_normal;
+uniform mat4 u_viewProjection;
+uniform mat4 u_model;
+varying highp vec3 v_normal;
+void main() {
+  v_normal = mat3(u_model) * a_normal;
+  gl_Position = u_viewProjection * u_model * vec4(a_position, 1.0);
+}`,
+        meshFragment,
+        ['a_position', 'a_normal'],
+        ['u_viewProjection', 'u_model', 'u_color'],
+      ),
+      line: createProgram(
+        `attribute vec3 a_position;
+attribute vec4 a_color;
+uniform mat4 u_viewProjection;
+varying vec4 v_color;
+void main() {
+  v_color = a_color;
+  gl_Position = u_viewProjection * vec4(a_position, 1.0);
+}`,
+        `precision mediump float;
+varying vec4 v_color;
+void main() {
+  gl_FragColor = v_color;
+}`,
+        ['a_position', 'a_color'],
+        ['u_viewProjection'],
+      ),
+    }
+  } catch (cause) {
+    console.warn('3D 网格渲染初始化失败，改为只显示骨架', cause)
+    gl = null
+    return
+  }
+  gl.enable(gl.DEPTH_TEST)
+  buildGrid()
+}
+
+function buildGrid() {
+  const vertices = []
+  const push = (from, to, color) => vertices.push(from[0], from[1], from[2], ...color, to[0], to[1], to[2], ...color)
   for (let value = -2; value <= 2.0001; value += 0.5) {
     const major = Math.abs(value - Math.round(value)) < 1e-6
-    const color = major ? 'rgba(148, 163, 184, 0.22)' : 'rgba(148, 163, 184, 0.1)'
-    line(context, project([value, -2, 0], projectBasis, width, height), project([value, 2, 0], projectBasis, width, height), color)
-    line(context, project([-2, value, 0], projectBasis, width, height), project([2, value, 0], projectBasis, width, height), color)
+    const color = major ? [0.58, 0.64, 0.72, 0.22] : [0.58, 0.64, 0.72, 0.1]
+    push([value, -2, 0], [value, 2, 0], color)
+    push([-2, value, 0], [2, value, 0], color)
   }
-  const origin = project([0, 0, 0], projectBasis, width, height)
-  line(context, origin, project([0.35, 0, 0], projectBasis, width, height), '#ff6b7a', 1.6)
-  line(context, origin, project([0, 0.35, 0], projectBasis, width, height), '#3ddc97', 1.6)
-  line(context, origin, project([0, 0, 0.35], projectBasis, width, height), '#5b8cff', 1.6)
+  push([0, 0, 0], [0.35, 0, 0], [1, 0.42, 0.48, 1])
+  push([0, 0, 0], [0, 0.35, 0], [0.24, 0.86, 0.59, 1])
+  push([0, 0, 0], [0, 0, 0.35], [0.36, 0.55, 1, 1])
+  const buffer = gl.createBuffer()
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW)
+  grid = { buffer, count: vertices.length / 7 }
 }
 
-function drawMeshes(context, projectBasis, width, height) {
-  if (!props.meshes?.length || !props.transforms?.length || !props.skeleton?.length) return
+function syncMeshes() {
+  if (uploadedMeshes === props.meshes) return
+  uploadedMeshes = props.meshes || []
+  for (const item of meshBuffers) {
+    gl.deleteBuffer(item.buffer)
+    gl.deleteBuffer(item.normalBuffer)
+  }
+  meshBuffers = []
+  for (const mesh of uploadedMeshes) {
+    if (!mesh.triangles?.length || !mesh.normals?.length) continue
+    const buffer = gl.createBuffer()
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
+    gl.bufferData(gl.ARRAY_BUFFER, mesh.triangles, gl.STATIC_DRAW)
+    const normalBuffer = gl.createBuffer()
+    gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer)
+    gl.bufferData(gl.ARRAY_BUFFER, mesh.normals, gl.STATIC_DRAW)
+    meshBuffers.push({
+      buffer,
+      normalBuffer,
+      count: mesh.triangles.length / 3,
+      node: mesh.node,
+      origin: meshModel(mesh),
+      color: (mesh.color || MESH_COLOR).slice(0, 3),
+    })
+  }
+}
+
+function drawScene(width, height) {
+  if (!gl || !glCanvas.value) return
+  syncMeshes()
+  gl.viewport(0, 0, glCanvas.value.width, glCanvas.value.height)
+  gl.clearColor(0, 0, 0, 0)
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+  gl.enable(gl.DEPTH_TEST)
+  gl.depthFunc(gl.LEQUAL)
+  const matrix = viewProjection(width, height)
+
+  gl.useProgram(programs.line.program)
+  gl.uniformMatrix4fv(programs.line.uniforms.u_viewProjection, false, matrix)
+  gl.bindBuffer(gl.ARRAY_BUFFER, grid.buffer)
+  gl.enableVertexAttribArray(programs.line.attributes.a_position)
+  gl.vertexAttribPointer(programs.line.attributes.a_position, 3, gl.FLOAT, false, 28, 0)
+  gl.enableVertexAttribArray(programs.line.attributes.a_color)
+  gl.vertexAttribPointer(programs.line.attributes.a_color, 4, gl.FLOAT, false, 28, 12)
+  gl.enable(gl.BLEND)
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+  gl.drawArrays(gl.LINES, 0, grid.count)
+  gl.disable(gl.BLEND)
+
+  if (!meshBuffers.length || !props.transforms?.length || !props.skeleton?.length) return
   const indices = new Map(props.skeleton.map((node, index) => [node.name, index]))
-  const triangles = []
-  for (const mesh of props.meshes) {
-    const index = indices.get(mesh.node)
-    const matrix = index === undefined ? null : props.transforms[index]
-    if (!matrix || !mesh.triangles?.length) continue
-    const [sx, sy, sz] = mesh.scale || [1, 1, 1]
-    const [rx, ry, rz] = mesh.rpy || [0, 0, 0]
-    const [tx, ty, tz] = mesh.xyz || [0, 0, 0]
-    const cr = Math.cos(rx)
-    const sr = Math.sin(rx)
-    const cp = Math.cos(ry)
-    const sp = Math.sin(ry)
-    const cy = Math.cos(rz)
-    const sy2 = Math.sin(rz)
-    const local = (x, y, z) => {
-      const px = x * sx
-      const py = y * sy
-      const pz = z * sz
-      const y1 = py * cr - pz * sr
-      const z1 = py * sr + pz * cr
-      const x2 = px * cp + z1 * sp
-      const z2 = -px * sp + z1 * cp
-      return [x2 * cy - y1 * sy2 + tx, x2 * sy2 + y1 * cy + ty, z2 + tz]
-    }
-    for (let vertex = 0; vertex + 8 < mesh.triangles.length; vertex += 9) {
-      const a = local(mesh.triangles[vertex], mesh.triangles[vertex + 1], mesh.triangles[vertex + 2])
-      const b = local(mesh.triangles[vertex + 3], mesh.triangles[vertex + 4], mesh.triangles[vertex + 5])
-      const c = local(mesh.triangles[vertex + 6], mesh.triangles[vertex + 7], mesh.triangles[vertex + 8])
-      const pa = project(world(matrix, a), projectBasis, width, height)
-      const pb = project(world(matrix, b), projectBasis, width, height)
-      const pc = project(world(matrix, c), projectBasis, width, height)
-      if (!pa || !pb || !pc) continue
-      // A cheap normal gives the flat preview some depth.
-      const e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]
-      const e2 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]]
-      const normal = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]]
-      const length = Math.hypot(normal[0], normal[1], normal[2]) || 1
-      const light = 0.32 + 0.68 * Math.max(0.15, Math.abs(normal[2]) / length)
-      triangles.push({ pa, pb, pc, depth: (pa.depth + pb.depth + pc.depth) / 3, light })
-    }
+  gl.useProgram(programs.mesh.program)
+  gl.uniformMatrix4fv(programs.mesh.uniforms.u_viewProjection, false, matrix)
+  gl.enableVertexAttribArray(programs.mesh.attributes.a_position)
+  gl.enableVertexAttribArray(programs.mesh.attributes.a_normal)
+  for (const item of meshBuffers) {
+    const index = indices.get(item.node)
+    const link = index === undefined ? null : props.transforms[index]
+    if (!link) continue
+    gl.uniformMatrix4fv(programs.mesh.uniforms.u_model, false, multiply(link, item.origin))
+    gl.uniform3fv(programs.mesh.uniforms.u_color, item.color)
+    gl.bindBuffer(gl.ARRAY_BUFFER, item.buffer)
+    gl.vertexAttribPointer(programs.mesh.attributes.a_position, 3, gl.FLOAT, false, 0, 0)
+    gl.bindBuffer(gl.ARRAY_BUFFER, item.normalBuffer)
+    gl.vertexAttribPointer(programs.mesh.attributes.a_normal, 3, gl.FLOAT, false, 0, 0)
+    gl.drawArrays(gl.TRIANGLES, 0, item.count)
   }
-  triangles.sort((left, right) => right.depth - left.depth)
-  for (const triangle of triangles) {
-    const value = Math.round(170 * triangle.light)
-    context.fillStyle = `rgba(${value}, ${Math.round(value * 1.12)}, ${Math.round(value * 1.4)}, 0.74)`
-    context.beginPath()
-    context.moveTo(triangle.pa.x, triangle.pa.y)
-    context.lineTo(triangle.pb.x, triangle.pb.y)
-    context.lineTo(triangle.pc.x, triangle.pc.y)
-    context.closePath()
-    context.fill()
-  }
-}
-
-function world(matrix, point) {
-  return [
-    matrix[0] * point[0] + matrix[4] * point[1] + matrix[8] * point[2] + matrix[12],
-    matrix[1] * point[0] + matrix[5] * point[1] + matrix[9] * point[2] + matrix[13],
-    matrix[2] * point[0] + matrix[6] * point[1] + matrix[10] * point[2] + matrix[14],
-  ]
 }
 
 function draw() {
   const element = host.value
-  const canvasElement = canvas.value
-  if (!element || !canvasElement) return
-  const context = canvasElement.getContext('2d')
-  const width = canvasElement.width
-  const height = canvasElement.height
+  const overlay = canvas.value
+  if (!element || !overlay) return
   const ratio = window.devicePixelRatio || 1
+  const cssWidth = overlay.width / ratio
+  const cssHeight = overlay.height / ratio
+  const context = overlay.getContext('2d')
   context.setTransform(ratio, 0, 0, ratio, 0, 0)
-  const cssWidth = width / ratio
-  const cssHeight = height / ratio
   context.clearRect(0, 0, cssWidth, cssHeight)
 
-  const gradient = context.createLinearGradient(0, 0, 0, cssHeight)
-  gradient.addColorStop(0, 'rgba(21, 25, 34, 0.95)')
-  gradient.addColorStop(1, 'rgba(11, 13, 18, 0.98)')
-  context.fillStyle = gradient
-  context.fillRect(0, 0, cssWidth, cssHeight)
+  drawScene(cssWidth, cssHeight)
 
   const projectBasis = basis()
-  drawGrid(context, projectBasis, cssWidth, cssHeight)
-
   if (!props.points?.length || !props.skeleton?.length) {
     context.fillStyle = 'rgba(153, 163, 179, 0.9)'
     context.font = '13px Inter, system-ui, sans-serif'
@@ -171,7 +332,6 @@ function draw() {
   }
 
   const projected = props.points.map((point) => project(point, projectBasis, cssWidth, cssHeight))
-  drawMeshes(context, projectBasis, cssWidth, cssHeight)
   const bones = []
   props.skeleton.forEach((node, index) => {
     if (node.parent === null) return
@@ -207,7 +367,7 @@ function draw() {
   context.fillStyle = 'rgba(153, 163, 179, 0.75)'
   context.font = '11px ui-monospace, SFMono-Regular, Menlo, monospace'
   context.textAlign = 'left'
-  context.fillText('拖动旋转 · 滚轮缩放 · 双击复位', 12, 18)
+  context.fillText(props.meshes?.length && !gl ? '当前浏览器不支持 WebGL，无法显示 3D 网格' : '拖动旋转 · 滚轮缩放 · 双击复位', 12, 18)
 }
 
 function onPointerDown(event) {
@@ -241,6 +401,7 @@ function resetCamera() {
 }
 
 onMounted(() => {
+  initGL()
   observer = new ResizeObserver(resize)
   observer.observe(host.value)
   resize()
@@ -248,6 +409,11 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   observer?.disconnect()
+  if (gl)
+    for (const item of meshBuffers) {
+      gl.deleteBuffer(item.buffer)
+      gl.deleteBuffer(item.normalBuffer)
+    }
 })
 
 watch(
@@ -258,8 +424,10 @@ watch(
 
 <template>
   <div ref="host" class="skeleton-view">
+    <canvas ref="glCanvas" class="mesh-layer" aria-hidden="true" />
     <canvas
       ref="canvas"
+      class="overlay"
       aria-label="机器人姿态预览"
       @pointerdown="onPointerDown"
       @pointermove="onPointerMove"
@@ -279,18 +447,27 @@ watch(
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 12px;
-  background: var(--bg-soft);
+  background: linear-gradient(180deg, rgba(21, 25, 34, 0.95), rgba(11, 13, 18, 0.98));
 }
 
 canvas {
   display: block;
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
+}
+
+.mesh-layer {
+  pointer-events: none;
+}
+
+canvas.overlay {
   cursor: grab;
   touch-action: none;
 }
 
-canvas:active {
+canvas.overlay:active {
   cursor: grabbing;
 }
 </style>

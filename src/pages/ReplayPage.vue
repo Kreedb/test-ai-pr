@@ -24,10 +24,9 @@ import { MAX_LOG_BYTES, alignLog, parseLogText } from '@/lib/replay/logfile'
 import { buildJointValues, computePose, normalizeQuat, quatToEuler } from '@/lib/replay/pose'
 import { ALL_PROFILES, attachSkeleton, detectProfile, mapJoints } from '@/lib/replay/profiles'
 import { MAX_BAG_BYTES } from '@/lib/replay/rosbag'
-import { parseStl, parseUrdf } from '@/lib/replay/urdf'
+import { parseStl, parseUrdf, smoothNormals } from '@/lib/replay/urdf'
 
 const SAMPLE = { file: 'samples/replay/luna-demo.bag', label: 'Luna 动作' }
-const MESH_TRIANGLES = 4000
 const MESH_MAX_BYTES = 96 * 1024 * 1024
 // Known `package://` sources. Uploaded STL files still win; this is the
 // best-effort fallback the issue asked for (luna-description STL on demand).
@@ -392,16 +391,17 @@ async function loadMeshes() {
     }
 
     const geometries = []
-    const totalBytes = loaded.reduce((sum, item) => sum + item.bytes.length, 0) || 1
     for (const item of loaded) {
-      const budget = Math.max(24, Math.round((MESH_TRIANGLES * item.bytes.length) / totalBytes))
-      const { triangles } = parseStl(item.bytes, { maxTriangles: budget })
+      // Full resolution: striding triangles leaves visible holes in the shell.
+      const { triangles } = parseStl(item.bytes)
       geometries.push({
         node: item.definition.link,
         triangles,
+        normals: smoothNormals(triangles),
         xyz: item.definition.xyz,
         rpy: item.definition.rpy,
         scale: item.definition.scale,
+        color: item.definition.color,
       })
     }
     if (token !== meshToken) return
@@ -890,8 +890,8 @@ onBeforeUnmount(() => {
           <span v-if="meshStatus" class="muted small">{{ meshStatus }}</span>
         </div>
         <p class="muted small">
-          预置骨架从 <code>public/robots/*.urdf</code> 加载，不再写死在源码里。Luna 的 URDF 引用了 limxdynamics/luna-description 的 STL，勾选“加载 3D
-          模型”后会按需下载并抽稀显示。关节按名称映射到骨架；没有名称的 bag 按机型配置的硬件下标顺序映射。
+          预置骨架从 <code>public/robots/*.urdf</code> 加载，不再写死在源码里。Luna 的 URDF 引用了 limxdynamics/luna-description 的 STL，勾选“加载 3D 模型”后会按需下载并用 WebGL
+          显示。关节按名称映射到骨架；没有名称的 bag 按机型配置的硬件下标顺序映射。
         </p>
       </section>
 

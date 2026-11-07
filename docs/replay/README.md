@@ -49,7 +49,7 @@ TRON2A（`tron2a.urdf`，10 关节）。Luna 的 URDF 直接来自
 `origin xyz/rpy`、`axis` 与 fixed joint 都会参与正运动学；模型按连杆原点估算的静止位姿低于地面时会自动抬高到 z=0
 （网格顶点不参与这个估算）。
 勾选“加载 3D 模型”后会解析 URDF 引用的 STL（本机选择的文件优先，预置 Luna 从 luna-description 按需下载），
-并按总三角形预算抽稀显示。`.dae` / `.obj` 暂不支持。
+按原始精度用 WebGL 显示；STL 本身没有颜色，默认使用中性材质色，URDF 的 `material` 颜色优先。`.dae` / `.obj` 暂不支持。
 
 新增机型只需放一个 URDF 到 `public/robots/`，在 `src/lib/replay/profiles.js` 注册机型与关节顺序；
 不需要把关节偏移写进 JavaScript，也不需要改页面或 3D 视图。
@@ -73,6 +73,7 @@ TRON2A（`tron2a.urdf`，10 关节）。Luna 的 URDF 直接来自
 - ROS2 sqlite3 bag 的 `topics` 表没有消息定义，只能按已知类型名选择内置字段布局；魔改字段请转存为 MCAP。
 - MCAP 的 zstd 压缩块暂不支持；请重新录制为 lz4 / 未压缩。
 - 3D 网格仅支持 STL；`.dae` / `.obj` 会提示跳过。预置 Luna 的 STL 需要联网按需下载，首次加载较慢。
+- 3D 网格靠 WebGL 渲染；浏览器禁用 WebGL 时只显示骨架。STL 没有材质信息，未在 URDF 里指定 `material` 的连杆使用默认颜色。
 - 日志与 bag 的时间基准不一致时（例如 bag 使用 epoch、日志只有 `clk`）无法自动对齐，页面会提示不重叠。
 - 骨架高度来自模型静止位姿，不是实测高度；模型与实机的安装偏差会直接反映在画面上。
 - 波形图最多渲染固定行数并为每行自动缩放，用于快速定位异常，不是精确的数值分析工具。

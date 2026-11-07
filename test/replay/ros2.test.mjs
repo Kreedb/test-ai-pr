@@ -10,7 +10,7 @@ import { DOMParser } from '@xmldom/xmldom'
 
 import { inspectBag, readBag, sniffBagFormat } from '../../src/lib/replay/bag.js'
 import { decodeImuMessage, decodeJointMessage, messageProfile, parseDefinition } from '../../src/lib/replay/rosmsg.js'
-import { parseStl, parseUrdf } from '../../src/lib/replay/urdf.js'
+import { parseStl, parseUrdf, smoothNormals } from '../../src/lib/replay/urdf.js'
 import { buildMcap, encodeCdrImu, encodeCdrJointState, IMU_DEFINITION, JOINT_DEFINITION } from './ros2-fixture.mjs'
 
 const root = fileURLToPath(new URL('../..', import.meta.url))
@@ -143,13 +143,18 @@ test('parses URDF joints, fixed links and mesh references', () => {
   const luna = parseUrdf(readFileSync(join(root, 'public/robots/luna.urdf'), 'utf8'), { parseXml: DOMParser })
   assert.equal(luna.joints.size, 27)
   assert.equal(luna.meshes.length, 28)
+  assert.ok(luna.meshes.every((mesh) => mesh.color === null))
   assert.ok(luna.skeleton.every((node, index) => node.parent === null || luna.skeleton.findIndex((item) => item.name === node.parent) < index))
   assert.ok(luna.skeleton[0].offset[2] > 0)
 
   const simple = parseUrdf(
     `<robot name="demo">
+      <material name="paint"><color rgba="0.1 0.2 0.3 1"/></material>
       <link name="base"/>
-      <link name="arm"/>
+      <link name="arm">
+        <visual><geometry><mesh filename="package://demo/a.stl"/></geometry><material name="paint"/></visual>
+        <visual><geometry><mesh filename="package://demo/b.stl"/></geometry><material><color rgba="1 0.5 0 1"/></material></visual>
+      </link>
       <joint name="shoulder" type="revolute">
         <parent link="base"/><child link="arm"/>
         <origin xyz="0 0 0.5" rpy="0 1.5707963 0"/><axis xyz="0 0 1"/>
@@ -158,6 +163,13 @@ test('parses URDF joints, fixed links and mesh references', () => {
     { parseXml: DOMParser },
   )
   assert.equal(simple.joints.size, 1)
+  assert.deepEqual(
+    simple.meshes.map((mesh) => mesh.color),
+    [
+      [0.1, 0.2, 0.3, 1],
+      [1, 0.5, 0, 1],
+    ],
+  )
   const arm = simple.skeleton.find((node) => node.name === 'arm')
   assert.deepEqual(arm.offset, [0, 0, 0.5])
   assert.ok(Math.abs(arm.rpy[1] - 1.5707963) < 1e-6)
@@ -177,4 +189,16 @@ test('parses binary STL triangles and decimates to a budget', () => {
   assert.equal(parsed.triangles.length, 90)
   const decimated = parseStl(bytes, { maxTriangles: 2 })
   assert.equal(decimated.triangles.length, 18)
+})
+
+test('welds shared STL vertices for smooth normals', () => {
+  // Two triangles sharing the p1-p2 edge, folded so their normals differ.
+  const triangles = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1])
+  const normals = smoothNormals(triangles)
+  assert.equal(normals.length, triangles.length)
+  // Shared vertices get the averaged normal; the unshared vertex keeps its face normal.
+  const shared = [1, 1, 2].map((value) => value / Math.sqrt(6))
+  for (const offset of [3, 6, 9, 12]) assert.ok(Math.abs(normals[offset] - shared[0]) < 1e-6 && Math.abs(normals[offset + 1] - shared[1]) < 1e-6 && Math.abs(normals[offset + 2] - shared[2]) < 1e-6)
+  assert.deepEqual([...normals.subarray(0, 3)], [0, 0, 1])
+  assert.ok(Math.abs(Math.hypot(normals[15], normals[16], normals[17]) - 1) < 1e-6)
 })
